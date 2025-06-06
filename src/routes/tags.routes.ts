@@ -1,0 +1,26 @@
+import { Router } from 'express';
+import { authMiddleware } from '../middlewares/auth.middleware';
+import { TagsController } from '../controllers/tags.controller';
+
+const router = Router();
+const tagsController = new TagsController();
+
+// 应用认证中间件
+router.use(authMiddleware);
+
+// 获取标签列表
+router.get('/list', tagsController.getList);
+
+// 获取标签详情
+router.get('/:id', tagsController.getDetail);
+
+// 创建标签
+router.post('/', tagsController.create);
+
+// 更新标签
+router.put('/:id', tagsController.update);
+
+// 删除标签
+router.delete('/:id', tagsController.delete);
+
+export default router;
