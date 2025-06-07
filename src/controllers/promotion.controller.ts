@@ -218,11 +218,17 @@ export class PromotionController {
         .andWhere('promotion.isDeleted = 0')
         .andWhere('rules.isDeleted = 0')
         .andWhere('promotion.startTime <= NOW()')
-        .andWhere('promotion.endTime >= NOW()')
-
-      const promotionData = await promotionQueryBuilder.getMany()
+        .andWhere('promotion.endTime >= NOW()');
+      const promotionData = await promotionQueryBuilder.getMany();
+      
+      const types = await AppDataSource.getRepository(Dict)
+        .createQueryBuilder('dict')
+        .where('dict.group = :group', { group: 2 })
+        .getMany();
+        
       return successResponse(res, {
-        promotions: promotionData
+        promotions: promotionData,
+        types
       }, '获取促销规则列表成功');
     } catch (error) {
       logger.error('获取促销活动及其关联的规则失败:', error);
