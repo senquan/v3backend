@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { PromotionRule } from '../models/promotion-rule.model';
+import { PromotionPlatforms } from '../models/promotion-platforms.motel';
 
 export enum PromotionType {
   DAILY_DISCOUNT = 1,    // 日常折扣
@@ -61,6 +62,9 @@ export class Promotion {
 
   @OneToMany(() => PromotionRule, rule => rule.promotion)
   rules!: PromotionRule[];
+
+  @OneToMany(() => PromotionPlatforms, platform => platform.promotion)
+  platforms!: PromotionPlatforms[];
 
   @Column({ type: 'boolean', default: false, comment: '是否可与其他促销活动叠加' })
   isStackable: boolean = false;

@@ -6,6 +6,7 @@ import { Dict } from '../models/dict.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { LessThan, MoreThan } from 'typeorm';
+import { PromotionPlatforms } from '../models/promotion-platforms.motel';
 
 interface FormulaConvertRequest {
   formula: string;
@@ -33,7 +34,7 @@ export class PromotionController {
         startTime, 
         endTime, 
         description, 
-        platformId,
+        platformIds,
         isStackable,
         copyFrom
       } = req.body;
@@ -79,13 +80,23 @@ export class PromotionController {
       promotion.startTime = start;
       promotion.endTime = end;
       promotion.description = description;
-      promotion.platformId = platformId;
       promotion.userId = userId;
       promotion.status = PromotionStatus.DRAFT;
       promotion.isStackable = isStackable || false;
 
       // 保存活动
       const savedPromotion = await queryRunner.manager.save(promotion);
+
+      if (platformIds && platformIds.length > 0) {
+        if (!platformIds.includes(0)) {
+          for (const platformId of platformIds) {
+            const promotionPlatform = new PromotionPlatforms();
+            promotionPlatform.promotionId = savedPromotion.id;
+            promotionPlatform.platformId = platformId;
+            queryRunner.manager.save(promotionPlatform);
+          }
+        }
+      }
 
       // 如果有源规则，复制规则到新活动
       if (sourceRules.length > 0) {
@@ -167,12 +178,28 @@ export class PromotionController {
         }
       }
 
-      // 分页查询
+      // 分页查询 - 使用关联查询获取促销及其平台信息
       const [promotions, total] = await queryBuilder
+        .leftJoinAndSelect('promotion.platforms', 'platforms')
+        .leftJoinAndMapOne(
+          'platforms.platformInfo',
+          Dict,
+          'platformDict',
+          'platformDict.value = platforms.platformId AND platformDict.group = 1'
+        )
         .orderBy('promotion.createdAt', 'DESC')
         .skip((Number(page) - 1) * Number(pageSize))
         .take(Number(pageSize))
         .getManyAndCount();
+
+      // 处理促销数据，格式化平台信息
+      const formattedPromotions = promotions.map(promotion => ({
+        ...promotion,
+        platforms: promotion.platforms ? promotion.platforms.map(pp => ({
+          id: pp.platformId,
+          name: pp.platformInfo?.name
+        })) : []
+      }));
 
       const platformQueryBuilder = AppDataSource.getRepository(Dict)
       .createQueryBuilder('dict')
@@ -189,7 +216,7 @@ export class PromotionController {
       }));
 
       return successResponse(res, {
-        promotions,
+        promotions: formattedPromotions,
         platforms,
         types,
         total,
@@ -210,17 +237,18 @@ export class PromotionController {
         platformId
       } = req.query;
 
+      if (!platformId) return errorResponse(res, 400, '缺少必要参数', null);
+
       const promotionQueryBuilder = AppDataSource.getRepository(Promotion)
         .createQueryBuilder('promotion')
         .innerJoinAndSelect('promotion.rules', 'rules')
-        .where('(promotion.platformId = :platformId OR promotion.platformId = 0)', { platformId })
+        .where('(promotion.id NOT IN (SELECT DISTINCT pp.promotion_id FROM promotion_platforms pp) OR promotion.id IN (SELECT pp.promotion_id FROM promotion_platforms pp WHERE pp.platform_id = :platformId))', { platformId })
         .andWhere('promotion.status != 0')
         .andWhere('promotion.isDeleted = 0')
         .andWhere('rules.isDeleted = 0')
         .andWhere('promotion.startTime <= NOW()')
         .andWhere('promotion.endTime >= NOW()');
       const promotionData = await promotionQueryBuilder.getMany();
-      
       const types = await AppDataSource.getRepository(Dict)
         .createQueryBuilder('dict')
         .where('dict.group = :group', { group: 2 })
@@ -261,8 +289,23 @@ export class PromotionController {
 
       const types = await typeQueryBuilder.getMany();
 
+      // 查询关联平台 - 一个查询获取平台id和名称
+      const platforms = await AppDataSource.getRepository(PromotionPlatforms)
+      .createQueryBuilder('promotionPlatforms')
+      .leftJoin(Dict, 'dict', 'dict.value = promotionPlatforms.platformId AND dict.group = :group', { group: 1 })
+      .select([
+        'promotionPlatforms.platformId as platformId',
+        'dict.name as platformName'
+      ])
+      .where('promotionPlatforms.promotionId = :promotionId', { promotionId: promotion.id })
+      .getRawMany();
+
       return successResponse(res, {
         promotion,
+        platforms: platforms.map(item => ({
+          id: item.platformId,
+          name: item.platformName
+        })),
         types
       }, '获取促销活动详情成功');
     } catch (error) {
@@ -286,7 +329,7 @@ export class PromotionController {
         endTime, 
         status,
         description,
-        platformId,
+        platformIds,
         isStackable
       } = req.body;
 
@@ -303,7 +346,6 @@ export class PromotionController {
       if (name) promotion.name = name;
       if (type) promotion.type = type;
       if (description !== undefined) promotion.description = description;
-      if (platformId !== undefined) promotion.platformId = platformId;
       if (isStackable !== undefined) promotion.isStackable = isStackable;
       
       // 更新时间
@@ -340,6 +382,33 @@ export class PromotionController {
 
       // 保存活动更新
       await queryRunner.manager.save(promotion);
+
+      // 更新关联的平台
+      // 是否有变化
+      let isPlatformChanged = false;
+      if (platformIds && platformIds.length > 0) {
+        const currentPlatformIds = await queryRunner.manager.find(PromotionPlatforms, {
+          where: { promotionId: promotion.id }
+        });
+        const currentPlatformIdSet = new Set(currentPlatformIds.map(platform => platform.platformId));
+        const newPlatformIdSet = new Set(platformIds);
+        if (currentPlatformIdSet.size !== newPlatformIdSet.size || !Array.from(currentPlatformIdSet).every(id => newPlatformIdSet.has(id))) {
+          isPlatformChanged = true;
+        }
+      }
+
+      if (isPlatformChanged) {
+        // 删除原有的关联关系
+        await queryRunner.manager.delete(PromotionPlatforms, { promotionId: promotion.id });
+        if (!platformIds.includes(0)) {
+          for (const platformId of platformIds) {
+            const promotionPlatform = new PromotionPlatforms();
+            promotionPlatform.promotionId = promotion.id;
+            promotionPlatform.platformId = platformId;
+            queryRunner.manager.save(promotionPlatform);
+          }
+        }
+      }
 
       await queryRunner.commitTransaction();
       return successResponse(res, promotion, '更新促销活动成功');

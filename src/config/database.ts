@@ -17,6 +17,7 @@ import { ProductModel } from '../models/product-model.model';
 import { ProductSeries } from '../models/product-series.model';
 import { ProductSeriesTag } from '../models/product-series-tag.model';
 import { Promotion } from '../models/promotion.model';
+import { PromotionPlatforms } from '../models/promotion-platforms.motel';
 import { PromotionRule } from '../models/promotion-rule.model';
 import { ReturnOrder } from '../models/return-order.model';
 import { ReturnOrderItem } from '../models/return-order-item.model';
@@ -48,7 +49,7 @@ export const AppDataSource = new DataSource({
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
   entities: [Category, Coupon, CouponUser, Customer, Dict, InviteCode, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, Product, ProductModel, ProductSeries, ProductSeriesTag, ProductTag,
-    Promotion, PromotionRule, Role, RolePermission, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, User, UserRole],
+    Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, User, UserRole],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });
