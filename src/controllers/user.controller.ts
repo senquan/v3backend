@@ -10,6 +10,7 @@ import { Permission } from '../models/permission.model';
 import * as jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
+import { platform } from 'os';
 const authController = require('../controllers/auth.controller');
 
 export class UserController {
@@ -25,7 +26,7 @@ export class UserController {
       const user = await userRepository.findOne({ 
         select: ['id', 'username', 'password', 'status', 'avatar', 'name', 'email', 'phone'],
         where: { username },
-        relations: ['roles']
+        relations: ['roles', 'roles.platforms']
       });
       // 用户不存在
       if (!user) return errorResponse(res, 401, '用户名或密码错误', null);
@@ -37,6 +38,7 @@ export class UserController {
 
       // 生成JWT令牌
       const userRoles = user.getRoleCodes();
+      const userPlatforms = user.getRolePlatforms();
 
       // 获取用户可访问的标签
       const accessibleTags = await AppDataSource.createQueryBuilder()
@@ -55,16 +57,18 @@ export class UserController {
         {
           id: user.id,
           roles: userRoles,
-          accessTags: tagIds
+          accessTags: tagIds,
+          accessPlatforms: userPlatforms 
         },
         process.env.JWT_SECRET || 'ei(@3kdl20KS21020alsa12',
         { expiresIn: '24h' }
       );
 
       // 更新最后登录时间和IP
-      user.last_login_time = new Date();
-      user.last_login_ip = req.ip || '';
-      await userRepository.save(user);
+      await userRepository.update(user.id, {
+        last_login_time: new Date(),
+        last_login_ip: req.ip || ''
+      });
       
       // 返回用户信息和令牌
       return res.json({
@@ -78,7 +82,8 @@ export class UserController {
             name: user.name,
             email: user.email,
             avatar: user.avatar,
-            roles: user.getRoleCodes()
+            roles: userRoles,
+            platforms: userPlatforms
           }
         }
       });
@@ -100,7 +105,7 @@ export class UserController {
       const userRepository = AppDataSource.getRepository(User);
       const user = await userRepository.findOne({
         where: { id: userId },
-        relations: ['roles']
+        relations: ['roles', 'roles.platforms']
       });
       
       if (!user) return errorResponse(res, 404, '用户不存在', null);
@@ -118,7 +123,8 @@ export class UserController {
           avatar: user.avatar,
           last_login_ip: user.last_login_ip,
           last_login_time: user.last_login_time,
-          roles: user.getRoleCodes()
+          roles: user.getRoleCodes(),
+          platforms: user.getRolePlatforms()
         }
       });
     } catch (error) {

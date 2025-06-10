@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Tag } from '../models/tag.model';
 import { Product } from '../models/product.model';
+import { PlatformTags } from '../models/platform-tags.model';
+import { Dict } from '../models/dict.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 
@@ -89,6 +91,8 @@ export class TagsController {
       if (color) tag.color = color;
       
       const savedTag = await AppDataSource.getRepository(Tag).save(tag);
+
+      this.updatePlatformTags(tag);
       
       return successResponse(res, savedTag, '创建标签成功');
     } catch (error) {
@@ -132,11 +136,40 @@ export class TagsController {
       if (color) tag.color = color;
       
       const updatedTag = await AppDataSource.getRepository(Tag).save(tag);
+
+      this.updatePlatformTags(updatedTag);
       
       return successResponse(res, updatedTag, '更新标签成功');
     } catch (error) {
       logger.error('更新标签失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  async updatePlatformTags(tag: Tag) {
+    try {
+      // 获取所有平台信息 (group=1的dict记录)
+      const platforms = await AppDataSource.getRepository(Dict).find({
+        where: { group: 1 }
+      });
+
+      // 删除该标签的所有现有平台绑定关系
+      await AppDataSource.getRepository(PlatformTags).delete({
+        tagId: tag.id
+      });
+
+      // 检查标签名称是否包含平台名称，如果包含则创建绑定关系
+      for (const platform of platforms) {
+        if (tag.name.toLowerCase().includes(platform.name.toLowerCase())) {
+          const platformTag = new PlatformTags();
+          platformTag.platformId = Number(platform.value);
+          platformTag.tagId = tag.id;
+          await AppDataSource.getRepository(PlatformTags).save(platformTag);
+          logger.info(`自动绑定标签 "${tag.name}" 到平台 "${platform.name}" (ID: ${platform.value})`);
+        }
+      }
+    } catch (error) {
+      logger.error('更新平台标签绑定关系失败:', error);
     }
   }
   

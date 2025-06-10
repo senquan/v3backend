@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Role } from './role.model';
 import { Staff } from './staff.model';
 import * as bcrypt from 'bcryptjs';
+import { platform } from 'os';
 
 @Entity('users')
 export class User {
@@ -66,5 +67,17 @@ export class User {
   // 获取角色代码列表
   getRoleCodes(): string[] {
     return this.roles ? this.roles.map(role => role.code) : [];
+  }
+
+  // 获取角色平台列表
+  getRolePlatforms(): number[] {
+    const platforms = this.roles? this.roles.map(role => role.platforms) : [];
+    const platformSet = new Set<number>;
+    platforms.forEach(platform => {
+      platform.forEach(p => {
+        platformSet.add(p.platformId);
+      })
+    })
+    return platforms.length > 0? Array.from(platformSet) : [];
   }
 }

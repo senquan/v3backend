@@ -6,9 +6,11 @@ import { RoleTags } from '../models/role-tags.model';
 import { Tag } from '../models/tag.model';
 import { Permission } from '../models/permission.model';
 import { RolePermission } from '../models/role-permission.model';
+import { RolePlatforms } from '../models/role-platforms.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { PermissionService } from '../services/permission.service';
+import { Dict } from '../models/dict.model';
 
 export class RoleController {
   
@@ -197,7 +199,7 @@ export class RoleController {
       // 查找角色
       const role = await AppDataSource.getRepository(Role).findOne({
         where: { id: Number(id) },
-        relations: ['tags']
+        relations: ['tags', 'platforms']
       });
 
       if (!role) {
@@ -209,9 +211,17 @@ export class RoleController {
        .createQueryBuilder('tag')
        .getManyAndCount();
 
+       // 查询所有平台 
+      const platforms = await AppDataSource.getRepository(Dict)
+      .createQueryBuilder('dict')
+      .where("dict.group = 1")
+      .getMany();
+
       return successResponse(res, {
         tags: role.tags,
         allTags: tags,
+        platforms: role.platforms,
+        allPlatforms: platforms,
         total
       }, '获取角色资源标签列表成功');
 
@@ -225,11 +235,12 @@ export class RoleController {
   async updateTags(req: Request, res: Response): Promise<Response> {
     try {
       const id = req.params.id;
-      const { tags } = req.body;
+      const { tags, platforms } = req.body;
 
       const roleRepository = AppDataSource.getRepository(Role);
       const role = await roleRepository.createQueryBuilder("role")
       .leftJoinAndSelect('role.tags','tags')
+      .leftJoinAndSelect('role.platforms','platforms')
       .where("role.id = :id", { id: id })
       .getOne();
 
@@ -263,6 +274,28 @@ export class RoleController {
         }))
         
         await roleTagsRepository.insert(tagsRelations)
+      }
+
+      const oldPlatforms = role.platforms?.map(platform => platform.platformId) || []
+      const newPlatforms = platforms.map((platform: any) => Number(platform))
+      
+      // 只有当标签发生变化时才更新
+      if (JSON.stringify([...oldPlatforms].sort())!== JSON.stringify([...newPlatforms].sort())) {
+
+        // 删除旧的关联关系
+        const rolePlatformsRepository = AppDataSource.getRepository(RolePlatforms);
+        await rolePlatformsRepository.delete({
+          roleId: role.id
+        })
+
+        // 创建新的关联关系
+        const platformsRelations = newPlatforms.map((platformId: number) => ({
+          roleId: role.id,
+          platformId
+        }))
+
+        await rolePlatformsRepository.insert(platformsRelations)
+        role.platforms = platformsRelations
       }
 
       await roleRepository.save(role);

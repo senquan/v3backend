@@ -227,6 +227,10 @@ export class OrderController {
 
   async getList(req: Request, res: Response): Promise<Response> {
     try {
+      const userRoles = (req as any).userRoles || [];
+      const userPlatforms = (req as any).accessPlatforms || [];
+      const isAdmin = userRoles.includes('ADMIN');
+
       const { page = 1, pageSize = 20, status, keyword, customerId } = req.query;
       const platformId = Number(req.query.platformId) || 0;
       
@@ -237,7 +241,16 @@ export class OrderController {
       // 添加新的查询条件
       if (status) queryBuilder.andWhere('order.status = :status', { status });
       if (customerId) queryBuilder.andWhere('order.customerId = :customerId', { customerId });
-      if (platformId) queryBuilder.andWhere('order.platformId = :platformId', { platformId });
+      if (platformId) {
+        if (!isAdmin && !userPlatforms.includes(platformId)) {
+          return errorResponse(res, 403, '没有权限', null);
+        }
+        queryBuilder.andWhere('order.platformId = :platformId', { platformId });
+      } else {
+        if (!isAdmin) {
+          queryBuilder.andWhere('order.platformId IN (:...platformIds)', { platformIds: userPlatforms });
+        }
+      }
       if (keyword) {
         queryBuilder.andWhere('order.name LIKE :keyword', { keyword: `%${keyword}%` });
       }
@@ -251,7 +264,8 @@ export class OrderController {
       const dictQueryBuilder = AppDataSource.getRepository(Dict)
       .createQueryBuilder('dict')
       .where('dict.group = :group', { group: 1 });
-      const platforms = await dictQueryBuilder.getMany();
+      const allPlatforms = await dictQueryBuilder.getMany();
+      const platforms = isAdmin ? allPlatforms : allPlatforms.filter((item) => userPlatforms.includes(Number(item.value)));
 
       return successResponse(res, {
         orders,
@@ -278,6 +292,12 @@ export class OrderController {
         .leftJoinAndSelect('product.color','color')
         .leftJoinAndSelect('product.modelType','model')
         .leftJoinAndSelect('product.serie','series')
+        .leftJoinAndMapOne(
+          'order.platform',
+          Dict,
+          'platformDict',
+          'platformDict.value = order.platformId AND platformDict.group = 1'
+        )
         .where('order.id = :id', { id })
         .getOne();
 

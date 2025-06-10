@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { OrderItem } from "./order-item.model";
 import { Customer } from "./customer.model";
 import { OneToMany } from "typeorm";
+import { Dict } from '../models/dict.model';
 
 @Entity("orders")
 export class Order {
@@ -61,4 +62,6 @@ export class Order {
 
   @OneToMany(() => OrderItem, item => item.order)
   items!: OrderItem[];
+
+  platform?: Dict;
 }

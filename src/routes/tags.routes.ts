@@ -15,10 +15,10 @@ router.get('/list', tagsController.getList);
 router.get('/:id', tagsController.getDetail);
 
 // 创建标签
-router.post('/', tagsController.create);
+router.post('/', tagsController.create.bind(tagsController));
 
 // 更新标签
-router.put('/:id', tagsController.update);
+router.put('/:id', tagsController.update.bind(tagsController));
 
 // 删除标签
 router.delete('/:id', tagsController.delete);

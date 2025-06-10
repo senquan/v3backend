@@ -11,15 +11,24 @@ import { Category } from '../models/category.model';
 import { Tag } from '../models/tag.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
+import { PlatformTags } from '../models/platform-tags.model';
 
 export class ProductController {
   // 获取商品列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, mid, keyword, color, serie, status, model, limit, sort } = req.query;
+      const { page = 1, pageSize = 20, mid, keyword, color, serie, status, model, limit, sort, platform } = req.query;
       
       const userRoles = (req as any).userRoles || [];
-      const accessTags = (req as any).accessTags || [];
+      let accessTags = (req as any).accessTags || [];
+
+      if (platform) {
+        const platformTagsRepository = AppDataSource.getRepository(PlatformTags);
+        const platformTags = await platformTagsRepository.find({
+          where: { platformId: Number(platform) }
+        });
+        accessTags = accessTags.filter((tagId: number) => platformTags.some(platformTag => platformTag.tagId === tagId));
+      }
 
       // 构建查询条件
       const queryBuilder = AppDataSource.getRepository(Product)

@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToMany, JoinTable, OneToMany } from 'typeorm';
 import { Tag } from './tag.model';
 import { RolePermission } from './role-permission.model';
+import { RolePlatforms } from './role-platforms.model';
 
 @Entity('roles')
 export class Role {
@@ -35,6 +36,9 @@ export class Role {
     inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' }
   })
   tags!: Tag[];
+
+  @OneToMany(() => RolePlatforms, platform => platform.role)
+  platforms!: RolePlatforms[];
 
   @OneToMany(() => RolePermission, rolePermission => rolePermission.role)
   rolePermissions!: RolePermission[];
