@@ -17,7 +17,7 @@ export class ProductController {
   // 获取商品列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, mid, keyword, color, serie, status, model, limit, sort, platform } = req.query;
+      const { page = 1, pageSize = 20, mid, keyword, color, serie, status, model, limit, sort, platform, images } = req.query;
       
       const userRoles = (req as any).userRoles || [];
       let accessTags = (req as any).accessTags || [];
@@ -86,6 +86,13 @@ export class ProductController {
       
       if (status !== undefined) {
         queryBuilder.andWhere('product.status = :status', { status });
+      }
+
+      if (images) {
+        if (images === '1') queryBuilder.andWhere('product.imageUrls != :imageUrls', { imageUrls: '' });
+        else {
+          queryBuilder.andWhere('product.imageUrls = :imageUrls', { imageUrls: '' });
+        }
       }
 
       if (Number(limit) > 0) {
