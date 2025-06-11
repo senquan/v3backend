@@ -112,7 +112,7 @@ export class DictController {
   // 创建字典
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { name, value, group, remark } = req.body;
+      const { name, value, icon, group, remark } = req.body;
       
       if (!name) {
         return errorResponse(res, 400, '字典名称不能为空', null);
@@ -139,6 +139,7 @@ export class DictController {
       const dict = new Dict();
       dict.name = name;
       dict.value = value;
+      dict.icon = icon;
       dict.group = Number(group);
       if (remark) dict.remark = remark;
       
@@ -155,7 +156,7 @@ export class DictController {
   async update(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
-      const { name, value, group, remark } = req.body;
+      const { name, value, icon, group, remark } = req.body;
       
       if (!name) {
         return errorResponse(res, 400, '字典名称不能为空', null);
@@ -193,6 +194,7 @@ export class DictController {
       // 更新字典
       dict.name = name;
       dict.value = value;
+      dict.icon = icon || null;
       dict.group = Number(group);
       dict.remark = remark || null;
       
