@@ -1,8 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from "typeorm";
 import { OrderItem } from "./order-item.model";
 import { Customer } from "./customer.model";
 import { OneToMany } from "typeorm";
 import { Dict } from '../models/dict.model';
+import { User } from './user.model';
 
 @Entity("orders")
 export class Order {
@@ -59,6 +60,11 @@ export class Order {
 
   @Column({ name: 'is_deleted', type: 'tinyint', default: 0 })
   isDeleted!: number;
+
+  // 关系
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'user_id' })
+  user!: User;
 
   @OneToMany(() => OrderItem, item => item.order)
   items!: OrderItem[];

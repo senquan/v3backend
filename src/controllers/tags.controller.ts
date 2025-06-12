@@ -92,7 +92,7 @@ export class TagsController {
       
       const savedTag = await AppDataSource.getRepository(Tag).save(tag);
 
-      this.updatePlatformTags(tag);
+      //this.updatePlatformTags(tag);
       
       return successResponse(res, savedTag, '创建标签成功');
     } catch (error) {
@@ -137,11 +137,31 @@ export class TagsController {
       
       const updatedTag = await AppDataSource.getRepository(Tag).save(tag);
 
-      this.updatePlatformTags(updatedTag);
+      //this.updatePlatformTags(updatedTag);
       
       return successResponse(res, updatedTag, '更新标签成功');
     } catch (error) {
       logger.error('更新标签失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  async getPlatformTags(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return errorResponse(res, 400, '平台ID不能为空', null);
+      }
+      const tags = await AppDataSource.getRepository(PlatformTags).find({
+        where: { platformId: Number(id) },
+        relations: ['tag']
+      });
+
+      return successResponse(res, {
+        tags
+      }, '获取标签列表成功');
+    } catch (error) {
+      logger.error('获取平台标签失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }

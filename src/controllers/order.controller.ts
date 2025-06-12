@@ -236,7 +236,7 @@ export class OrderController {
       
       const queryBuilder = AppDataSource.getRepository(Order)
         .createQueryBuilder('order')
-        .leftJoinAndSelect('order.items', 'items');
+        .leftJoinAndSelect('order.user', 'user');
 
       // 添加新的查询条件
       if (status) queryBuilder.andWhere('order.status = :status', { status });
