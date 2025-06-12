@@ -231,7 +231,7 @@ export class OrderController {
       const userPlatforms = (req as any).accessPlatforms || [];
       const isAdmin = userRoles.includes('ADMIN');
 
-      const { page = 1, pageSize = 20, status, keyword, customerId } = req.query;
+      const { page = 1, pageSize = 20, status, username, keyword, customerId } = req.query;
       const platformId = Number(req.query.platformId) || 0;
       
       const queryBuilder = AppDataSource.getRepository(Order)
@@ -253,6 +253,9 @@ export class OrderController {
       }
       if (keyword) {
         queryBuilder.andWhere('order.name LIKE :keyword', { keyword: `%${keyword}%` });
+      }
+      if (username) {
+        queryBuilder.andWhere('user.name LIKE :username', { username: `%${username}%` });
       }
 
       const [orders, total] = await queryBuilder
