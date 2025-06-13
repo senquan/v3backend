@@ -574,6 +574,7 @@ export class ProductController {
         updateAt: new Date()
       })
       const updatedProduct = await queryRunner.manager.save(product);
+      await queryRunner.commitTransaction();
       return successResponse(res, updatedProduct, '更新商品成功');
     } catch (error) {
       if (queryRunner.isTransactionActive) {
