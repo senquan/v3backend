@@ -236,7 +236,8 @@ export class OrderController {
       
       const queryBuilder = AppDataSource.getRepository(Order)
         .createQueryBuilder('order')
-        .leftJoinAndSelect('order.user', 'user');
+        .leftJoinAndSelect('order.user', 'user')
+        .leftJoinAndSelect('user.staff', 'staff');
 
       // 添加新的查询条件
       if (status) queryBuilder.andWhere('order.status = :status', { status });
@@ -255,7 +256,7 @@ export class OrderController {
         queryBuilder.andWhere('order.name LIKE :keyword', { keyword: `%${keyword}%` });
       }
       if (username) {
-        queryBuilder.andWhere('user.name LIKE :username', { username: `%${username}%` });
+        queryBuilder.andWhere('user.username LIKE :username OR staff.name LIKE :username', { username: `%${username}%` });
       }
 
       const [orders, total] = await queryBuilder
