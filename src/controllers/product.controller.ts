@@ -841,11 +841,7 @@ export class ProductController {
   // 批量更新商品价格
   async batchUpdatePrices(req: Request, res: Response): Promise<Response> {
     try {
-      const { ids, adjustType, values, searchParams} = req.body;
-      
-      if (!searchParams && (!ids || ids.length === 0) ) {
-        return errorResponse(res, 400, "请提供有效的商品数据", null);
-      }
+      const { ids, scope, adjustType, values, searchParams} = req.body;
 
       if (values.length < 1) {
         return errorResponse(res, 400, "设置值数据不全", null);
@@ -859,9 +855,10 @@ export class ProductController {
       // 构建查询条件
       const queryBuilder = productRepository.createQueryBuilder('product');
 
-      if (ids && ids.length > 0) {
+      if (scope === "selected") {
+        if (!ids || ids.length === 0) return errorResponse(res, 400, "请提供有效的商品数据", null);
         queryBuilder.where('product.id IN (:...ids)', { ids });
-      } else if (searchParams) {
+      } else if (scope === "all" && searchParams) {
         queryBuilder.innerJoinAndSelect('product.modelType', 'mt');
         if (searchParams.keyword) {
           if (searchParams.keyword.length === 13 && /^[0-9]+$/.test(String(searchParams.keyword))) {
@@ -879,8 +876,10 @@ export class ProductController {
         }
   
         if (searchParams.serie) {
-          queryBuilder.andWhere('mt.serieId = :serie', { serie: searchParams.serie });
+          queryBuilder.andWhere('product.serieId = :serie', { serie: searchParams.serie });
         }
+      } else {
+        return errorResponse(res, 400, "请提供有效的商品数据", null);
       }
       queryBuilder.andWhere('product.isDeleted = 0');
 

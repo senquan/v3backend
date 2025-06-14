@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
+import { In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Tag } from '../models/tag.model';
 import { Product } from '../models/product.model';
+import { ProductTag } from '../models/product-tag.model';
 import { PlatformTags } from '../models/platform-tags.model';
 import { Dict } from '../models/dict.model';
 import { logger } from '../utils/logger';
@@ -328,6 +330,130 @@ export class TagsController {
       return successResponse(res, activeTags, '获取商品标签成功');
     } catch (error) {
       logger.error('获取商品标签失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  async batchUpdateTags(req: Request, res: Response): Promise<Response> {
+    try {
+      const { ids, scope, adjustType, values, searchParams} = req.body;
+      
+      const userRoles = (req as any).userRoles || [];
+      const accessTags = (req as any).accessTags || [];
+
+      const productRepository = AppDataSource.getRepository(Product);
+      // 构建查询条件
+      const queryBuilder = productRepository.createQueryBuilder('product');
+      if (scope === "selected") {
+        if (!ids || ids.length === 0) return errorResponse(res, 400, "请提供有效的商品数据", null);
+        queryBuilder.where('product.id IN (:...ids)', { ids });
+      } else if (scope === "all" && searchParams) {
+        queryBuilder.innerJoinAndSelect('product.modelType', 'mt');
+        if (searchParams.keyword) {
+          if (searchParams.keyword.length === 13 && /^[0-9]+$/.test(String(searchParams.keyword))) {
+            queryBuilder.andWhere('product.barCode = :keyword', { keyword: searchParams.keyword }); 
+          } else {
+            queryBuilder.andWhere(
+              '(product.name LIKE :keyword OR product.materialId LIKE :keyword OR mt.name LIKE :keyword)',
+              { keyword: `%${searchParams.keyword}%` }
+            );
+          }
+        }
+        
+        if (searchParams.color) {
+          queryBuilder.andWhere('product.colorId = :color', { color: searchParams.color });
+        }
+  
+        if (searchParams.serie) {
+          queryBuilder.andWhere('product.serieId = :serie', { serie: searchParams.serie });
+        }
+      } else {
+        return errorResponse(res, 400, "请提供有效的商品数据", null);
+      }
+      queryBuilder.andWhere('product.isDeleted = 0');
+
+      if (!userRoles.includes("ADMIN")) {
+        const whereClause = `(
+          (NOT EXISTS (SELECT 1 FROM product_tags pt WHERE pt.product_id = product.id) 
+          AND
+          NOT EXISTS (SELECT 1 FROM product_series_tags pst WHERE pst.series_id = mt.serie_id))
+          OR 
+          ${accessTags.length > 0 ? `EXISTS (SELECT 1 FROM product_tags pt WHERE pt.product_id = product.id AND pt.tag_id IN (:...accessTags))` : 'FALSE'} 
+          OR 
+          ${accessTags.length > 0 ? `EXISTS (SELECT 1 FROM product_series_tags pst WHERE pst.series_id = mt.serie_id AND pst.tag_id IN (:...accessTags))` : 'FALSE'}
+        )`;
+        queryBuilder.andWhere(whereClause, { accessTags });
+      }
+
+      // 执行查询
+      const products = await queryBuilder.getMany();
+
+      const productTagRepository = AppDataSource.getRepository(ProductTag);
+      const productIds = products.map(p => p.id);
+
+      if (adjustType === "clear") {
+        // 清除所有目标商品的标签
+        if (productIds.length === 0) {
+          return errorResponse(res, 400, "没有找到符合条件的商品", null);
+        }
+        
+        await productTagRepository.delete({
+          productId: In(productIds)
+        });
+        
+        return successResponse(res, { affectedProducts: productIds.length }, '清除商品标签完成');
+      } else {
+        // 批量增加标签
+        if (!values || values.length < 1) {
+          return errorResponse(res, 400, "请提供要添加的标签", null);
+        }
+        
+        if (productIds.length === 0) {
+          return errorResponse(res, 400, "没有找到符合条件的商品", null);
+        }
+
+        // 获取每个商品现有的标签，避免重复添加
+        const existingTags = await productTagRepository.find({
+          where: {
+            productId: In(productIds),
+            tagId: In(values)
+          }
+        });
+
+        // 创建现有标签的映射，用于快速查找
+        const existingTagsMap = new Set(
+          existingTags.map(tag => `${tag.productId}-${tag.tagId}`)
+        );
+
+        // 准备要插入的新标签关联
+        const newProductTags: ProductTag[] = [];
+        
+        for (const productId of productIds) {
+          for (const tagId of values) {
+            const key = `${productId}-${tagId}`;
+            // 只添加不存在的标签关联
+            if (!existingTagsMap.has(key)) {
+              const productTag = new ProductTag();
+              productTag.productId = productId;
+              productTag.tagId = tagId;
+              newProductTags.push(productTag);
+            }
+          }
+        }
+
+        // 批量插入新的标签关联
+        if (newProductTags.length > 0) {
+          await productTagRepository.save(newProductTags);
+        }
+
+        return successResponse(res, {
+          affectedProducts: productIds.length,
+          addedTags: newProductTags.length,
+          skippedDuplicates: (productIds.length * values.length) - newProductTags.length
+        }, '批量添加标签完成');
+      }
+    } catch (error) {
+      logger.error('批量更新标签失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
