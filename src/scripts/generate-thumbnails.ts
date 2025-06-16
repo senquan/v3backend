@@ -15,11 +15,8 @@ async function main() {
     // 创建控制器实例
     const imageProcessor = new ImageProcessorController();
     
-    // 执行图片处理
-    await imageProcessor.processImages();
-    
     // 生成缩略图
-    logger.info('开始生成缩略图...');
+    logger.info('开始批量生成缩略图...');
     await imageProcessor.generateThumbnails();
     
     // 关闭数据库连接
@@ -28,7 +25,7 @@ async function main() {
     
     process.exit(0);
   } catch (error) {
-    logger.error(`脚本执行失败: ${error}`);
+    logger.error(`缩略图生成脚本执行失败: ${error}`);
     process.exit(1);
   }
 }
