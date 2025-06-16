@@ -6,11 +6,15 @@ export class UploadController {
     private readonly logger = new Logger(UploadController.name);
     private readonly imageProcessor = new ImageProcessorController();
     
-    async uploadImage(file: Express.Multer.File) {
+    uploadImage(file: Express.Multer.File) {
       this.logger.log(`文件上传成功: ${file.filename}`);
       
       // 异步生成缩略图，不阻塞响应
-      this.generateThumbnailAsync(file.filename);
+      setImmediate(() => {
+        this.generateThumbnailAsync(file.filename).catch(error => {
+          this.logger.error(`缩略图生成异步处理失败: ${error}`);
+        });
+      });
       
       return {
         code: 0,
@@ -18,12 +22,16 @@ export class UploadController {
       };
     }
     
-    async uploadImages(files: Express.Multer.File[]) {
+    uploadImages(files: Express.Multer.File[]) {
       this.logger.log(`批量上传成功: ${files.length}个文件`);
       
       // 异步生成缩略图，不阻塞响应
-      files.forEach(file => {
-        this.generateThumbnailAsync(file.filename);
+      setImmediate(() => {
+        files.forEach(file => {
+          this.generateThumbnailAsync(file.filename).catch(error => {
+            this.logger.error(`缩略图生成异步处理失败: ${error}`);
+          });
+        });
       });
       
       return {
