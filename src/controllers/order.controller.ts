@@ -231,7 +231,7 @@ export class OrderController {
       const userPlatforms = (req as any).accessPlatforms || [];
       const isAdmin = userRoles.includes('ADMIN');
 
-      const { page = 1, pageSize = 20, status, username, keyword, customerId } = req.query;
+      const { page = 1, pageSize = 20, status, username, keyword, customerId, startDate, endDate, payStatus } = req.query;
       const platformId = Number(req.query.platformId) || 0;
       
       const queryBuilder = AppDataSource.getRepository(Order)
@@ -240,7 +240,10 @@ export class OrderController {
         .leftJoinAndSelect('user.staff', 'staff');
 
       // 添加新的查询条件
-      if (status) queryBuilder.andWhere('order.status = :status', { status });
+      if (status && Array.isArray(status) && status.length > 0) queryBuilder.andWhere('order.status IN (:...status)', { status: status.map(Number) });
+      if (payStatus && Array.isArray(payStatus) && payStatus.length > 0) queryBuilder.andWhere('order.payStatus IN (:...payStatus)', { payStatus: payStatus.map(Number) });
+      if (startDate) queryBuilder.andWhere('order.createdAt >= :startDate', { startDate });
+      if (endDate) queryBuilder.andWhere('order.createdAt <= :endDate', { endDate });
       if (customerId) queryBuilder.andWhere('order.customerId = :customerId', { customerId });
       if (platformId) {
         if (!isAdmin && !userPlatforms.includes(platformId)) {
