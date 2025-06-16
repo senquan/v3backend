@@ -1,0 +1,21 @@
+# Common
+dist
+node_modules
+.env
+.eslintrc
+
+# MacOS
+.DS_Store
+
+# Local env files
+*.local
+
+# Logs
+*.log
+
+# Use the pnpm
+package-lock.json
+pnpm-lock.yaml
+logs/*
+uploads/*
+src.old

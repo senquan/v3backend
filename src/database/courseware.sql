@@ -1,0 +1,25 @@
+-- 创建课件库表
+CREATE TABLE IF NOT EXISTS `tr_coursewares` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `title` varchar(100) NOT NULL COMMENT '课件标题',
+  `description` text COMMENT '课件描述',
+  `file_path` varchar(255) NOT NULL COMMENT '文件路径',
+  `file_type` varchar(50) DEFAULT NULL COMMENT '文件类型',
+  `file_size` int(11) DEFAULT NULL COMMENT '文件大小(KB)',
+  `category` smallint(6) DEFAULT 0 COMMENT '课件分类',
+  `tags` varchar(255) DEFAULT NULL COMMENT '标签',
+  `status` tinyint(4) DEFAULT 0 COMMENT '状态：0-草稿，1-已发布，2-已下架',
+  `view_count` int(11) DEFAULT 0 COMMENT '查看次数',
+  `download_count` int(11) DEFAULT 0 COMMENT '下载次数',
+  `is_deleted` tinyint(4) DEFAULT 0 COMMENT '是否删除：0-未删除，1-已删除',
+  `creator_id` int(11) DEFAULT NULL COMMENT '创建者ID',
+  `updater_id` int(11) DEFAULT NULL COMMENT '更新者ID',
+  `created_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_title` (`title`),
+  KEY `idx_category` (`category`),
+  KEY `idx_status` (`status`),
+  KEY `idx_creator` (`creator_id`),
+  KEY `idx_is_deleted` (`is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='课件库表';
