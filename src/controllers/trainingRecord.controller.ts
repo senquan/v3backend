@@ -2,17 +2,91 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { errorResponse, successResponse } from '../utils/response';
 import { Material } from '../models/entities/Material.entity';
+import { TrainingPlanScope } from '../models/entities/TrainingPlanScope.entity';
 import { TrainingRecord } from '../models/entities/TrainingRecord.entity';
 import { TrainingRecordParticipant } from '../models/entities/TrainingRecordParticipant.entity';
 import { TrainingRecordCourseware } from '../models/entities/TrainingRecordCourseware.entity';
 import { TrainingRecordContent } from '../models/entities/TrainingRecordContent.entity';
 import { TrainingPlan } from '../models/entities/TrainingPlan.entity';
 import { Branch } from '../models/entities/Branch.entity';
-import { finished } from 'stream';
 
 export class TrainingRecordController {
   
     async getList(req: Request, res: Response): Promise<Response> {
+        try {
+            const { page = 1, pageSize = 20, keyword, branch, sort } = req.query;
+            const branchId = Number(branch);
+            
+            // 构建查询条件
+            const queryBuilder = AppDataSource.getRepository(TrainingRecord)
+              .createQueryBuilder('record')
+              .leftJoinAndSelect('record.training_plan', 'plan')
+              .where('plan.is_deleted = :is_deleted', { is_deleted: 0 });
+            
+            // 添加筛选条件
+            if (keyword) {
+              queryBuilder.andWhere('(plan.name LIKE :keyword OR record.remarks LIKE :keyword)', { keyword: `%${keyword}%` });
+            }
+      
+            // 添加排序
+            if (sort) {
+              const order = String(sort).substring(0, 1);
+              const field = String(sort).substring(1);
+              if (field && order) {
+                queryBuilder.orderBy(`record.${field}`, order === "+" ? "ASC" : "DESC");
+              }
+            } else {
+              queryBuilder.orderBy('record.id', 'ASC');
+            }
+
+            if (branchId > 0) {
+                const subQueryBuilder = AppDataSource.getRepository(TrainingPlanScope)
+                 .createQueryBuilder('scope')
+                 .where('scope.branch_id = :branch_id')
+                 .select('scope.training_plan_id');
+                queryBuilder.andWhere('record.training_plan_id IN (' + subQueryBuilder.getQuery() + ')')
+                 .setParameter('branch_id', branchId);
+            }
+      
+            // 分页
+            const total = await queryBuilder.getCount();
+            const records = await queryBuilder
+              .skip((Number(page) - 1) * Number(pageSize))
+              .take(Number(pageSize))
+              .getMany();
+      
+            // 格式化返回数据
+            const formattedStatistics = records.map(record => ({
+              id: record.id,
+              name: record.training_plan.name,
+              actual_time: record.actual_time,
+              trainer: record.training_plan.trainer,
+              training_mode: record.training_plan.training_mode,
+              training_category: record.training_plan.training_category,
+              planned_participants: record.training_plan.planned_participants,
+              planned_time: record.training_plan.planned_time,
+              training_hours: record.training_plan.training_hours,
+              assessment_method: record.training_plan.assessment_method,
+              exam_method: record.training_plan.exam_method,
+              status: record.training_plan.status,
+              actual_participants: 0,
+              passed: 0,
+              created_time: record.training_plan.created_time,
+              updated_time: record.training_plan.updated_time
+            }));
+      
+            return successResponse(res, {
+              records: formattedStatistics,
+              total,
+              page: Number(page),
+              pageSize: Number(pageSize)
+            }, '获取课件列表成功');
+        } catch (error) {
+            return errorResponse(res, 500, '服务器内部错误', null);
+        }
+    }
+
+    async getListGroup(req: Request, res: Response): Promise<Response> {
         try {
             const { page = 1, pageSize = 20, keyword, category, status, sort } = req.query;
             
@@ -196,6 +270,23 @@ export class TrainingRecordController {
             }
         } catch (error) {
             console.error('创建培训记录失败:', error);
+            return errorResponse(res, 500, '服务器内部错误', null);
+        }
+    }
+
+    async getDetail(req: Request, res: Response): Promise<Response> {
+        try {
+            const id = req.params.id;
+            const trainingRecordRepository = AppDataSource.getRepository(TrainingRecord);
+            const trainingRecord = await trainingRecordRepository.findOne({
+                where: { id: Number(id) }
+            });
+            if (!trainingRecord) {
+                return errorResponse(res, 404, '培训记录不存在', null);
+            }
+            return successResponse(res, trainingRecord, '获取培训记录详情成功');
+        } catch (error) {
+            console.error('获取培训记录详情失败:', error);
             return errorResponse(res, 500, '服务器内部错误', null);
         }
     }

@@ -4,6 +4,10 @@ import { Branch } from '../models/entities/Branch.entity';
 import { Category } from '../models/entities/Category.entity';
 import { Courseware } from '../models/entities/Courseware.entity';
 import { CoursewareMaterial } from '../models/entities/CoursewareMaterial.entity';
+import { Exam } from '../models/entities/Exam.entity';
+import { ExamAnswer } from '../models/entities/ExamAnswer.entity';
+import { ExamQuestion } from '../models/entities/ExamQuestion.entity';
+import { ExamRecord } from '../models/entities/ExamRecord.entity';
 import { Material } from '../models/entities/Material.entity';
 import { Matrix } from '../models/entities/Matrix.entity';
 import { Project } from '../models/entities/Project.entity';
@@ -32,8 +36,8 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'training',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [Branch, Category, Courseware, CoursewareMaterial, Material, Matrix, Project, ProjectDepartmentMember, Question, QuestionOption
-    , TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordParticipant, User, ConstructionWorker],
+  entities: [Branch, Category, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Project, ProjectDepartmentMember, Question
+    , QuestionOption, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordParticipant, User, ConstructionWorker],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });

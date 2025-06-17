@@ -8,6 +8,9 @@ const recordController = new TrainingRecordController();
 // 应用认证中间件
 router.use(authMiddleware);
 
+// 获取培训计划分组
+router.get('/group', recordController.getListGroup);
+
 // 获取培训计划列表
 router.get('/list', recordController.getList);
 
@@ -15,7 +18,7 @@ router.get('/list', recordController.getList);
 //router.get('/staff', recordController.getStaff);
 
 // 获取培训计划详情
-//router.get('/:id', recordController.getDetail);
+router.get('/:id', recordController.getDetail);
 
 // 创建培训计划
 router.post('/', recordController.create);

@@ -82,6 +82,8 @@ export class CoursewareController {
       
       const courseware = await AppDataSource.getRepository(Courseware)
         .createQueryBuilder('courseware')
+        .leftJoinAndSelect('courseware.coursewareMaterials', 'materials')
+        .leftJoinAndSelect('materials.material', 'material')
         .where('courseware._id = :id', { id: Number(id) })
         .andWhere('courseware.is_deleted = :is_deleted', { is_deleted: 0 })
         .getOne();
@@ -101,6 +103,11 @@ export class CoursewareController {
         description: courseware.description,
         category: courseware.category,
         tags: courseware.tags,
+        materials: courseware.coursewareMaterials.map(m => ({
+          id: m.material._id,
+          title: m.material.title,
+          file_path: m.material.file_path
+        })),
         status: courseware.status,
         view_count: courseware.view_count,
         download_count: courseware.download_count,
@@ -121,9 +128,7 @@ export class CoursewareController {
       const { 
         title, 
         description, 
-        file_path, 
-        file_type, 
-        file_size, 
+        files,
         category, 
         tags, 
         status 
@@ -131,10 +136,6 @@ export class CoursewareController {
       
       if (!title) {
         return errorResponse(res, 400, '课件标题不能为空', null);
-      }
-
-      if (!file_path) {
-        return errorResponse(res, 400, '课件文件路径不能为空', null);
       }
       
       // 检查课件标题是否已存在
@@ -161,7 +162,23 @@ export class CoursewareController {
         // updater_id: req.user?.id || null
       });
 
-      await coursewareRepository.save(newCourseware);
+      const savedCourseware = await coursewareRepository.save(newCourseware);
+
+      const materialRepository = AppDataSource.getRepository(Material);
+      const coursewareMaterialRepository = AppDataSource.getRepository(CoursewareMaterial);
+      if (files && files.length > 0) {
+        const contentPromises = files.map(async (content: { name: string, url: string }) => {
+            const material = new Material();
+            material.title = content.name;
+            material.file_path = content.url;
+            const savedMaterial = await materialRepository.save(material);
+            const coursewareMaterial = new CoursewareMaterial();
+            coursewareMaterial.courseware_id = savedCourseware._id;
+            coursewareMaterial.material_id = savedMaterial._id;
+            return coursewareMaterialRepository.save(coursewareMaterial);
+        });
+        await Promise.all(contentPromises);
+      }
 
       return successResponse(res, { id: newCourseware._id }, '创建课件成功');
     } catch (error) {
@@ -177,9 +194,7 @@ export class CoursewareController {
       const { 
         title, 
         description, 
-        file_path, 
-        file_type, 
-        file_size, 
+        files, 
         category, 
         tags, 
         status 
@@ -193,7 +208,8 @@ export class CoursewareController {
       
       // 检查课件是否存在
       const courseware = await coursewareRepository.findOne({
-        where: { _id: Number(id), is_deleted: 0 }
+        where: { _id: Number(id), is_deleted: 0 },
+        relations: ['coursewareMaterials', 'coursewareMaterials.material']
       });
       
       if (!courseware) {
@@ -204,7 +220,7 @@ export class CoursewareController {
       const existingCourseware = await coursewareRepository.findOne({
         where: { title, is_deleted: 0 }
       });
-      
+
       if (existingCourseware && existingCourseware._id !== Number(id)) {
         return errorResponse(res, 400, '课件标题已存在', null);
       }
@@ -218,6 +234,35 @@ export class CoursewareController {
       // courseware.updater_id = req.user?.id || null;
 
       await coursewareRepository.save(courseware);
+
+      const oldFiles = courseware.coursewareMaterials.map(m => ({
+        id: m.material._id,
+        name: m.material.title,
+        file_path: m.material.file_path
+      }));
+      const newFiles = files || [];
+      const deletedFiles = oldFiles.filter((f: any) => !newFiles.some((n: any) => n.url === f.file_path));
+      const addedFiles = newFiles.filter((f: any) => !oldFiles.some((o: any) => o.file_path === f.url));
+      if (deletedFiles.length > 0 || addedFiles.length > 0) {
+        const coursewareMaterialRepository = AppDataSource.getRepository(CoursewareMaterial);
+        const materialRepository = AppDataSource.getRepository(Material);
+        deletedFiles.map(async (f: any) => {
+          if (f.id) {
+            await coursewareMaterialRepository.delete({ material_id: f.id });
+            await materialRepository.delete({ _id: f.id });
+          }
+        });
+        addedFiles.map(async (f: any) => {
+          const material = new Material();
+          material.title = f.name;
+          material.file_path = f.url;
+          const savedMaterial = await materialRepository.save(material);
+          const coursewareMaterial = new CoursewareMaterial();
+          coursewareMaterial.courseware_id = courseware._id;
+          coursewareMaterial.material_id = savedMaterial._id;
+          return coursewareMaterialRepository.save(coursewareMaterial);
+        });
+      }
 
       return successResponse(res, { id: courseware._id }, '更新课件成功');
     } catch (error) {
