@@ -11,6 +11,9 @@ const examController = new ExamController();
 // 生成考试
 router.post('/generate/:id', examController.generateExamByRecord.bind(examController));
 
+// 获取我的考试列表
+router.get('/mylist', examController.getMyList.bind(examController));
+
 // 获取考试列表
 router.get('/list', examController.getList.bind(examController));
 

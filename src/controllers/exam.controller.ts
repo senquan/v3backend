@@ -4,6 +4,8 @@ import { Exam } from "../models/entities/Exam.entity";
 import { ExamQuestion } from "../models/entities/ExamQuestion.entity";
 import { Question } from "../models/entities/Question.entity";
 import { ExamRecord } from "../models/entities/ExamRecord.entity";
+import { TrainingRecord } from "../models/entities/TrainingRecord.entity";
+import { TrainingRecordParticipant } from "../models/entities/TrainingRecordParticipant.entity";
 import { QuestionOption } from "../models/entities/QuestionOption.entity";
 import { logger } from "../utils/logger";
 import { errorResponse, successResponse } from "../utils/response";
@@ -45,13 +47,13 @@ export class ExamController {
   private getDefaultExamSettings(): ExamSettings {
     return {
       totalScore: 100,
-      examCategory: 1,
+      examCategory: 101,
       level: 3,
       knowledgeCoverage: 80,
       difficulty: 3,
       fairnessIndex: 85,
       questionCount: 50,
-      questionTypes: ['单选题', '多选题', '判断题'],
+      questionTypes: ['单选', '多选', '判断'],
       categoryIds: []
     };
   }
@@ -81,6 +83,23 @@ export class ExamController {
 
     const recordId = req.params.id;
     req.body.recordId = recordId;
+
+    // 查找培训记录
+    const trainingRecord = await AppDataSource.getRepository(TrainingRecord).findOne({
+      where: { id: Number(recordId) },
+      relations: ['training_plan']
+    });
+    if (!trainingRecord) {
+      return errorResponse(res, 400, "培训记录不存在");
+    }
+    req.body.title = trainingRecord.training_plan.name + "考试";
+    req.body.description = "培训记录编号：" + trainingRecord.id;
+    req.body.trainingCategory = trainingRecord.training_plan.training_category;
+
+    let settings = this.getDefaultExamSettings();
+    settings.examCategory = 101;
+
+    req.body.settings = settings;
     return this.generateExam(req, res);
   }
 
@@ -91,6 +110,7 @@ export class ExamController {
         recordId,
         title,
         description,
+        trainingCategory,
         examType = 1,
         settings = this.getDefaultExamSettings(),
         selectionConfig = this.getDefaultSelectionConfig()
@@ -110,7 +130,7 @@ export class ExamController {
         exam.description = description;
         exam.type = examType;
         exam.category_id = settings.examCategory;
-        exam.training_category = settings.examCategory;
+        exam.training_category = trainingCategory;
         exam.level = settings.level;
         exam.total_score = settings.totalScore;
         exam.pass_score = Math.floor(settings.totalScore * 0.6); // 默认60%及格
@@ -148,12 +168,13 @@ export class ExamController {
         // 4. 生成考生考试记录
         if (recordId) await this.generateExamRecord(queryRunner, recordId, savedExam._id);
 
+        // 5. 获取生成的考卷信息（在事务提交前）
+        const examWithQuestions = await this.getExamWithQuestionsInTransaction(queryRunner, savedExam._id);
+
         await queryRunner.commitTransaction();
-
-        // 4. 返回生成的考卷信息
-        const examWithQuestions = await this.getExamWithQuestions(savedExam._id);
-
-        return successResponse(res, {
+        
+        // 6. 准备返回数据
+        const responseData = {
           exam: examWithQuestions,
           statistics: {
             totalQuestions: selectedQuestions.length,
@@ -161,7 +182,9 @@ export class ExamController {
             typeDistribution: this.calculateTypeDistribution(selectedQuestions),
             categoryDistribution: this.calculateCategoryDistribution(selectedQuestions)
           }
-        }, "考卷生成成功", 201);
+        };
+        
+        return successResponse(res, responseData, "考卷生成成功");
 
       } catch (error) {
         await queryRunner.rollbackTransaction();
@@ -181,10 +204,27 @@ export class ExamController {
     recordId: number,
     examId: number
   ): Promise<void> {
-    const examRecord = new ExamRecord();
-    examRecord.training_record_id = recordId;
-    examRecord.exam_id = examId;
-    await queryRunner.manager.save(examRecord);
+    try {
+      const queryBuilder = queryRunner.manager
+        .createQueryBuilder(TrainingRecordParticipant, "participant")
+        .where("participant.training_record_id = :recordId", { recordId });
+      const participants = await queryBuilder.getMany();
+
+      const examRecords = await queryRunner.manager.createQueryBuilder(ExamRecord, "exam")
+        .where("exam.training_record_id = :recordId", { recordId }).getMany();
+
+      // 对于每个参与考试的人员，如果没有考试记录，创建
+      for (const participant of participants) {
+        if (examRecords.some((record: ExamRecord) => record.participant_id === participant.id)) continue;
+        const examRecord = new ExamRecord();
+        examRecord.training_record_id = recordId;
+        examRecord.exam_id = examId;
+        examRecord.participant_id = participant.id;
+        await queryRunner.manager.save(examRecord);
+      }
+    } catch (error) {
+      logger.error("生成考试记录失败:", error);
+    }
   }
 
   // 智能选题算法
@@ -198,7 +238,6 @@ export class ExamController {
       let queryBuilder = queryRunner.manager
         .createQueryBuilder(Question, "question")
         .leftJoinAndSelect("question.options", "options")
-        .leftJoinAndSelect("question.categoryEntity", "category")
         .where("question.status = :status", { status: true });
 
       // 2. 应用筛选条件
@@ -262,6 +301,18 @@ export class ExamController {
     }
   }
 
+  // 获取考试详情（包含题目）- 在事务中执行
+  private async getExamWithQuestionsInTransaction(queryRunner: any, examId: number): Promise<any> {
+    return await queryRunner.manager
+      .createQueryBuilder(Exam, "exam")
+      .leftJoinAndSelect("exam.examQuestions", "examQuestion")
+      .leftJoinAndSelect("examQuestion.questionEntity", "question")
+      .leftJoinAndSelect("question.options", "options")
+      .where("exam._id = :examId", { examId })
+      .orderBy("examQuestion.question_order", "ASC")
+      .getOne();
+  }
+
   // 获取考试详情（包含题目）
   private async getExamWithQuestions(examId: number): Promise<any> {
     return await AppDataSource.getRepository(Exam)
@@ -269,7 +320,6 @@ export class ExamController {
       .leftJoinAndSelect("exam.examQuestions", "examQuestion")
       .leftJoinAndSelect("examQuestion.questionEntity", "question")
       .leftJoinAndSelect("question.options", "options")
-      .leftJoinAndSelect("question.categoryEntity", "category")
       .where("exam._id = :examId", { examId })
       .orderBy("examQuestion.question_order", "ASC")
       .getOne();
@@ -321,9 +371,10 @@ export class ExamController {
 
       const queryBuilder = AppDataSource.getRepository(Exam)
         .createQueryBuilder("exam")
-        .leftJoinAndSelect("exam.categoryEntity", "category")
         .leftJoinAndSelect("exam.creatorEntity", "creator")
         .where("exam.status != :status", { status: 0 });
+
+      const userId = (req as any).user?.id;
 
       // 添加筛选条件
       if (keyword) {
@@ -349,6 +400,45 @@ export class ExamController {
 
       const [exams, total] = await queryBuilder
         .orderBy("exam._id", "DESC")
+        .skip(skip)
+        .take(pageSizeNum)
+        .getManyAndCount();
+
+      return successResponse(res, {
+        exams,
+        total,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        totalPages: Math.ceil(total / pageSizeNum)
+      }, "获取考试列表成功");
+    } catch (error) {
+      logger.error("获取考试列表失败:", error);
+      return errorResponse(res, 500, "获取考试列表失败");
+    }
+  }
+
+  async getMyList(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = (req as any).user?.id || 4;
+      const { page = 1, pageSize = 20 } = req.query;
+
+      const queryBuilder = AppDataSource.getRepository(ExamRecord)
+        .createQueryBuilder("record")
+        .leftJoinAndSelect("record.participant", "participant")
+        .leftJoinAndSelect("record.examEntity", "exam")
+        .leftJoinAndSelect("exam.examQuestions", "examQuestion");
+
+      if (userId) {
+        queryBuilder.andWhere("participant.user_id = :userId", { userId });
+      }
+
+      // 计算分页
+      const pageNum = Number(page);
+      const pageSizeNum = Number(pageSize);
+      const skip = (pageNum - 1) * pageSizeNum;
+
+      const [exams, total] = await queryBuilder
+        .orderBy("record._id", "DESC")
         .skip(skip)
         .take(pageSizeNum)
         .getManyAndCount();

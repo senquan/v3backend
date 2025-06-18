@@ -15,7 +15,7 @@ router.get('/group', recordController.getListGroup);
 router.get('/list', recordController.getList);
 
 // 获取培训计划人员列表
-//router.get('/staff', recordController.getStaff);
+router.get('/:id/participants', recordController.getParticipants);
 
 // 获取培训计划详情
 router.get('/:id', recordController.getDetail);

@@ -18,7 +18,7 @@ export class Exam {
   @Column({ type: "smallint", nullable: true, comment: "考试类型" })
   type: number | null = null;
 
-  @Column({ type: "integer", nullable: true, comment: "分类ID" })
+  @Column({ type: "integer", nullable: true, comment: "考试分类" })
   category_id: number | null = null;
 
   @Column({ type: "smallint", nullable: true, comment: "培训分类" })
@@ -52,10 +52,6 @@ export class Exam {
   update_time!: Date;
 
   // 关联关系
-  @ManyToOne(() => Category)
-  @JoinColumn({ name: "category_id" })
-  categoryEntity!: Category;
-
   @ManyToOne(() => User)
   @JoinColumn({ name: "creator" })
   creatorEntity!: User;

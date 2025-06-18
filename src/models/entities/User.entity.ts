@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
 import { TrainingPlan } from './TrainingPlan.entity';
+import { Branch } from './Branch.entity';
 
 @Entity('user')
 export class User {
@@ -75,6 +76,10 @@ export class User {
   @ManyToOne(() => User)
   @JoinColumn()
   updater!: User;
+
+  @ManyToOne(() => Branch)
+  @JoinColumn({ name: 'branch' })
+  branchEntity!: Branch;
 
   @OneToMany(() => TrainingPlan, trainingPlan => trainingPlan.creator)
   created_training_plans!: TrainingPlan[];

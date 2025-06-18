@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { errorResponse, successResponse } from '../utils/response';
 import { Material } from '../models/entities/Material.entity';
@@ -9,6 +10,9 @@ import { TrainingRecordCourseware } from '../models/entities/TrainingRecordCours
 import { TrainingRecordContent } from '../models/entities/TrainingRecordContent.entity';
 import { TrainingPlan } from '../models/entities/TrainingPlan.entity';
 import { Branch } from '../models/entities/Branch.entity';
+import { User } from '../models/entities/User.entity';
+import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity';
+import { ExamRecord } from '../models/entities/ExamRecord.entity';
 
 export class TrainingRecordController {
   
@@ -287,6 +291,58 @@ export class TrainingRecordController {
             return successResponse(res, trainingRecord, '获取培训记录详情成功');
         } catch (error) {
             console.error('获取培训记录详情失败:', error);
+            return errorResponse(res, 500, '服务器内部错误', null);
+        }
+    }
+
+    async getParticipants(req: Request, res: Response): Promise<Response> {
+        try {
+            const id = req.params.id;
+            const participantRepository = AppDataSource.getRepository(TrainingRecordParticipant);
+            const trainingRecordParticipants = await participantRepository.find({
+                where: { training_record_id: Number(id) }
+            });
+            if (!trainingRecordParticipants) {
+                return errorResponse(res, 404, '培训记录人员不存在', null);
+            }
+            const userIds = trainingRecordParticipants.map(participant => participant.user_id);
+            const workerIds = trainingRecordParticipants.map(participant => participant.worker_id);
+            const userRepository = AppDataSource.getRepository(User);
+            const workerRepository = AppDataSource.getRepository(ConstructionWorker);
+            const users = await userRepository.find({
+                where: { _id: In(userIds) },
+                relations: ['branchEntity']
+            });
+            const workers = await workerRepository.find({
+                where: { _id: In(workerIds) },
+                relations: ['branchEntity']
+            });
+            // 获取考试记录
+            const examRecordRepository = AppDataSource.getRepository(ExamRecord);
+            const examRecords = await examRecordRepository.find({
+                where: { training_record_id: Number(id) }
+            });
+            const examRecordMap = new Map<number, ExamRecord>()
+            examRecords.forEach(record => {
+                examRecordMap.set(record.participant_id, record);
+            })
+            const participants = [...users, ...workers].map(participant => {
+                return {
+                    id: participant._id,
+                    name: participant.name,
+                    type: participant instanceof User ? participant.type : 0,
+                    gender: participant instanceof User ? participant.gender : participant.sex,
+                    age: participant instanceof User ? participant.age : 0,
+                    organization: participant.branchEntity?.name || '',
+                    idcard: 0,
+                    hours: 0,
+                    passed: examRecordMap.get(participant._id)?.is_passed,
+                    score: examRecordMap.get(participant._id)?.score
+                }
+            });
+            return successResponse(res, participants, '获取培训记录人员成功');
+        } catch (error) {
+            console.error('获取培训记录人员失败:', error);
             return errorResponse(res, 500, '服务器内部错误', null);
         }
     }

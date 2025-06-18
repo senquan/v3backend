@@ -1,6 +1,5 @@
 import { CreateDateColumn, Entity, PrimaryGeneratedColumn, Column, JoinColumn, OneToMany, ManyToOne, UpdateDateColumn } from "typeorm";
 import { User } from "./User.entity";
-import { Category } from "./Category.entity";
 import { QuestionOption } from "./QuestionOption.entity";
 
 @Entity("questions")
@@ -8,7 +7,7 @@ export class Question {
   @PrimaryGeneratedColumn()
   _id!: number;
 
-  @Column({ type: "integer", nullable: true, comment: "题目分类" })
+  @Column({ type: "integer", nullable: true, comment: "考试分类" })
   category_id: number | null = null;
 
   @Column({ type: "smallint", nullable: true, comment: "培训分类" })
@@ -60,10 +59,6 @@ export class Question {
   update_time!: Date;
 
   // 关联关系
-  @ManyToOne(() => Category)
-  @JoinColumn({ name: "category_id" })
-  categoryEntity!: Category;
-
   @ManyToOne(() => User)
   @JoinColumn({ name: "creator" })
   creatorEntity!: User;
