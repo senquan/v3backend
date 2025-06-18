@@ -3,6 +3,7 @@ import { AppDataSource } from "../config/database";
 import { Exam } from "../models/entities/Exam.entity";
 import { ExamQuestion } from "../models/entities/ExamQuestion.entity";
 import { Question } from "../models/entities/Question.entity";
+import { ExamRecord } from "../models/entities/ExamRecord.entity";
 import { QuestionOption } from "../models/entities/QuestionOption.entity";
 import { logger } from "../utils/logger";
 import { errorResponse, successResponse } from "../utils/response";
@@ -76,10 +77,18 @@ export class ExamController {
     };
   }
 
+  async generateExamByRecord(req: Request, res: Response): Promise<Response> {
+
+    const recordId = req.params.id;
+    req.body.recordId = recordId;
+    return this.generateExam(req, res);
+  }
+
   // 自动生成考卷
   async generateExam(req: Request, res: Response): Promise<Response> {
     try {
       const {
+        recordId,
         title,
         description,
         examType = 1,
@@ -136,6 +145,9 @@ export class ExamController {
           await queryRunner.manager.save(examQuestion);
         }
 
+        // 4. 生成考生考试记录
+        if (recordId) await this.generateExamRecord(queryRunner, recordId, savedExam._id);
+
         await queryRunner.commitTransaction();
 
         // 4. 返回生成的考卷信息
@@ -161,6 +173,18 @@ export class ExamController {
       logger.error("生成考卷失败:", error);
       return errorResponse(res, 500, "生成考卷失败");
     }
+  }
+
+  // 生成考试记录
+  private async generateExamRecord(
+    queryRunner: any,
+    recordId: number,
+    examId: number
+  ): Promise<void> {
+    const examRecord = new ExamRecord();
+    examRecord.training_record_id = recordId;
+    examRecord.exam_id = examId;
+    await queryRunner.manager.save(examRecord);
   }
 
   // 智能选题算法
