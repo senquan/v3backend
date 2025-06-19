@@ -11,7 +11,7 @@ export class TicketController {
   // 创建工单
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { title, content, ticketType, priority, productId, orderId } = req.body;
+      const { title, content, ticketType, priority, productId, orderId, storeName, trackId } = req.body;
       const userId = (req as any).user?.id;
 
       if (!title || !content || !ticketType) {
@@ -21,13 +21,15 @@ export class TicketController {
       const ticket = new Ticket();
       ticket.title = title;
       ticket.content = content;
-      ticket.ticketType = ticketType;
+      ticket.ticketType = Number(ticketType);
       ticket.priority = priority || 2; // 默认中等优先级
       ticket.status = 1; // 待处理
       ticket.creatorId = userId;
       
       if (productId) ticket.productId = productId;
       if (orderId) ticket.orderId = orderId;
+      if (storeName && (ticket.ticketType === 1 || ticket.ticketType === 2)) ticket.related = storeName;
+      if (trackId && (ticket.ticketType === 4)) ticket.related = trackId;
 
       const savedTicket = await AppDataSource.getRepository(Ticket).save(ticket);
       

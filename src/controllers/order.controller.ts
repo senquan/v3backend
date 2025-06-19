@@ -231,8 +231,7 @@ export class OrderController {
       const userPlatforms = (req as any).accessPlatforms || [];
       const isAdmin = userRoles.includes('ADMIN');
 
-      const { page = 1, pageSize = 20, status, username, keyword, customerId, startDate, endDate, payStatus } = req.query;
-      const platformId = Number(req.query.platformId) || 0;
+      const { page = 1, pageSize = 20, status, username, keyword, customerId, startDate, endDate, payStatus, platformIds } = req.query;
       
       const queryBuilder = AppDataSource.getRepository(Order)
         .createQueryBuilder('order')
@@ -245,11 +244,17 @@ export class OrderController {
       if (startDate) queryBuilder.andWhere('order.createdAt >= :startDate', { startDate });
       if (endDate) queryBuilder.andWhere('order.createdAt <= :endDate', { endDate });
       if (customerId) queryBuilder.andWhere('order.customerId = :customerId', { customerId });
-      if (platformId) {
-        if (!isAdmin && !userPlatforms.includes(platformId)) {
-          return errorResponse(res, 403, '没有权限', null);
+      if (platformIds && Array.isArray(platformIds) && platformIds.length > 0) {
+        if (!isAdmin) {
+          const intersection = userPlatforms.filter((value: number) => platformIds.map(Number).includes(value));
+          if (intersection.length === 0) {
+            return errorResponse(res, 403, '没有权限', null);
+          } else {
+            queryBuilder.andWhere('order.platformId IN (:...platformIds)', { platformIds: intersection });
+          }
+        } else {
+          queryBuilder.andWhere('order.platformId IN (:...platformIds)', { platformIds: platformIds.map(Number) });
         }
-        queryBuilder.andWhere('order.platformId = :platformId', { platformId });
       } else {
         if (!isAdmin) {
           queryBuilder.andWhere('order.platformId IN (:...platformIds)', { platformIds: userPlatforms });

@@ -43,6 +43,9 @@ export class Ticket {
   @Column({ name: "order_id", nullable: true })
   orderId?: number;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  related?: string;
+
   @Column({ name: "processed_at", type: "datetime", nullable: true })
   processedAt?: Date;
 

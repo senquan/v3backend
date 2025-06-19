@@ -457,6 +457,7 @@ export class UserController {
           const allPermissions = await AppDataSource.getRepository(Permission)
             .createQueryBuilder('permission')
             .where('permission.status = :status', { status: 1 })
+            .orderBy('permission.sort', 'ASC')
             .getMany();
           
           // 找出所有权限的父节点
