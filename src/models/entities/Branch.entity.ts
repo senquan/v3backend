@@ -3,7 +3,7 @@ import { User } from './User.entity';
 
 @Entity({ 
   name: 'branch',
-  schema: 'sb' 
+  schema: 'crscs' 
 })
 export class Branch {
   @PrimaryGeneratedColumn()

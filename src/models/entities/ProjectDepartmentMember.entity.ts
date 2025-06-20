@@ -4,7 +4,7 @@ import { Project } from './Project.entity';
 
 @Entity({ 
   name: 'project_department_members',
-  schema: 'sb' 
+  schema: 'crscs' 
 })
 export class ProjectDepartmentMember {
   @PrimaryGeneratedColumn()

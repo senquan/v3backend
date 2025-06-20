@@ -5,7 +5,7 @@ import { Project } from './Project.entity';
 
 @Entity({ 
   name: 'construction_worker',
-  schema: 'sb' 
+  schema: 'crscs' 
 })
 export class ConstructionWorker {
   @PrimaryGeneratedColumn()
