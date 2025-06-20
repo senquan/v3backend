@@ -20,43 +20,43 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     // 从请求头中获取 token
     const authHeader = req.headers.authorization;
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) return errorResponse(res, 401, '未提供有效的认证令牌');
-    
-    // 提取 token
-    const token = authHeader.split(' ')[1];
-    
-    // 验证 token
-    const decoded = jwt.verify(
-      token, 
-      process.env.JWT_SECRET || 'your-secret-key'
-    ) as JwtPayload;
-    
-    if (!decoded || !decoded.id) return errorResponse(res, 401, '无效的认证令牌');
-    
-    // 查询用户信息
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { _id: decoded.id }
-    });
-    
-    if (!user) return errorResponse(res, 401, '用户不存在');
-    
-    // 检查用户状态
-    if (user.status !== 1) return errorResponse(res, 403, '账户已被禁用');
-    
-    // 将用户信息添加到请求对象中
-    (req as any).user = user;
-    // 将角色和标签信息添加到请求对象中
-    if (decoded.roles) {
-      (req as any).userRoles = decoded.roles;
-    } else {
-      // 如果 JWT 中没有角色信息，则从用户对象中获取
-      (req as any).userRoles = [];
-    }
-    // 将可访问标签添加到请求对象中
-    (req as any).accessTags = decoded.accessTags || [];
-    // 继续处理请求
     next();
+    // if (!authHeader || !authHeader.startsWith('Bearer ')) return errorResponse(res, 401, '未提供有效的认证令牌');
+    
+    // // 提取 token
+    // const token = authHeader.split(' ')[1];
+    
+    // // 验证 token
+    // const decoded = jwt.verify(
+    //   token, 
+    //   process.env.JWT_SECRET || 'your-secret-key'
+    // ) as JwtPayload;
+    
+    // if (!decoded || !decoded.id) return errorResponse(res, 401, '无效的认证令牌');
+    
+    // // 查询用户信息
+    // const userRepository = AppDataSource.getRepository(User);
+    // const user = await userRepository.findOne({
+    //   where: { _id: decoded.id }
+    // });
+    
+    // if (!user) return errorResponse(res, 401, '用户不存在');
+    
+    // // 检查用户状态
+    // if (user.status !== 1) return errorResponse(res, 403, '账户已被禁用');
+    
+    // // 将用户信息添加到请求对象中
+    // (req as any).user = user;
+    // // 将角色和标签信息添加到请求对象中
+    // if (decoded.roles) {
+    //   (req as any).userRoles = decoded.roles;
+    // } else {
+    //   // 如果 JWT 中没有角色信息，则从用户对象中获取
+    //   (req as any).userRoles = [];
+    //}
+    // 将可访问标签添加到请求对象中
+    // (req as any).accessTags = decoded.accessTags || [];
+    // 继续处理请求
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({
