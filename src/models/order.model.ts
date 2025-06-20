@@ -50,6 +50,9 @@ export class Order {
   payAt?: Date;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
+  prices: string | null = null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
   remark: string | null = null;
 
   @UpdateDateColumn({ name: 'updated_at' })

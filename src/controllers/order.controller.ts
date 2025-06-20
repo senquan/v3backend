@@ -40,7 +40,8 @@ export class OrderController {
     const userId = (req as any).user.id;
     try {
       // 修改请求参数解析
-      const { name, type, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, products, remark, matchLogs } = req.body;
+      const { name, type, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs } = req.body;
+
 
       // 验证必要字段
       if (!name || !platformId || !products?.length) {
@@ -76,6 +77,12 @@ export class OrderController {
       order.payPrice = flashPrice; 
       order.status = Number(type) > 0 ? 0 : -1;   // 0 发布，-1 草稿
       order.payStatus = 0; // 未支付
+      order.prices = JSON.stringify({
+        flashPrice,
+        dailyPrice,
+        promotionPrice,
+        bonusUsed,
+      })
 
       // 保存订单
       const savedOrder = await queryRunner.manager.save(order);
