@@ -346,4 +346,24 @@ export class TrainingRecordController {
             return errorResponse(res, 500, '服务器内部错误', null);
         }
     }
+
+    async getMyStat(req: Request, res: Response): Promise<Response> {
+        try {
+            const id = req.params.id;
+            return successResponse(res, id, '获取培训统计成功');
+        } catch (error) {
+            console.error('获取培训统计失败:', error);
+            return errorResponse(res, 500, '服务器内部错误', null);
+        }
+    }
+
+    async getMyTraining(req: Request, res: Response): Promise<Response> {
+        try {
+            const id = req.params.id;
+            return successResponse(res, id, '获取我的培训记录统计成功');
+        } catch (error) {
+            console.error('获取培训记录失败:', error);
+            return errorResponse(res, 500, '服务器内部错误', null);
+        }
+    }
 }

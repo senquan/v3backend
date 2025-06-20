@@ -2,7 +2,10 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { TrainingPlan } from './TrainingPlan.entity';
 import { Branch } from './Branch.entity';
 
-@Entity('user')
+@Entity({ 
+  name: 'user',
+  schema: 'sb' 
+})
 export class User {
   @PrimaryGeneratedColumn()
   _id!: number;

@@ -3,7 +3,10 @@ import { User } from './User.entity';
 import { Branch } from './Branch.entity';
 import { Project } from './Project.entity';
 
-@Entity('construction_worker')
+@Entity({ 
+  name: 'construction_worker',
+  schema: 'sb' 
+})
 export class ConstructionWorker {
   @PrimaryGeneratedColumn()
   _id!: number;

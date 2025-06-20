@@ -17,6 +17,12 @@ router.get('/list', recordController.getList);
 // 获取培训计划人员列表
 router.get('/:id/participants', recordController.getParticipants);
 
+// 获取培训计统计
+router.get('/my-stats', recordController.getMyStat);
+
+// 获取我的培训详情
+router.get('/my-trainings', recordController.getMyTraining);
+
 // 获取培训计划详情
 router.get('/:id', recordController.getDetail);
 

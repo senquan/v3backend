@@ -1,7 +1,10 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { User } from './User.entity';
 
-@Entity('branch')
+@Entity({ 
+  name: 'branch',
+  schema: 'sb' 
+})
 export class Branch {
   @PrimaryGeneratedColumn()
   _id!: number;

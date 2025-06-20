@@ -34,10 +34,11 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASS || 'password',
   database: process.env.DB_NAME || 'training',
+  schema: process.env.DB_SCHEMA || 'public',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
   entities: [Branch, Category, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Project, ProjectDepartmentMember, Question
-    , QuestionOption, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordParticipant, User, ConstructionWorker],
+    , QuestionOption, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordParticipant, User, ConstructionWorker ],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });

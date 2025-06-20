@@ -3,7 +3,10 @@ import { User } from './User.entity';
 import { ProjectDepartmentMember } from './ProjectDepartmentMember.entity';
 import { Branch } from './Branch.entity';
 
-@Entity('project')
+@Entity({ 
+  name: 'project_department_members',
+  schema: 'sb' 
+})
 export class Project {
   @PrimaryGeneratedColumn()
   _id!: number;
@@ -18,7 +21,7 @@ export class Project {
   code!: string;
 
   @Column({ type: 'integer', nullable: true })
-  @Index('idx_project_branch')
+  @Index('idx_project_department_members_branch')
   branch!: number;
 
   @Column({ type: 'smallint', default: 1 })

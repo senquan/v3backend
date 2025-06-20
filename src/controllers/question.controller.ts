@@ -14,7 +14,6 @@ export class QuestionController {
       // 构建查询条件
       const queryBuilder = AppDataSource.getRepository(Question)
         .createQueryBuilder("question")
-        .leftJoinAndSelect("question.categoryEntity", "category")
         .leftJoinAndSelect("question.creatorEntity", "creator")
         .leftJoinAndSelect("question.options", "options")
         .where("question.status = :status", { status: true });

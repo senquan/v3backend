@@ -2,7 +2,10 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { User } from './User.entity';
 import { Project } from './Project.entity';
 
-@Entity('project_department_members')
+@Entity({ 
+  name: 'project_department_members',
+  schema: 'sb' 
+})
 export class ProjectDepartmentMember {
   @PrimaryGeneratedColumn()
   _id!: number;
