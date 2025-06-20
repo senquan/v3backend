@@ -45,11 +45,11 @@ export class Branch {
 
   // 关联关系
   @ManyToOne(() => User)
-  @JoinColumn()
+  @JoinColumn({ name: 'creator' })
   creatorEntity!: User;
 
   @ManyToOne(() => User)
-  @JoinColumn()
+  @JoinColumn({ name: 'updater' })
   updaterEntity!: User;
 
   @OneToMany(() => User, user => user.branch)

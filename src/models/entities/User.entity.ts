@@ -78,11 +78,11 @@ export class User {
 
   // 关联关系
   @ManyToOne(() => User)
-  @JoinColumn()
+  @JoinColumn({ name: 'creator' })
   creatorEntity!: User;
 
   @ManyToOne(() => User)
-  @JoinColumn()
+  @JoinColumn({ name: 'updater' })
   updaterEntity!: User;
 
   @ManyToOne(() => Branch)
