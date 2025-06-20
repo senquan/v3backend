@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
+
 import { User } from './User.entity';
 
 @Entity({ 
@@ -30,20 +31,26 @@ export class Branch {
   @Column({ type: 'boolean', default: true })
   enabled!: boolean;
 
+  @Column({ type: 'integer', nullable: true })
+  creator: number | null = null;
+
   @CreateDateColumn()
-  created_time!: Date;
+  create_time!: Date;
+
+  @Column({ type: 'integer', nullable: true })
+  updater: number | null = null;
 
   @UpdateDateColumn()
-  updated_time!: Date;
+  update_time!: Date;
 
   // 关联关系
   @ManyToOne(() => User)
   @JoinColumn()
-  creator!: User;
+  creatorEntity!: User;
 
   @ManyToOne(() => User)
   @JoinColumn()
-  updater!: User;
+  updaterEntity!: User;
 
   @OneToMany(() => User, user => user.branch)
   users!: User[];

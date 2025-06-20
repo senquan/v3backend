@@ -134,8 +134,8 @@ export class TrainingRecordController {
               incomplete: 0,
               planned: 0,
               actual: 0,
-              created_time: branch.created_time,
-              updated_time: branch.updated_time
+              created_time: branch.create_time,
+              updated_time: branch.update_time
             }));
       
             return successResponse(res, {
@@ -331,7 +331,7 @@ export class TrainingRecordController {
                     id: participant._id,
                     name: participant.name,
                     type: participant instanceof User ? participant.type : 0,
-                    gender: participant instanceof User ? participant.gender : participant.sex,
+                    gender: participant instanceof User ? 0 : participant.sex,
                     age: participant instanceof User ? participant.age : 0,
                     organization: participant.branchEntity?.name || '',
                     idcard: 0,

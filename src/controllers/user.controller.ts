@@ -143,7 +143,6 @@ export class UserController {
           'user.branch',
           'user.join_date',
           'user.age',
-          'user.gender',
           'user.married',
           'user.status',
           'user.email',
@@ -151,8 +150,8 @@ export class UserController {
           'user.oa_id',
           'user.entrance',
           'user.notes',
-          'user.created_at',
-          'user.updated_at'
+          'user.create_time',
+          'user.update_time'
         ]) // 不返回密码等敏感信息
         .where('user._id = :id', { id: Number(id) })
         .getOne();
@@ -170,7 +169,6 @@ export class UserController {
         branch: user.branch,
         join_date: user.join_date,
         age: user.age,
-        gender: user.gender,
         married: user.married,
         status: user.status,
         email: user.email,
@@ -178,8 +176,8 @@ export class UserController {
         oa_id: user.oa_id,
         entrance: user.entrance,
         notes: user.notes,
-        created_at: user.created_at,
-        updated_at: user.updated_at
+        created_at: user.create_time,
+        updated_at: user.update_time
       };
       
       return successResponse(res, formattedUser, '获取用户详情成功');

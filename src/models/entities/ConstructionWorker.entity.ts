@@ -35,13 +35,13 @@ export class ConstructionWorker {
   notes: string | null = null;
 
   @Column({ type: 'integer', nullable: true })
-  creator_id: number | null = null;
+  creator: number | null = null;
 
   @CreateDateColumn()
   create_time!: Date;
 
   @Column({ type: 'integer', nullable: true })
-  updater_id: number | null = null;
+  updater: number | null = null;
 
   @UpdateDateColumn()
   update_time!: Date;
@@ -56,10 +56,10 @@ export class ConstructionWorker {
   projectEntity!: Project;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'creator_id' })
-  creator!: User;
+  @JoinColumn({ name: 'creator' })
+  creatorEntity!: User;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'updater_id' })
-  updater!: User;
+  @JoinColumn({ name: 'updater' })
+  updaterEntity!: User;
 }

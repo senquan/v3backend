@@ -37,13 +37,13 @@ export class Project {
   project_department_members: number | null = null;
 
   @Column({ type: 'integer', nullable: true })
-  creator_id: number | null = null;
+  creator: number | null = null;
 
   @CreateDateColumn()
   create_time!: Date;
 
   @Column({ type: 'integer', nullable: true })
-  updater_id: number | null = null;
+  updater: number | null = null;
 
   @UpdateDateColumn()
   update_time!: Date;
@@ -54,12 +54,12 @@ export class Project {
   branchEntity!: Branch;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'creator_id' })
-  creator!: User;
+  @JoinColumn({ name: 'creator' })
+  creatorEntity!: User;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'updater_id' })
-  updater!: User;
+  @JoinColumn({ name: 'updater' })
+  updaterEntity!: User;
 
   @OneToMany(() => ProjectDepartmentMember, member => member._parent)
   members!: ProjectDepartmentMember[];

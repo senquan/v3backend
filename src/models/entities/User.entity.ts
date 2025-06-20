@@ -35,9 +35,6 @@ export class User {
   @Column({ type: 'integer', default: 0 })
   age!: number;
 
-  @Column({ type: 'varchar', length: 10, nullable: true })
-  gender: string | null = null;
-
   @Column({ type: 'boolean', default: true })
   married!: boolean;
 
@@ -66,19 +63,27 @@ export class User {
   password_modify_date: Date | null = null;
 
   @CreateDateColumn()
-  created_at!: Date;
+  create_time!: Date;
 
   @UpdateDateColumn()
-  updated_at!: Date;
+  update_time!: Date;
+
+  @Column({ type: 'integer' })
+  @Index('idx_users_creator_id')
+  creator!: number;
+
+  @Column({ type: 'integer' })
+  @Index('idx_users_updater_id')
+  updater!: number;
 
   // 关联关系
   @ManyToOne(() => User)
   @JoinColumn()
-  creator!: User;
+  creatorEntity!: User;
 
   @ManyToOne(() => User)
   @JoinColumn()
-  updater!: User;
+  updaterEntity!: User;
 
   @ManyToOne(() => Branch)
   @JoinColumn({ name: 'branch' })
