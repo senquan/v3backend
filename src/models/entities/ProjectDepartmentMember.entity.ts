@@ -3,7 +3,7 @@ import { User } from './User.entity';
 import { Project } from './Project.entity';
 
 @Entity({ 
-  name: 'project_department_members',
+  name: 'project_department_member',
   schema: 'crscs' 
 })
 export class ProjectDepartmentMember {
@@ -11,14 +11,14 @@ export class ProjectDepartmentMember {
   _id!: number;
 
   @Column({ type: 'integer', nullable: false })
-  @Index('idx_project_department_members_parent')
+  @Index('idx_project_department_member_parent')
   _parent!: number;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   seq: string | null = null;
 
   @Column({ type: 'integer', nullable: false })
-  @Index('idx_project_department_members_member')
+  @Index('idx_project_department_member_member')
   member!: number;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
