@@ -50,6 +50,9 @@ export class User {
   @Column({ type: 'integer', nullable: true })
   oa_id: number | null = null;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  wx_id: string | null = null;
+
   @Column({ type: 'integer', nullable: true })
   entrance: number | null = null;
 
