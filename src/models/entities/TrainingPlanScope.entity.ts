@@ -40,11 +40,15 @@ export class TrainingPlanScope {
   @JoinColumn({ name: 'training_plan_id' })
   training_plan!: TrainingPlan;
 
-  @ManyToOne(() => Branch)
+  @ManyToOne(() => Branch, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'branch_id' })
   branch: Branch | null = null;
 
-  @ManyToOne(() => Project)
+  @ManyToOne(() => Project, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'project_department_id' })
-  project: Branch | null = null;
+  project: Project | null = null;
 }

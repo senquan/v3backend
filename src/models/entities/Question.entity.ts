@@ -59,11 +59,15 @@ export class Question {
   update_time!: Date;
 
   // 关联关系
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: "creator" })
   creatorEntity!: User;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: "updater" })
   updaterEntity!: User;
 

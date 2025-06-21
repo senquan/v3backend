@@ -37,11 +37,15 @@ export class TrainingRecordCourseware {
   @JoinColumn({ name: 'courseware_id' })
   courseware!: Courseware;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'creator' })
   creator_info!: User;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'updater' })
   updater_info!: User;
 }

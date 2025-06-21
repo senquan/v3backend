@@ -32,14 +32,18 @@ export class Material {
   updated_time!: Date;
 
   // 关联关系
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'creator' })
   creatorEntity!: User;
 
   @Column({ type: 'integer', nullable: true })
   creator: number | null = null;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'updater' })
   updaterEntity!: User;
 

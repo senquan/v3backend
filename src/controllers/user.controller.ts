@@ -63,9 +63,7 @@ export class UserController {
             'user.branch',
             'user.email',
             'user.phone',
-            'user.status',
-            'user.created_at',
-            'user.updated_at'
+            'user.status'
         ]);
         
         if (keyword) {
@@ -109,9 +107,7 @@ export class UserController {
             branch: user.branch,
             email: user.email,
             phone: user.phone,
-            status: user.status,
-            created_at: user.created_at,
-            updated_at: user.updated_at
+            status: user.status
         }));
       }
       

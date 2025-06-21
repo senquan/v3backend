@@ -50,19 +50,27 @@ export class ConstructionWorker {
   password!: string;
 
   // 关联关系
-  @ManyToOne(() => Branch)
+  @ManyToOne(() => Branch, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'branch' })
   branchEntity!: Branch;
 
-  @ManyToOne(() => Project)
+  @ManyToOne(() => Project, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'project' })
   projectEntity!: Project;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'creator' })
   creatorEntity!: User;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'updater' })
   updaterEntity!: User;
 }

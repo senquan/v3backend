@@ -31,11 +31,15 @@ export class TrainingRecordParticipant {
   @JoinColumn({ name: 'training_record_id' })
   training_record!: TrainingRecord;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'user_id' })
   user!: User;
 
-  @ManyToOne(() => ConstructionWorker)
+  @ManyToOne(() => ConstructionWorker, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'worker_id' })
   worker!: ConstructionWorker;
 }

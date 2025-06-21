@@ -39,11 +39,15 @@ export class Matrix {
   @JoinColumn({ name: 'category_id' })
   category: Category | null = null;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'creator' })
   creatorEntity!: User;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'updater' })
   updaterEntity!: User;
 }

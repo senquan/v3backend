@@ -52,11 +52,15 @@ export class TrainingRecord {
   @JoinColumn({ name: 'training_plan_id' })
   training_plan!: TrainingPlan;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'creator' })
   creator_info!: User;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: 'updater' })
   updater_info!: User;
 

@@ -47,11 +47,15 @@ export class TrainingPlan {
   updated_time!: Date;
 
   // 关联关系
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn()
   creator!: User;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, {
+    createForeignKeyConstraints: false
+  })
   @JoinColumn()
   updater!: User;
 
