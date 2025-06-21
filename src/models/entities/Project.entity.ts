@@ -34,9 +34,6 @@ export class Project {
   project_manager_name: string | null = null;
 
   @Column({ type: 'integer', nullable: true })
-  project_department_members: number | null = null;
-
-  @Column({ type: 'integer', nullable: true })
   creator: number | null = null;
 
   @CreateDateColumn()
