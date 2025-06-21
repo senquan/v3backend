@@ -3,7 +3,7 @@ import { User } from './User.entity';
 import { Project } from './Project.entity';
 
 @Entity({ 
-  name: 'project_department_member',
+  name: 'project_department_members',
   schema: 'crscs' 
 })
 export class ProjectDepartmentMember {
@@ -11,14 +11,14 @@ export class ProjectDepartmentMember {
   _id!: number;
 
   @Column({ type: 'integer', nullable: false })
-  @Index('idx_project_department_member_parent')
+  @Index('idx_project_department_members_parent')
   _parent!: number;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   seq: string | null = null;
 
   @Column({ type: 'integer', nullable: false })
-  @Index('idx_project_department_member_member')
+  @Index('idx_project_department_members_member')
   member!: number;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
@@ -31,13 +31,13 @@ export class ProjectDepartmentMember {
   is_manager!: boolean;
 
   @Column({ type: 'integer', nullable: true })
-  creator: number | null = null;
+  creator_id: number | null = null;
 
   @CreateDateColumn()
   create_time!: Date;
 
   @Column({ type: 'integer', nullable: true })
-  updater: number | null = null;
+  updater_id: number | null = null;
 
   @UpdateDateColumn()
   update_time!: Date;
@@ -52,11 +52,11 @@ export class ProjectDepartmentMember {
   memberUser!: User;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'creator' })
+  @JoinColumn({ name: 'creator_id' })
   creatorEntity!: User;
 
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'updater' })
+  @JoinColumn({ name: 'updater_id' })
   updaterEntity!: User;
 }

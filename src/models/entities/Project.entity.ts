@@ -21,7 +21,7 @@ export class Project {
   code!: string;
 
   @Column({ type: 'integer', nullable: true })
-  @Index('idx_project_department_members_branch')
+  @Index('idx_project_branch')
   branch!: number;
 
   @Column({ type: 'smallint', default: 1 })
@@ -37,13 +37,13 @@ export class Project {
   project_department_members: number | null = null;
 
   @Column({ type: 'integer', nullable: true })
-  creator: number | null = null;
+  creator_id: number | null = null;
 
   @CreateDateColumn()
   create_time!: Date;
 
   @Column({ type: 'integer', nullable: true })
-  updater: number | null = null;
+  updater_id: number | null = null;
 
   @UpdateDateColumn()
   update_time!: Date;
@@ -54,11 +54,11 @@ export class Project {
   branchEntity!: Branch;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'creator' })
+  @JoinColumn({ name: 'creator_id' })
   creatorEntity!: User;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'updater' })
+  @JoinColumn({ name: 'updater_id' })
   updaterEntity!: User;
 
   @OneToMany(() => ProjectDepartmentMember, member => member._parent)

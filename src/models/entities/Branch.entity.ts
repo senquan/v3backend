@@ -32,24 +32,24 @@ export class Branch {
   enabled!: boolean;
 
   @Column({ type: 'integer', nullable: true })
-  creator: number | null = null;
+  creator_id: number | null = null;
 
   @CreateDateColumn()
-  create_time!: Date;
+  created_time!: Date;
 
   @Column({ type: 'integer', nullable: true })
-  updater: number | null = null;
+  updater_id: number | null = null;
 
   @UpdateDateColumn()
-  update_time!: Date;
+  updated_time!: Date;
 
   // 关联关系
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'creator' })
+  @JoinColumn({ name: 'creator_id' })
   creatorEntity!: User;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'updater' })
+  @JoinColumn({ name: 'updater_id' })
   updaterEntity!: User;
 
   @OneToMany(() => User, user => user.branch)
