@@ -419,7 +419,7 @@ export class ExamController {
 
   async getMyList(req: Request, res: Response): Promise<Response> {
     try {
-      const userId = (req as any).user?.id || 2;
+      const userId = (req as any).user?.id || 1393;
       const { page = 1, pageSize = 20 } = req.query;
 
       const queryBuilder = AppDataSource.getRepository(ExamRecord)
