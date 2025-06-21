@@ -134,8 +134,8 @@ export class TrainingRecordController {
               incomplete: 0,
               planned: 0,
               actual: 0,
-              created_time: branch.created_time,
-              updated_time: branch.updated_time
+              created_time: branch.create_time,
+              updated_time: branch.update_time
             }));
       
             return successResponse(res, {
