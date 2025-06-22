@@ -2,8 +2,13 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { OrderItem } from "./order-item.model";
 import { Customer } from "./customer.model";
 import { OneToMany } from "typeorm";
-import { Dict } from '../models/dict.model';
+import { Dict } from './dict.model';
 import { User } from './user.model';
+
+export enum OrderType {
+  COMMON = 1,
+  PROJECT = 2,
+}
 
 @Entity("orders")
 export class Order {
@@ -12,6 +17,9 @@ export class Order {
 
   @Column({ length: 100 })
   name!: string;
+
+  @Column({ type: 'smallint', default: OrderType.COMMON, comment: '订单类型' })  
+  type!: OrderType;
 
   @Column({ name: 'platform_id' })
   platformId!: number;

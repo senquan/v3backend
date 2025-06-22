@@ -2,20 +2,11 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Order } from '../models/order.model';
 import { OrderItem } from '../models/order-item.model';
-import { Promotion } from '../models/promotion.model';
-import { PromotionRule } from '../models/promotion-rule.model';
 import { OrderStatusLogService } from '../services/order-status-log.service';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { Dict } from '../models/dict.model';
-import { Product } from '../models/product.model';
 import { OrderCalculationLog } from '../models/order-calculation-log.model';
-
-interface ProductWithQuantity {
-  product: Product;
-  quantity: number;
-  unitPrice: number;
-}
 
 interface DiscountMatchLog {
   productId: number;
@@ -40,7 +31,7 @@ export class OrderController {
     const userId = (req as any).user.id;
     try {
       // 修改请求参数解析
-      const { name, type, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs } = req.body;
+      const { name, type, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs } = req.body;
 
 
       // 验证必要字段
@@ -50,6 +41,7 @@ export class OrderController {
 
       // 生成订单信息
       const order = new Order();
+      order.type = type || 1;
       order.name = name;
       order.platformId = platformId;
       order.customerId = 0;
@@ -75,7 +67,7 @@ export class OrderController {
       order.quantity = totalQuantity;
       order.originPrice = originPrice;
       order.payPrice = flashPrice; 
-      order.status = Number(type) > 0 ? 0 : -1;   // 0 发布，-1 草稿
+      order.status = Number(status) > 0 ? 0 : -1;   // 0 发布，-1 草稿
       order.payStatus = 0; // 未支付
       order.prices = JSON.stringify({
         flashPrice,
@@ -139,7 +131,7 @@ export class OrderController {
     const userId = (req as any).user.id;
     try {
       const { id } = req.params;
-      const { name, type, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, products, remark, matchLogs } = req.body;
+      const { name, type, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs } = req.body;
 
       // 验证必要字段
       if (!name ||!platformId ||!products?.length) {
@@ -156,6 +148,7 @@ export class OrderController {
       }
 
       // 更新订单信息
+      order.type = type || 1;
       order.name = name;
       order.platformId = platformId;
       order.customerId = 0;
@@ -181,8 +174,14 @@ export class OrderController {
       order.quantity = totalQuantity;
       order.originPrice = originPrice;
       order.payPrice = flashPrice;
-      order.status = Number(type) > 0? 0 : -1;   // 0 发布，-1 草稿
+      order.status = Number(status) > 0? 0 : -1;   // 0 发布，-1 草稿
       order.payStatus = 0; // 未支付
+      order.prices = JSON.stringify({
+        flashPrice,
+        dailyPrice,
+        promotionPrice,
+        bonusUsed,
+      })
 
       // 保存订单
       await queryRunner.manager.save(order);
@@ -239,11 +238,14 @@ export class OrderController {
       const isAdmin = userRoles.includes('ADMIN');
 
       const { page = 1, pageSize = 20, status, username, keyword, customerId, startDate, endDate, payStatus, platformIds } = req.query;
+      let type = Number(req.query.type);
+      if (!type) type = 1;
       
       const queryBuilder = AppDataSource.getRepository(Order)
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.user', 'user')
-        .leftJoinAndSelect('user.staff', 'staff');
+        .leftJoinAndSelect('user.staff', 'staff')
+        .where('order.type = :type', { type });
 
       // 添加新的查询条件
       if (status && Array.isArray(status) && status.length > 0) queryBuilder.andWhere('order.status IN (:...status)', { status: status.map(Number) });
@@ -389,240 +391,6 @@ export class OrderController {
     } catch (error) {
       logger.error('删除订单失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
-    }
-  }
-
-  async calculatePrice(req: Request, res: Response): Promise<Response> {
-    try {
-      const { platformId, products } = req.body;
-
-      // 过滤有效产品并创建数量映射
-      const validProducts = products.filter((p: any) => p.quantity > 0 && p.id);
-      const productIds = validProducts.map((p: any) => p.id);
-      const quantityMap = new Map(validProducts.map((p: any) => [p.id, p.quantity]));
-
-      const productData = AppDataSource.getRepository(Product)
-       .createQueryBuilder('product')
-       .leftJoinAndSelect('product.color','color')
-       .leftJoinAndSelect('product.modelType','model')
-       .leftJoinAndSelect('product.serie', 'series')
-       .where('product.id IN (:...productIds)', { productIds })
-       .getMany();
-
-      // 分类处理产品数据
-      const [productMap, bonusMap] = (await productData).reduce((maps, product) => {
-        const [products, bonuses] = maps;
-        const targetMap = product.serie?.id === 82 ? bonuses : products;
-        const quantity = Number(quantityMap.get(product.id)) || 0;
-        
-        targetMap.set(product.id, {
-          product,
-          quantity,
-          unitPrice: product.basePrice
-        });
-        
-        return maps;
-      }, [new Map<number, ProductWithQuantity>(), new Map<number, ProductWithQuantity>()]);
-
-      // 计算订单总价
-      let totalBasePrice = 0;
-      productMap.forEach(productWithQuantity => {
-        totalBasePrice += productWithQuantity.product.basePrice * productWithQuantity.quantity;
-      });
-      totalBasePrice = Number(totalBasePrice.toFixed(2));
-      const promotionQueryBuilder = AppDataSource.getRepository(Promotion)
-        .createQueryBuilder('promotion')
-        .innerJoinAndSelect('promotion.rules', 'rules')
-        .where('(promotion.platformId = :platformId OR promotion.platformId = 0)', { platformId })
-        .andWhere('rules.isDeleted = 0')
-        .andWhere('promotion.startTime <= NOW()')
-        .andWhere('promotion.endTime >= NOW()')
-
-      const promotionData = await promotionQueryBuilder.getMany();
-
-      const dailyDiscountResult = calculateDiscount(promotionData.filter(promotion => promotion.type === 1).flatMap(promotion => promotion.rules), productMap);
-      const promotionDiscountResult = calculateDiscount(promotionData.filter(promotion => promotion.type === 2).flatMap(promotion => promotion.rules), productMap);
-      const flashDiscountResult = calculateDiscount(promotionData.filter(promotion => promotion.type === 3).flatMap(promotion => promotion.rules), productMap);
-      const usedBonusPoint = calculateBonusPoint(bonusMap);
-
-      const dailyDiscount = dailyDiscountResult.discount;
-      const promotionDiscount = promotionDiscountResult.discount;
-      const flashDiscount = flashDiscountResult.discount;
-
-      const dailyPrice = Number((totalBasePrice - dailyDiscount).toFixed(2));
-      const promotionPrice = Number((totalBasePrice - promotionDiscount).toFixed(2));
-      const flashPrice = Number((Math.min(dailyPrice, promotionPrice) - flashDiscount).toFixed(2));
-
-      // 计算价格和数量
-      const productsArray = Array.from(productMap, ([id, data]) => ({
-        id,
-        unitPrice: data.unitPrice,
-        quantity: data.quantity
-      }));
-      return successResponse(res, {
-        totalBasePrice,
-        dailyDiscount,
-        dailyPrice,
-        promotionDiscount,
-        promotionPrice,
-        flashDiscount,
-        flashPrice,
-        usedBonusPoint,
-        products: productsArray,
-        matchLogs: {
-          daily: dailyDiscountResult.matchLogs,
-          promotion: promotionDiscountResult.matchLogs,
-          flash: flashDiscountResult.matchLogs
-        }
-      }, '获取订单价格成功');
-    } catch (error) {
-      logger.error('获取订单价格失败:', error);
-      return errorResponse(res, 500, '服务器内部错误', null);
-    }
-
-    function calculateDiscount(rules: Array<PromotionRule>, products: Map<number, ProductWithQuantity>) {
-      let totalDiscount = 0;
-      
-      // 创建一个Map来跟踪每个产品的累计折扣和最终单价
-      const productDiscounts = new Map<number, {
-        totalDiscountValue: number,  // 累计折扣值（百分比）
-        totalDiscount: number,       // 累计折扣金额
-        finalUnitPrice: number       // 最终单价
-      }>();
-
-      const matchLogs = [] as DiscountMatchLog[];
-      
-      // 遍历每条规则
-      rules.forEach(rule => {
-        // 筛选符合条件的产品
-        products.forEach(productWithQuantity => {
-          
-          if (matchCondition(productWithQuantity.product, JSON.stringify(rule.condition))) {
-            const productId = productWithQuantity.product.id;
-            const basePrice = Number(productWithQuantity.product.basePrice);
-            const currentDiscountValue = Number(rule.discountValue); // 当前规则的折扣值（百分比）
-            const currentDiscount = basePrice * productWithQuantity.quantity * currentDiscountValue; // 当前规则的折扣金额
-            
-            // 获取产品当前的累计折扣信息，如果不存在则初始化
-            const discountInfo = productDiscounts.get(productId) || {
-              totalDiscountValue: 0,
-              totalDiscount: 0,
-              finalUnitPrice: basePrice
-            };
-            
-            // 累加折扣值和折扣金额
-            discountInfo.totalDiscountValue += currentDiscountValue;
-            discountInfo.totalDiscount += currentDiscount;
-            
-            // 计算新的最终单价（考虑所有已应用的折扣）
-            discountInfo.finalUnitPrice = basePrice * (1 - discountInfo.totalDiscountValue);
-            
-            // 更新产品的折扣信息
-            productDiscounts.set(productId, discountInfo);
-
-            // 记录匹配日志
-            matchLogs.push({
-              productId,
-              ruleId: rule.id,
-              name: rule.name,
-              value: rule.discountValue,
-              pirce: basePrice * (1 - currentDiscountValue), // 单独应用此规则的价格
-              stepPrice: basePrice * (1 - discountInfo.totalDiscountValue) // 应用所有已应用的折扣后的价格
-            });
-          }
-        });
-      });
-
-      // 更新产品Map中的单价并计算总折扣
-      productDiscounts.forEach((discountInfo, productId) => {
-        totalDiscount += discountInfo.totalDiscount;
-        // 更新productMap中对应产品的unitPrice
-        const product = products.get(productId);
-        if (product) {
-          // 确保最终价格不会低于0
-          product.unitPrice = Math.max(0, Number(discountInfo.finalUnitPrice.toFixed(2)));
-        }
-      });
-      
-      return {
-        discount: Number(totalDiscount.toFixed(2)),
-        matchLogs
-      };
-    }
-    
-    // 条件匹配函数
-    function matchCondition(product: { [key: string]: any }, conditionStr: string): boolean {
-      // 解析JSON字符串为对象
-      const condition = JSON.parse(conditionStr) as Record<string, Record<string, unknown>>;
-      
-      for (const [field, criteria] of Object.entries(condition)) {
-        // 获取产品对应字段的值
-        let productValue = product[field];
-        
-        // 如果是关联对象（如series, color等），获取其name属性
-        if (productValue && typeof productValue === 'object' && 'name' in productValue) {
-          productValue = productValue.name;
-        }
-        
-        // 使用类型断言确保criteria是一个对象
-        const typedCriteria = criteria as Record<string, unknown>;
-        for (const [operator, values] of Object.entries(typedCriteria)) {
-          switch (operator) {
-            case 'equal':
-              if (Array.isArray(values)) {
-                if (!values.includes(productValue)) return false;
-              } else {
-                if (productValue !== values) return false;
-              }
-              break;
-            case 'notEqual':
-              if (Array.isArray(values)) {
-                if (values.includes(productValue)) return false;
-              } else {
-                if (productValue === values) return false;
-              }
-              break;
-            case 'in':
-              if (!Array.isArray(values) || !values.includes(productValue)) return false;
-              break;
-            case 'notIn':
-              if (!Array.isArray(values) || values.includes(productValue)) return false;
-              break;
-            case 'contains':
-              if (!Array.isArray(values) || !values.some((pattern: string) => {
-                // 处理通配符匹配
-                const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-                return regex.test(productValue);
-              })) return false;
-              break;
-            case 'greaterThanOrEqual':
-              if (typeof values === 'number' && productValue < values) return false;
-              break;
-            case 'lessThanOrEqual':
-              if (typeof values === 'number' && productValue > values) return false;
-              break;
-            case 'greaterThan':
-              if (typeof values === 'number' && productValue <= values) return false;
-              break;
-            case 'lessThan':
-              if (typeof values === 'number' && productValue >= values) return false;
-              break;
-            case 'like':
-              if (typeof values === 'number' && productValue >= values) return false;
-              break;
-          }
-        }
-      }
-      
-      return true;
-    }
-
-    function calculateBonusPoint(products: Map<number, ProductWithQuantity>) {
-      let totalBonusPoint = 0;
-      products.forEach(productWithQuantity => {
-        totalBonusPoint += (productWithQuantity.product.modelType?.value || 0) * productWithQuantity.quantity;
-      });
-      return totalBonusPoint;
     }
   }
 

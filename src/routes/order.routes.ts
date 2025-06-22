@@ -36,7 +36,7 @@ router.put('/:id/status', orderController.updateStatus.bind(orderController));
 router.delete('/:id', orderController.delete);
 
 // 计算订单价格
-router.post('/price', orderController.calculatePrice);
+// router.post('/price', orderController.calculatePrice);
 
 // 退货订单相关路由
 // 获取退货订单列表
