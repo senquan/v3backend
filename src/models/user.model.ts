@@ -2,7 +2,6 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Role } from './role.model';
 import { Staff } from './staff.model';
 import * as bcrypt from 'bcryptjs';
-import { platform } from 'os';
 
 @Entity('users')
 export class User {

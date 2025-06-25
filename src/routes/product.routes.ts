@@ -18,6 +18,9 @@ router.get('/series/list', productController.fetchSeriesList);
 // 获取商品类型列表
 router.get('/models/list', productController.fetchModelList);
 
+// 获取商品价格历史
+router.get('/history/:id', productController.fetchPriceHistory);
+
 // 获取商品详情
 router.get('/:id', async (req, res, next) => {
     // 获取商品标签

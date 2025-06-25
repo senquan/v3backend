@@ -10,7 +10,7 @@ import { Permission } from '../models/permission.model';
 import * as jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
-import { platform } from 'os';
+
 const authController = require('../controllers/auth.controller');
 
 export class UserController {

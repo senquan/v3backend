@@ -8,6 +8,7 @@ import { ProductSeriesTag } from '../models/product-series-tag.model';
 import { ProductTag } from '../models/product-tag.model';
 import { SpecItem } from '../models/spec-item.model';
 import { Category } from '../models/category.model';
+import { OrderItem } from '../models/order-item.model';
 import { Tag } from '../models/tag.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
@@ -116,6 +117,7 @@ export class ProductController {
       // 获取总数和分页数据
       const products = await queryBuilder
         .addOrderBy('mt.sort', 'DESC')
+        .addOrderBy('color.sort', 'DESC')
         .addOrderBy('product.id', 'DESC')
         .skip(skip)
         .take(pageSizeNum)
@@ -333,6 +335,37 @@ export class ProductController {
       return successResponse(res, product, '获取商品详情成功');
     } catch (error) {
       logger.error('获取商品详情失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  async fetchPriceHistory(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const items = await AppDataSource.getRepository(OrderItem)
+        .createQueryBuilder('orderItems')
+        .leftJoinAndSelect('orderItems.order', 'order')
+        .leftJoinAndSelect('orderItems.product', 'product')
+        .where('orderItems.productId = :id', { id })
+        .andWhere('order.isDeleted = :isDeleted', { isDeleted: 0 })
+        .getMany();
+
+      if (items.length > 0) {
+        const basePrice = items[0].product?.basePrice;
+        const formattedData = {
+          basePrice,
+          priceHistory: items.map((item) => ({
+            id: item.id,
+            price: item.unitPrice,
+            quantity: item.quantity,
+            updatedAt: item.order.updatedAt
+          }))
+        }
+        return successResponse(res, formattedData, '获取商品历史价格成功');
+      }
+      return successResponse(res, null, '获取商品历史价格成功'); 
+    } catch (error) {
+      logger.error('获取商品历史价格失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }

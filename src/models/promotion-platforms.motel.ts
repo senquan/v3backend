@@ -1,6 +1,6 @@
 import { Entity, PrimaryColumn, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { Promotion } from './promotion.model';
-import { Dict } from '../models/dict.model';
+import { Dict } from './dict.model';
 
 @Entity('promotion_platforms')
 export class PromotionPlatforms {
