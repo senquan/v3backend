@@ -4,6 +4,8 @@ import { Ticket } from '../models/ticket.model';
 import { TicketComment } from "../models/ticket-comment.model";
 import { TicketAttachment } from '../models/ticket-attachment.model';
 import { User } from '../models/user.model';
+import { Role } from '../models/role.model';
+import { Staff } from '../models/staff.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 
@@ -11,11 +13,22 @@ export class TicketController {
   // 创建工单
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { title, content, ticketType, priority, productId, orderId, storeName, trackId } = req.body;
+      const { title, content, ticketType, priority, productId, orderId, storeName, trackId, assigneeId } = req.body;
       const userId = (req as any).user?.id;
 
       if (!title || !content || !ticketType) {
         return errorResponse(res, 400, '标题、内容和工单类型不能为空', null);
+      }
+      if (assigneeId) {
+        const assignee = await AppDataSource.getRepository(Staff).findOne({
+          where: {
+            id: assigneeId,
+            isDeleted: 0
+          }
+        })
+        if (!assignee) {
+          return errorResponse(res, 400, '指定的处理人不存在', null);
+        }
       }
 
       const ticket = new Ticket();
@@ -25,6 +38,7 @@ export class TicketController {
       ticket.priority = priority || 2; // 默认中等优先级
       ticket.status = 1; // 待处理
       ticket.creatorId = userId;
+      if (assigneeId) ticket.assigneeId = assigneeId;
       
       if (productId) ticket.productId = productId;
       if (orderId) ticket.orderId = orderId;
@@ -58,16 +72,13 @@ export class TicketController {
         .createQueryBuilder('ticket')
         .leftJoinAndSelect('ticket.creator', 'creator')
         .leftJoinAndSelect('ticket.assignee', 'assignee')
-        .leftJoinAndSelect('assignee.staff', 'staff')
+        .leftJoinAndSelect('ticket.order', 'order')
         .where('ticket.isDeleted = :isDeleted', { isDeleted: 0 });
       
       // 非管理员只能看到自己创建的或分配给自己的工单
-      if (!userRoles.includes('ADMIN') && !userRoles.includes('SUPPORT')) {
-        queryBuilder.andWhere('ticket.creatorId = :userId', { userId });
-      } else if (userRoles.includes('SUPPORT') && !userRoles.includes('ADMIN')) {
-        // 客服人员可以看到分配给自己的和未分配的工单
-        queryBuilder.andWhere('(ticket.assigneeId = :userId OR ticket.assigneeId IS NULL)', { userId });
-      }
+      if (!userRoles.includes('ADMIN')) {
+        queryBuilder.andWhere('(ticket.creatorId = :userId OR assignee.userId = :userId)', { userId });
+      } 
       
       // 添加筛选条件
       if (status) {
@@ -110,6 +121,87 @@ export class TicketController {
     }
   }
 
+  // 获取可指派用户列表
+  async getAssigneeList(req: Request, res: Response): Promise<Response> {
+    const userRoles = (req as any).userRoles || [];
+    const isAdmin = userRoles.includes('ADMIN');
+    const isOp = userRoles.some((role: any) => role.includes('OP'));
+    const userPlatforms = (req as any).accessPlatforms || [];
+    try {
+
+      // 如果不是管理员，需要筛选出支持的平台
+      const assignees = await AppDataSource.getRepository(Staff)
+        .createQueryBuilder('staff')
+        .innerJoinAndSelect('staff.user', 'user')
+        .leftJoinAndSelect('user.roles', 'roles')
+        .select(['staff.id', 'staff.name', 'user.id', 'user.name', 'roles.id', 'roles.name', 'roles.code'])
+        .where('user.status = :status', { status: 1 })
+        .getMany();
+
+      // 筛选出支持用户的平台
+      if (!isAdmin) {
+        // 查询角色包含平台资源
+        const rolesWithPlatforms = await AppDataSource.getRepository(Role)
+          .createQueryBuilder('role')
+          .leftJoinAndSelect('role.platforms', 'platforms')
+          .select(['role.id', 'role.name', 'role.code', 'platforms.platformId'])
+          .getMany();
+        
+        const roleMap = new Map<number, Role>();
+        rolesWithPlatforms.forEach(role => {
+          roleMap.set(role.id, role);
+        })
+
+        assignees.forEach(assignee => {
+          if (assignee.user !== null) {
+            assignee.user.roles = assignee.user.roles?.filter(role => roleMap.get(role.id)?.platforms?.some(p => userPlatforms.includes(p.platformId))) || [];
+          }
+        })
+      }
+      const filteredAssignees = assignees.filter(assignee => assignee.user?.roles?.length || 0 > 0);
+
+      const targetRole = new Set<string>();
+      if (userRoles.some((role: any) => role.includes('WM'))) {
+        targetRole.add('OP')
+      }
+      if (userRoles.some((role: any) => role.includes('GD'))) {
+        targetRole.add('OP')
+      }
+      if (userRoles.some((role: any) => role.includes('CS'))) {
+        targetRole.add('AS')
+        targetRole.add('OP')
+      }
+
+      // 将用户按角色分组
+      const flatAssignees: { id: number, role: string, name: string }[] = [];
+      const addedUser = new Set<string>();
+      filteredAssignees.forEach(assignee => {
+        if (assignee.user !== null) {
+          assignee.user.roles?.forEach(role => {
+            if (!isAdmin && !isOp && !targetRole.has(role.code.substring(0 , 2))) {
+              return;
+            }
+            if (!addedUser.has(role.code + assignee.id)) {
+              flatAssignees.push({
+                id: assignee.id,
+                role: role.code,
+                name: assignee.name || assignee.user?.name || assignee.user?.username || ''
+              });
+            }
+            addedUser.add(role.code + assignee.id);
+          })
+        }
+      })
+      
+      return successResponse(res, {
+        assignees: flatAssignees,
+      }, '获取可指派用户列表成功');
+    } catch (error) {
+      logger.error('获取可指派用户列表失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
   // 获取工单详情
   async getDetail(req: Request, res: Response): Promise<Response> {
     try {
@@ -148,6 +240,39 @@ export class TicketController {
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
+
+  // 删除工单
+  async delete(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+      const userRoles = (req as any).userRoles || [];
+      
+      const ticketRepository = AppDataSource.getRepository(Ticket);
+      const ticket = await ticketRepository.findOne({ 
+        where: { id: Number(id), isDeleted: 0 } 
+      });
+      
+      if (!ticket) {
+        return errorResponse(res, 404, '工单不存在', null);
+      }
+
+      // 只有管理员和工单创建者可以删除工单
+      if (!userRoles.includes('ADMIN') && ticket.creatorId !== userId) {
+        return errorResponse(res, 403, '无权删除此工单', null);
+      }
+      
+      // 软删除工单
+      ticket.isDeleted = 1;
+      await ticketRepository.save(ticket);
+      
+      return successResponse(res, null, '工单删除成功');
+    } catch (error) {
+      logger.error('删除工单失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
 
   // 分配工单
   async assign(req: Request, res: Response): Promise<Response> {
@@ -209,11 +334,6 @@ export class TicketController {
       const { content, status } = req.body;
       const userId = (req as any).user?.id;
       const userRoles = (req as any).userRoles || [];
-      
-      // 只有管理员和客服可以处理工单
-      if (!userRoles.includes('ADMIN') && !userRoles.includes('SUPPORT')) {
-        return errorResponse(res, 403, '无权处理工单', null);
-      }
       
       const ticketRepository = AppDataSource.getRepository(Ticket);
       const ticket = await ticketRepository.findOne({ 
@@ -396,7 +516,7 @@ export class TicketController {
   async addComment(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
-      const { content, isInternal } = req.body;
+      const { content, isInternal, isDone, fileList } = req.body;
       const userId = (req as any).user?.id;
       const userRoles = (req as any).userRoles || [];
       
@@ -406,7 +526,7 @@ export class TicketController {
       
       const ticketRepository = AppDataSource.getRepository(Ticket);
       const ticket = await ticketRepository.findOne({ 
-        where: { id: Number(id), isDeleted: 0 } 
+        where: { id: Number(id), isDeleted: 0 }
       });
       
       if (!ticket) {
@@ -418,30 +538,50 @@ export class TicketController {
         return errorResponse(res, 400, '工单已关闭或取消，不能添加评论', null);
       }
       
-      // 内部评论只有管理员和客服可以添加
-      if (isInternal && !userRoles.includes('ADMIN') && !userRoles.includes('SUPPORT')) {
-        return errorResponse(res, 403, '无权添加内部评论', null);
-      }
-      
-      // 检查权限：只有管理员、客服或工单创建者可以添加评论
-      if (!userRoles.includes('ADMIN') && !userRoles.includes('SUPPORT') && ticket.creatorId !== userId) {
-        return errorResponse(res, 403, '无权添加评论', null);
-      }
-      
       // 添加评论
       const comment = new TicketComment();
       comment.ticketId = Number(id);
       comment.userId = userId;
       comment.content = content;
       comment.isInternal = isInternal || false;
+
       
       const savedComment = await AppDataSource.getRepository(TicketComment).save(comment);
-      
-      // 如果是客户添加的评论，更新工单状态为待处理
-      if (ticket.creatorId === userId && ticket.status === 3) {
-        ticket.status = 2; // 更新为处理中
-        await ticketRepository.save(ticket);
+
+      if (Array.isArray(fileList) && fileList.length > 0) {
+        // 创建评论附件
+        for (const filePath of fileList) {
+          const attachment = new TicketAttachment();
+          attachment.ticketId = Number(id);
+          attachment.userId = userId;
+          attachment.commentId = savedComment.id;
+          attachment.filename = filePath.substring(filePath.lastIndexOf('/') + 1);
+          attachment.path = filePath;
+          attachment.mimetype = filePath.substring(filePath.lastIndexOf('.') + 1);
+          attachment.size = 0;
+          await AppDataSource.getRepository(TicketAttachment).save(attachment);
+        }
       }
+      
+      if (isDone) {
+        const staffRepository = AppDataSource.getRepository(Staff);
+        const staff = await staffRepository.findOne({ 
+          where: { userId: ticket.creatorId, isDeleted: 0 }
+        });
+        if (!staff) {
+          return errorResponse(res, 404, '员工不存在', null);
+        }
+        await ticketRepository.update({ id: Number(id) }, {
+          status: 3,
+          assignee: staff
+        });
+      }
+
+      // 如果是客户添加的评论，更新工单状态为待处理
+      // if (ticket.creatorId === userId && ticket.status === 3) {
+      //   ticket.status = 2; // 更新为处理中
+      //   await ticketRepository.save(ticket);
+      // }
       
       return successResponse(res, savedComment, '评论添加成功');
     } catch (error) {

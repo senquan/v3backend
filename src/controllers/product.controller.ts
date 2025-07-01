@@ -78,7 +78,11 @@ export class ProductController {
       }
       
       if (color) {
-        queryBuilder.andWhere('product.colorId = :color', { color });
+        if (color === "default") {
+          queryBuilder.andWhere('product.colorId IS NULL');
+        } else {
+          queryBuilder.andWhere('product.colorId = :color', { color });
+        }
       }
 
       if (serie) {

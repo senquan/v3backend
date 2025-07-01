@@ -1,5 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from "typeorm";
 import { User } from "./user.model";
+import { Staff } from "./staff.model";
+import { Order } from "./order.model";
 import { TicketComment } from "./ticket-comment.model";
 import { TicketAttachment } from "./ticket-attachment.model";
 
@@ -33,15 +35,19 @@ export class Ticket {
   @Column({ name: "assignee_id", nullable: true })
   assigneeId?: number;
 
-  @ManyToOne(() => User, { nullable: true })
+  @ManyToOne(() => Staff, { nullable: true })
   @JoinColumn({ name: "assignee_id" })
-  assignee?: User;
+  assignee?: Staff;
 
   @Column({ name: "product_id", nullable: true })
   productId?: number;
 
   @Column({ name: "order_id", nullable: true })
   orderId?: number;
+
+  @ManyToOne(() => Order)
+  @JoinColumn({ name: "order_id" })
+  order!: Order;
 
   @Column({ type: "varchar", length: 255, nullable: true })
   related?: string;
