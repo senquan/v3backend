@@ -376,6 +376,26 @@ export class OrderController {
     }
   }
 
+  async changeOrderType(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const type = Number(req.body.type);
+      const changeType = type === 2 ? 1 : 2;
+
+      const orderRepository = AppDataSource.getRepository(Order);
+      const order = await orderRepository.findOneBy({ id: Number(id) });
+
+      if (!order) return errorResponse(res, 404, '订单不存在', null);
+
+      if (order.type === changeType) return successResponse(res, changeType, '订单类型未改变');
+      await orderRepository.update(order.id, { type: changeType });
+      return successResponse(res, changeType, '更新订单类型成功');
+    } catch (error) {
+      logger.error('更新订单类型失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
   async delete(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;

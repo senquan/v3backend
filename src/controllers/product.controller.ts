@@ -505,20 +505,24 @@ export class ProductController {
         relations: ["color", "modelType", "serie", "tags"]
       });
       if (!product) throw new Error("商品不存在");
-      
+
       if (productData.materialId && productData.materialId !== product.materialId) {
         const existingSku = await queryRunner.manager.findOne(Product, { where: { sku: productData.materialId, isDeleted: 0 } });
         if (existingSku) throw new Error("物料已存在");
       }
 
-      if (productData.colorId && productData.colorId !== product.colorId) {
-        const colorId = Number(productData.colorId);
-        if (colorId) {
-          const color = await queryRunner.manager.findOne(SpecItem, { where: { id: colorId } });
-          if (color) product.color = color;
-        } else {
-          product.color = null;
+      if (productData.colorId) {
+        if (productData.colorId !== product.colorId) {
+          const colorId = Number(productData.colorId);
+          if (colorId) {
+            const color = await queryRunner.manager.findOne(SpecItem, { where: { id: colorId } });
+            if (color) product.color = color;
+          } else {
+            product.color = null;
+          }
         }
+      } else if (product.colorId) {
+        product.color = null;
       }
 
       // 检查型号是否更新
@@ -533,13 +537,13 @@ export class ProductController {
             existingModelType.isDeleted = 0;
             await modelTypeRepository.save(existingModelType);
           }
-          productData.modelType = existingModelType;
+          product.modelType = existingModelType;
         } else {
           // 创建新型号
           const newModelType = new ProductModel();
           newModelType.name = productData.modelType;
           const savedModelType = await modelTypeRepository.save(newModelType);
-          productData.modelType = savedModelType;
+          product.modelType = savedModelType;
         }
       } else if (Number(productData.modelType > 0)) {
         const modelType = await modelTypeRepository.findOne({
@@ -548,9 +552,9 @@ export class ProductController {
         if (!modelType) {
           return errorResponse(res, 400, '指定的型号不存在', null);
         }
-        productData.modelType = modelType;
+        product.modelType = modelType;
       } else {
-        productData.modelType = null;
+        product.modelType = null;
       }
 
       const serieId = Number(productData.serie);
@@ -579,7 +583,15 @@ export class ProductController {
         product.imageUrls = productData.imageFiles.join(',');
       }
 
-      // 处理标签关联
+      const { modelType, serie, tags, ...updateData } = productData;
+      Object.assign(product, {
+        ...updateData,
+        updateAt: new Date()
+      })
+
+      const updatedProduct = await queryRunner.manager.save(product);
+
+    // 处理标签关联
       const oldTags = product.tags?.map(tag => tag.id) || [];
       const newTags = productData.tags.filter((tag: any) => typeof tag === "number");
 
@@ -605,12 +617,8 @@ export class ProductController {
         await queryRunner.manager.insert(ProductTag, tagRelations);
         delete productData.tags;
       }
-      const { modelType, serie, ...updateData } = productData;
-      Object.assign(product, {
-        ...updateData,
-        updateAt: new Date()
-      })
-      const updatedProduct = await queryRunner.manager.save(product);
+
+
       await queryRunner.commitTransaction();
       return successResponse(res, updatedProduct, '更新商品成功');
     } catch (error) {
