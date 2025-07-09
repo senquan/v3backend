@@ -6,6 +6,7 @@ import { CouponUser } from '../models/coupon-user.model';
 import { Customer } from '../models/customer.model';
 import { Dict } from '../models/dict.model';
 import { InviteCode } from '../models/invite-code.model';
+import { Notification } from '../models/notification.model';
 import { Order } from '../models/order.model';
 import { OrderCalculationLog } from '../models/order-calculation-log.model';
 import { OrderItem } from '../models/order-item.model';
@@ -50,7 +51,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'cardbug',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [Category, Coupon, CouponUser, Customer, Dict, InviteCode, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag, ProductTag,
+  entities: [Category, Coupon, CouponUser, Customer, Dict, InviteCode, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag, ProductTag,
     Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, User, UserRole],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],

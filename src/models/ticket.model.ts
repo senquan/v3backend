@@ -20,7 +20,7 @@ export class Ticket {
   ticketType!: number; // 工单类型：1-咨询，2-投诉，3-售后，4-建议
 
   @Column({ name: "priority", default: 2 })
-  priority!: number; // 优先级：1-低，2-中，3-高，4-紧急
+  priority!: number; // 优先级：1-日常，2-一般，3-紧急，4-加急，5-特急
 
   @Column({ default: 1 })
   status!: number; // 状态：1-待处理，2-处理中，3-待确认，4-已关闭，5-已取消

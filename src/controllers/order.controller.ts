@@ -251,7 +251,7 @@ export class OrderController {
       if (status && Array.isArray(status) && status.length > 0) queryBuilder.andWhere('order.status IN (:...status)', { status: status.map(Number) });
       if (payStatus && Array.isArray(payStatus) && payStatus.length > 0) queryBuilder.andWhere('order.payStatus IN (:...payStatus)', { payStatus: payStatus.map(Number) });
       if (startDate) queryBuilder.andWhere('order.createdAt >= :startDate', { startDate });
-      if (endDate) queryBuilder.andWhere('order.createdAt <= :endDate', { endDate });
+      if (endDate) queryBuilder.andWhere('order.createdAt <= :endDate', { endDate: endDate + " 23:59:59" });
       if (customerId) queryBuilder.andWhere('order.customerId = :customerId', { customerId });
       if (platformIds && Array.isArray(platformIds) && platformIds.length > 0) {
         if (!isAdmin) {
@@ -273,7 +273,7 @@ export class OrderController {
         queryBuilder.andWhere('order.name LIKE :keyword', { keyword: `%${keyword}%` });
       }
       if (username) {
-        queryBuilder.andWhere('user.username LIKE :username OR staff.name LIKE :username', { username: `%${username}%` });
+        queryBuilder.andWhere('(user.username LIKE :username OR staff.name LIKE :username)', { username: `%${username}%` });
       }
 
       const [orders, total] = await queryBuilder

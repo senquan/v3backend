@@ -8,7 +8,9 @@
         "build": "tsc",
         "lint": "eslint . --ext .ts",
         "process-images": "ts-node src/scripts/process-images.ts",
-        "generate-thumbnails": "ts-node src/scripts/generate-thumbnails.ts"
+        "generate-thumbnails": "ts-node src/scripts/generate-thumbnails.ts",
+        "upgrade-ticket-priority": "ts-node src/scripts/upgrade-ticket-priority.ts",
+        "test-ticket-priority": "ts-node src/scripts/test-ticket-priority.ts"
     },
     "dependencies": {
         "@nestjs/platform-express": "^11.1.0",

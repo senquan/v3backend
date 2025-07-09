@@ -8,6 +8,7 @@ import { Role } from '../models/role.model';
 import { Staff } from '../models/staff.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
+import { NotificationService } from '../services/notification.service';
 
 export class TicketController {
   // 创建工单
@@ -53,6 +54,12 @@ export class TicketController {
       comment.userId = userId;
       comment.content = '工单已创建，等待处理';
       await AppDataSource.getRepository(TicketComment).save(comment);
+
+      // 如果指定了处理人，创建待办通知
+      if (savedTicket.assigneeId) {
+        const notificationService = new NotificationService();
+        await notificationService.createTicketTodoNotification(savedTicket);
+      }
 
       return successResponse(res, savedTicket, '工单创建成功');
     } catch (error) {
@@ -278,7 +285,7 @@ export class TicketController {
   async assign(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
-      const { assigneeId } = req.body;
+      const { assigneeId, content } = req.body;
       const userId = (req as any).user?.id;
       const userRoles = (req as any).userRoles || [];
       
@@ -297,28 +304,51 @@ export class TicketController {
       }
       
       // 检查被分配人是否存在
-      const assignee = await AppDataSource.getRepository(User).findOne({
-        where: { id: assigneeId }
-      });
-      
-      if (!assignee) {
-        return errorResponse(res, 400, '指定的处理人不存在', null);
+      if (assigneeId) {
+        const staffRepository = AppDataSource.getRepository(Staff);
+        const assignee = await staffRepository.findOne({ 
+          where: { id: assigneeId, isDeleted: 0 } 
+        });
+        
+        if (!assignee) {
+          return errorResponse(res, 404, '被分配人不存在', null);
+        }
       }
       
-      // 更新工单状态和处理人
+      // 记录原分配人和状态
+      const oldAssigneeId = ticket.assigneeId;
+      const oldStatus = ticket.status;
+      
+      // 更新工单分配信息
       ticket.assigneeId = assigneeId;
-      if (ticket.status === 1) { // 如果是待处理状态，更新为处理中
+      // ticket.assignedAt = assigneeId ? new Date() : null;
+      
+      // 如果分配了处理人，状态改为处理中
+      if (assigneeId && ticket.status === 1) {
         ticket.status = 2;
       }
       
       await ticketRepository.save(ticket);
       
-      // 添加评论记录
+      // 添加分配评论
       const comment = new TicketComment();
       comment.ticketId = Number(id);
       comment.userId = userId;
-      comment.content = `工单已分配给 ${assignee.name || assignee.username}`;
+      comment.content = content || (assigneeId ? '工单已分配' : '工单分配已取消');
       await AppDataSource.getRepository(TicketComment).save(comment);
+      
+      // 创建通知
+      const notificationService = new NotificationService();
+      
+      // 如果分配给了新的处理人，发送待办通知
+      if (assigneeId && assigneeId !== oldAssigneeId) {
+        await notificationService.createTicketTodoNotification(ticket);
+      }
+      
+      // 如果状态发生变化，创建状态变更通知
+      if (oldStatus !== ticket.status) {
+        await notificationService.createTicketStatusChangeNotification(ticket, oldStatus, ticket.status);
+      }
       
       return successResponse(res, ticket, '工单分配成功');
     } catch (error) {
@@ -349,6 +379,9 @@ export class TicketController {
         return errorResponse(res, 403, '无权处理此工单', null);
       }
       
+      // 记录原状态
+      const oldStatus = ticket.status;
+      
       // 更新工单状态
       if (status) {
         ticket.status = status;
@@ -367,6 +400,12 @@ export class TicketController {
         comment.content = content;
         comment.isInternal = req.body.isInternal || false;
         await AppDataSource.getRepository(TicketComment).save(comment);
+      }
+      
+      // 如果状态发生变化，创建状态变更通知
+      if (oldStatus !== ticket.status) {
+        const notificationService = new NotificationService();
+        await notificationService.createTicketStatusChangeNotification(ticket, oldStatus, ticket.status);
       }
       
       return successResponse(res, ticket, '工单处理成功');
@@ -402,6 +441,9 @@ export class TicketController {
         return errorResponse(res, 400, '只有待确认状态的工单可以被确认', null);
       }
       
+      // 记录原状态
+      const oldStatus = ticket.status;
+      
       // 更新工单状态为已关闭
       ticket.status = 4;
       ticket.closedAt = new Date();
@@ -413,6 +455,10 @@ export class TicketController {
       comment.userId = userId;
       comment.content = content || '用户已确认工单处理结果';
       await AppDataSource.getRepository(TicketComment).save(comment);
+      
+      // 创建状态变更通知
+      const notificationService = new NotificationService();
+      await notificationService.createTicketStatusChangeNotification(ticket, oldStatus, ticket.status);
       
       return successResponse(res, ticket, '工单确认成功');
     } catch (error) {
@@ -448,6 +494,9 @@ export class TicketController {
         return errorResponse(res, 400, '工单已经是关闭或取消状态', null);
       }
       
+      // 记录原状态
+      const oldStatus = ticket.status;
+      
       // 更新工单状态为已关闭
       ticket.status = 4;
       ticket.closedAt = new Date();
@@ -459,6 +508,12 @@ export class TicketController {
       comment.userId = userId;
       comment.content = reason || '管理员已关闭工单';
       await AppDataSource.getRepository(TicketComment).save(comment);
+      
+      // 如果状态发生变化，创建状态变更通知
+      if (oldStatus !== ticket.status) {
+        const notificationService = new NotificationService();
+        await notificationService.createTicketStatusChangeNotification(ticket, oldStatus, ticket.status);
+      }
       
       return successResponse(res, ticket, '工单关闭成功');
     } catch (error) {
@@ -494,6 +549,9 @@ export class TicketController {
         return errorResponse(res, 400, '工单已经是关闭或取消状态', null);
       }
       
+      // 记录原状态
+      const oldStatus = ticket.status;
+      
       // 更新工单状态为已取消
       ticket.status = 5;
       await ticketRepository.save(ticket);
@@ -504,6 +562,10 @@ export class TicketController {
       comment.userId = userId;
       comment.content = reason || '用户已取消工单';
       await AppDataSource.getRepository(TicketComment).save(comment);
+      
+      // 创建状态变更通知
+      const notificationService = new NotificationService();
+      await notificationService.createTicketStatusChangeNotification(ticket, oldStatus, ticket.status);
       
       return successResponse(res, ticket, '工单取消成功');
     } catch (error) {
