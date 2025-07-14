@@ -346,25 +346,11 @@ export class NotificationController {
       if (!Array.isArray(ids) || ids.length === 0) {
         return errorResponse(res, 400, '通知ID列表不能为空', null);
       }
+      
+      const notificationService = new NotificationService();
+      const count = await notificationService.markBatchAsRead(ids as number[], userId);
 
-      const notificationRepository = AppDataSource.getRepository(Notification);
-      const queryBuilder = notificationRepository.createQueryBuilder('notification');
-
-      queryBuilder.where('notification.id IN (:...ids)', { ids })
-        .andWhere('notification.is_active = :isActive', { isActive: 1 });
-
-      if (userId) {
-        queryBuilder.andWhere(
-          '(notification.userId = :userId OR notification.userId IS NULL)',
-          { userId }
-        );
-      }
-
-      await queryBuilder.update()
-        .set({ isRead: true, updatedAt: new Date() })
-        .execute();
-
-      return successResponse(res, null, '批量标记为已读成功');
+      return successResponse(res, count, '批量标记为已读成功');
     } catch (error) {
       logger.error('批量标记通知为已读失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
