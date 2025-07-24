@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import * as jwt from 'jsonwebtoken';
 import { AppDataSource } from '../config/database';
 import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity';
 import { User } from '../models/entities/User.entity';
@@ -6,7 +7,60 @@ import { ProjectDepartmentMember } from '../models/entities/ProjectDepartmentMem
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 
+const authController = require('../controllers/auth.controller');
+
 export class UserController {
+  // 用户登录
+  async login(req: Request, res: Response): Promise<Response> {
+    try {
+      const { username, password, code, captchaId } = req.body;
+
+      if (!authController.verifyCaptcha(captchaId, code)) return errorResponse(res, 400, '验证码错误', null);
+
+      // 查找用户
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({ 
+        select: ['_id', 'name', 'password', 'status', 'realname', 'email', 'phone'],
+        where: { name: username }
+      });
+      // 用户不存在
+      if (!user) return errorResponse(res, 401, '用户名或密码错误', null);
+      // 验证密码
+      const isPasswordValid = await user.validatePassword(password, user.password);
+      if (!isPasswordValid) return errorResponse(res, 401, '用户名或密码错误', null);
+      // 检查用户状态
+      if (user.status !== 1) return errorResponse(res, 403, '账户状态异常', null);
+
+      // 生成 JWT 令牌
+      const token = jwt.sign(
+        {
+          id: user._id
+        },
+        process.env.JWT_SECRET || 'EA(@eroiw302sodD03p21',
+        { expiresIn: '24h' }
+      );
+
+      // 返回用户信息和令牌
+      return res.json({
+        code: 0,
+        message: '登录成功',
+        data: {
+          token,
+          user: {
+            id: user._id,
+            realname: user.realname,
+            name: user.name,
+            email: user.email,
+            phone: user.phone
+          }
+        }
+      });
+    } catch (error) {
+      logger.error('登录失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
   // 获取用户列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {

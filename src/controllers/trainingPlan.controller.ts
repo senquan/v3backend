@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
+import { Trainer } from '../models/entities/Trainer.entity';
 import { TrainingPlan } from '../models/entities/TrainingPlan.entity';
 import { TrainingPlanScope } from '../models/entities/TrainingPlanScope.entity';
 import { logger } from '../utils/logger';
@@ -18,6 +19,7 @@ export class TrainingPlanController {
       // 构建查询条件
       const queryBuilder = AppDataSource.getRepository(TrainingPlan)
         .createQueryBuilder('plan')
+        .leftJoinAndSelect('plan.trainer', 'trainer')
         .leftJoinAndSelect('plan.scopes', 'scope')
         .leftJoinAndSelect('scope.branch','branch')
         .leftJoinAndSelect('scope.project','project')
@@ -85,7 +87,7 @@ export class TrainingPlanController {
           name: plan.name,
           training_scope,
           training_scope_names,
-          trainer: plan.trainer,
+          trainer: plan.trainer?.name,
           training_mode: plan.training_mode,
           training_category: plan.training_category,
           planned_participants: plan.planned_participants,
@@ -167,6 +169,7 @@ export class TrainingPlanController {
       
       const plan = await AppDataSource.getRepository(TrainingPlan)
         .createQueryBuilder('plan')
+        .leftJoinAndSelect('plan.trainer', 'trainer')
         .leftJoinAndSelect('plan.scopes', 'scope')
         .where('plan._id = :id', { id: Number(id) })
         .andWhere('plan.is_deleted = :is_deleted', { is_deleted: 0 })
@@ -228,6 +231,10 @@ export class TrainingPlanController {
       if (!name) {
         return errorResponse(res, 400, '培训计划名称不能为空', null);
       }
+
+      if (!trainer) {
+        return errorResponse(res, 400, '教培人员不能为空', null);
+      }
       
       // 检查培训计划名称是否已存在
       const planRepository = AppDataSource.getRepository(TrainingPlan);
@@ -237,6 +244,16 @@ export class TrainingPlanController {
       
       if (existingTrainingPlan) {
         return errorResponse(res, 400, '培训计划名称已存在', null);
+      }
+
+      // 检查教培人员是否存在
+      const trainerRepository = AppDataSource.getRepository(Trainer);
+      const existingTrainer = await trainerRepository.findOne({
+        where: { id: Number(trainer), is_deleted: false }
+      });
+      
+      if (!existingTrainer) {
+        return errorResponse(res, 400, '教培人员不存在', null);
       }
       
       // 开始事务
@@ -248,7 +265,7 @@ export class TrainingPlanController {
         // 创建新培训计划
         const plan = new TrainingPlan();
         plan.name = name;
-        plan.trainer = trainer;
+        plan.trainer = existingTrainer;
         plan.training_mode = training_mode;
         plan.training_category = training_category;
         plan.planned_participants = planned_participants;
@@ -341,6 +358,16 @@ export class TrainingPlanController {
         }
       }
 
+      // 检查教培人员是否存在
+      const trainerRepository = AppDataSource.getRepository(Trainer);
+      const existingTrainer = await trainerRepository.findOne({
+        where: { id: Number(trainer), is_deleted: false }
+      });
+      
+      if (!existingTrainer) {
+        return errorResponse(res, 400, '教培人员不存在', null);
+      }
+
       // 开始事务
       const queryRunner = AppDataSource.createQueryRunner();
       await queryRunner.connect();
@@ -349,7 +376,7 @@ export class TrainingPlanController {
       try {
         // 更新培训计划信息
         plan.name = name;
-        plan.trainer = trainer;
+        plan.trainer = existingTrainer;
         plan.training_mode = training_mode;
         plan.training_category = training_category;
         plan.planned_participants = planned_participants;

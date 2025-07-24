@@ -137,6 +137,42 @@ export class TrainingRecordController {
               created_time: branch.create_time,
               updated_time: branch.update_time
             }));
+
+            // 根据培训计划范围查询分公司涉及的培训计划数量
+            const subQueryBuilder = AppDataSource.getRepository(TrainingPlanScope)
+             .createQueryBuilder('scope')
+             .where('scope.branch_id IN (branch_ids)')
+             .select('scope.training_plan_id')
+             .getQuery();
+            const subQuery = subQueryBuilder.replace('branch_ids', branchs.map(branch => branch._id).join(','));
+            // 统计每个分公司的培训计划数量
+            const planCountResult = await AppDataSource.query(`
+                SELECT branch_id, COUNT(*) as total FROM training.tr_training_plan_scopes
+                WHERE training_plan_id IN (${subQuery})
+                GROUP BY branch_id
+            `);
+            // 更新分公司的培训计划数量
+            formattedStatistics.forEach(branch => {
+                const count = planCountResult.find((item: any) => item.branch_id === branch.id);
+                branch.total = count?.total || 0;
+                branch.incomplete = branch.total - branch.finished;
+            });
+
+            // 根据 TrainingRecordParticipant 统计计划参培人数
+            const participantCountResult = await AppDataSource.query(`
+                SELECT sb.user.branch, COUNT(*) as planned
+                FROM training.tr_training_record_participants
+                INNER JOIN training.tr_training_records ON training.tr_training_record_participants.training_record_id = training.tr_training_records.id
+                INNER JOIN sb.user ON sb.user._id = training.tr_training_record_participants.user_id
+                WHERE training.tr_training_records.training_plan_id IN (${subQuery})
+                GROUP BY sb.user.branch
+            `);
+            
+            // 更新分公司的参培人数
+            formattedStatistics.forEach(branch => {
+                const count = participantCountResult.find((item: any) => item.branch === branch.id);
+                branch.planned = count?.planned || 0;
+            });
       
             return successResponse(res, {
               records: formattedStatistics,

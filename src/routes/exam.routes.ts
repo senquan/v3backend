@@ -6,7 +6,7 @@ const router = Router();
 const examController = new ExamController();
 
 // 应用认证中间件
-// router.use(authMiddleware);
+router.use(authMiddleware);
 
 // 生成考试
 router.post('/generate/:id', examController.generateExamByRecord.bind(examController));

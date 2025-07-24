@@ -5,28 +5,31 @@ import { authMiddleware } from '../middlewares/auth.middleware';
 const router = Router();
 const materialController = new MaterialController();
 
+// 应用认证中间件
+router.use(authMiddleware);
+
 // 获取培训资料列表
-router.get('/list', authMiddleware, materialController.getList);
+router.get('/list', materialController.getList);
 
 // 获取培训资料详情
-router.get('/:id', authMiddleware, materialController.getDetail);
+router.get('/:id', materialController.getDetail);
 
 // 创建培训资料
-router.post('/', authMiddleware, materialController.create);
+router.post('/', materialController.create);
 
 // 更新培训资料
-router.put('/:id', authMiddleware, materialController.update);
+router.put('/:id', materialController.update);
 
 // 删除培训资料
-router.delete('/:id', authMiddleware, materialController.delete);
+router.delete('/:id', materialController.delete);
 
 // 批量删除培训资料
-router.post('/batch-delete', authMiddleware, materialController.batchDelete);
+router.post('/batch-delete', materialController.batchDelete);
 
 // 关联课件
-router.post('/associate-courseware', authMiddleware, materialController.associateCourseware);
+router.post('/associate-courseware', materialController.associateCourseware);
 
 // 获取培训资料关联的课件
-router.get('/:id/coursewares', authMiddleware, materialController.getAssociatedCoursewares);
+router.get('/:id/coursewares', materialController.getAssociatedCoursewares);
 
 export default router;

@@ -10,7 +10,7 @@ const router = Router();
 const uploadController = new UploadController();
 
 // 应用认证中间件
-//router.use(authMiddleware);
+router.use(authMiddleware);
 
 const storage = multer.diskStorage({
 destination: (req, file, cb) => {

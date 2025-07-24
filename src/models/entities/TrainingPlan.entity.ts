@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
 import { User } from './User.entity';
+import { Trainer } from './Trainer.entity';
 import { TrainingPlanScope } from './TrainingPlanScope.entity';
 
 @Entity('tr_training_plans')
@@ -9,9 +10,6 @@ export class TrainingPlan {
 
   @Column({ type: 'varchar', length: 100, nullable: false })
   name!: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  trainer: string | null = null;
 
   @Column({ type: 'smallint', default: 0 })
   training_mode!: number;
@@ -47,6 +45,9 @@ export class TrainingPlan {
   updated_time!: Date;
 
   // 关联关系
+  @ManyToOne(() => Trainer)
+  trainer!: Trainer;
+
   @ManyToOne(() => User, {
     createForeignKeyConstraints: false
   })

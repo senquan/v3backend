@@ -6,7 +6,7 @@ const router = Router();
 const userController = new UserController();
 
 // 应用认证中间件
-//router.use(authMiddleware);
+router.use(authMiddleware);
 
 // 获取用户列表
 router.get('/list', userController.getList);

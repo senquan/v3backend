@@ -2,6 +2,8 @@ import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
 import { Branch } from '../models/entities/Branch.entity';
 import { Category } from '../models/entities/Category.entity';
+import { Certificate } from '../models/entities/Certificate.entity';
+import { CertificateTemplate } from '../models/entities/CertificateTemplate.entity';
 import { Courseware } from '../models/entities/Courseware.entity';
 import { CoursewareMaterial } from '../models/entities/CoursewareMaterial.entity';
 import { Exam } from '../models/entities/Exam.entity';
@@ -14,6 +16,18 @@ import { Project } from '../models/entities/Project.entity';
 import { ProjectDepartmentMember } from '../models/entities/ProjectDepartmentMember.entity';
 import { Question } from '../models/entities/Question.entity';
 import { QuestionOption } from '../models/entities/QuestionOption.entity';
+import { Survey } from '../models/entities/Survey.entity';
+import { SurveyQuestion } from '../models/entities/SurveyQuestion.entity';
+import { SurveyQuestionOption } from '../models/entities/SurveyQuestionOption.entity';
+import { SurveySubmission } from '../models/entities/SurveySubmission.entity';
+import { SurveyAnswer } from '../models/entities/SurveyAnswer.entity';
+import { Tag } from '../models/entities/Tag.entity';
+import { Task } from '../models/entities/Task.entity';
+import { TaskAssignment } from '../models/entities/TaskAssignment.entity';
+import { TaskItem } from '../models/entities/TaskItem.entity';
+import { TaskProgress } from '../models/entities/TaskProgress.entity';
+import { Trainer } from '../models/entities/Trainer.entity';
+import { TrainerTag } from '../models/entities/TrainerTag.entity';
 import { TrainingPlan } from '../models/entities/TrainingPlan.entity';
 import { TrainingPlanScope } from '../models/entities/TrainingPlanScope.entity';
 import { TrainingRecord } from '../models/entities/TrainingRecord.entity';
@@ -37,8 +51,8 @@ export const AppDataSource = new DataSource({
   schema: process.env.DB_SCHEMA || 'public',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [Branch, Category, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Project, ProjectDepartmentMember, Question
-    , QuestionOption, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordParticipant, User, ConstructionWorker ],
+  entities: [Branch, Category, Certificate, CertificateTemplate, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Project, ProjectDepartmentMember, Question
+    , QuestionOption, Survey, SurveyQuestion, SurveyQuestionOption, SurveySubmission, SurveyAnswer, Tag, Task, TaskAssignment, TaskItem, TaskProgress, Trainer, TrainerTag, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordParticipant, User, ConstructionWorker ],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });

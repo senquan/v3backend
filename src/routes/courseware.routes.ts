@@ -6,7 +6,7 @@ const router = Router();
 const coursewareController = new CoursewareController();
 
 // 应用认证中间件
-// router.use(authMiddleware);
+router.use(authMiddleware);
 
 // 获取课件列表
 router.get('/list', coursewareController.getList.bind(coursewareController));

@@ -6,7 +6,7 @@ const router = Router();
 const planController = new TrainingPlanController();
 
 // 应用认证中间件
-//router.use(authMiddleware);
+router.use(authMiddleware);
 
 // 获取培训计划列表
 router.get('/list', planController.getList);

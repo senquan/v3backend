@@ -17,7 +17,7 @@ exports.generateCaptcha = (req: Request, res: Response) => {
     ignoreChars: '0o1il', // 排除容易混淆的字符
     noise: 2, // 干扰线条数量
     color: true, // 验证码的字符是否有颜色
-    background: '#f0f2f5' // 背景颜色
+    background: '#aec8e3' // 背景颜色
   });
   
   // 生成唯一标识符

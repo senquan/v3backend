@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
+import * as md5 from 'md5';
 import { TrainingPlan } from './TrainingPlan.entity';
 import { Branch } from './Branch.entity';
 
@@ -94,4 +95,8 @@ export class User {
 
   @OneToMany(() => TrainingPlan, trainingPlan => trainingPlan.creator)
   created_training_plans!: TrainingPlan[];
+
+  async validatePassword(password: string, dbPassword: string): Promise<boolean> {
+    return md5.default(password) === dbPassword;
+  }
 }
