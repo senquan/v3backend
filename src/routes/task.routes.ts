@@ -128,6 +128,32 @@ const batchDeleteValidation = [
     .withMessage('ID必须是正整数')
 ];
 
+const assignStudentsValidation = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('任务ID必须是正整数'),
+  body('userIds')
+    .optional()
+    .isArray()
+    .withMessage('用户ID列表必须是数组格式'),
+  body('userIds.*')
+    .if(body('userIds').exists())
+    .isInt({ min: 1 })
+    .withMessage('用户ID必须是正整数'),
+  body('departmentIds')
+    .optional()
+    .isArray()
+    .withMessage('部门ID列表必须是数组格式'),
+  body('departmentIds.*')
+    .if(body('departmentIds').exists())
+    .isInt({ min: 1 })
+    .withMessage('部门ID必须是正整数'),
+  body('reason')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('分配原因长度不能超过500个字符')
+];
+
 // 路由定义
 
 /**
@@ -143,6 +169,30 @@ router.get('/',
 );
 
 /**
+ * @route GET /api/tasks/:id/learning
+ * @desc 获取任务学习内容
+ * @access Private
+ */
+router.get('/:id/learning',
+  authenticateToken,
+  idValidation,
+  validateRequest,
+  taskController.getTaskLearningContent.bind(taskController)
+);
+
+/**
+ * @route GET /api/tasks/:id/learning-content
+ * @desc 获取任务学习内容（新接口）
+ * @access Private
+ */
+router.get('/:id/learning-content',
+  authenticateToken,
+  idValidation,
+  validateRequest,
+  taskController.getTaskLearningContent.bind(taskController)
+);
+
+/**
  * @route GET /api/tasks/:id
  * @desc 获取任务详情
  * @access Private
@@ -152,6 +202,18 @@ router.get('/:id',
   idValidation,
   validateRequest,
   taskController.getTaskById.bind(taskController)
+);
+
+/**
+ * @route POST /api/tasks/:id/complete-item
+ * @desc 完成任务项
+ * @access Private
+ */
+router.post('/:id/complete-item',
+  authenticateToken,
+  idValidation,
+  validateRequest,
+  taskController.completeTaskItem.bind(taskController)
 );
 
 /**
@@ -212,6 +274,18 @@ router.post('/:id/publish',
   idValidation,
   validateRequest,
   taskController.publishTask.bind(taskController)
+);
+
+/**
+ * @route POST /api/tasks/:id/assign-students
+ * @desc 分配学员到任务
+ * @access Private
+ */
+router.post('/:id/assign-students',
+  authenticateToken,
+  assignStudentsValidation,
+  validateRequest,
+  taskController.assignStudentsToTask.bind(taskController)
 );
 
 export default router;

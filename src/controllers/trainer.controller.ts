@@ -76,6 +76,11 @@ export class TrainerController {
         grade: trainer.grade,
         email: trainer.email,
         phone: trainer.phone,
+        position: trainer.position,
+        title: trainer.title,
+        idcard: trainer.idcard,
+        bank: trainer.bank,
+        bankcard: trainer.bankcard,
         fee: trainer.fee,
         introduction: trainer.introduction,
         created_at: trainer.created_at,
@@ -134,6 +139,11 @@ export class TrainerController {
         grade: trainer.grade,
         email: trainer.email,
         phone: trainer.phone,
+        position: trainer.position,
+        title: trainer.title,
+        idcard: trainer.idcard,
+        bank: trainer.bank,
+        bankcard: trainer.bankcard,
         fee: trainer.fee,
         introduction: trainer.introduction,
         created_at: trainer.created_at,
@@ -167,6 +177,11 @@ export class TrainerController {
         avatar,
         grade,
         email,
+        position,
+        title,
+        idcard,
+        bank,
+        bankcard,
         fee,
         introduction,
         tag_ids = []
@@ -238,6 +253,11 @@ export class TrainerController {
       trainer.grade = grade ? Number(grade) : 1;
       trainer.email = email || null;
       trainer.phone = phone || null;
+      trainer.position = position || null;
+      trainer.title = title || null;
+      trainer.idcard = idcard || null;
+      trainer.bank = bank || null;
+      trainer.bankcard = bankcard || null;
       trainer.fee = fee ? Number(fee) : null;
       trainer.introduction = introduction || null;
       trainer.is_deleted = false;
@@ -279,6 +299,11 @@ export class TrainerController {
         grade,
         email,
         phone,
+        position,
+        title,
+        idcard,
+        bank,
+        bankcard,
         fee,
         introduction,
         tag_ids = []
@@ -343,9 +368,13 @@ export class TrainerController {
       trainer.grade = grade ? Number(grade) : 1;
       trainer.email = email || null;
       trainer.phone = phone || null;
+      trainer.position = position || null;
+      trainer.title = title || null;
+      trainer.idcard = idcard || null;
+      trainer.bank = bank || null;
+      trainer.bankcard = bankcard || null;
       trainer.fee = fee ? Number(fee) : null;
       trainer.introduction = introduction || null;
-      // trainer.updater_id = req.user?.id || null;
       
       await trainerRepository.save(trainer);
       

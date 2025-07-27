@@ -159,7 +159,7 @@ export class MatrixController {
       matrix.standard = standard;
       matrix.assessment_method = assessment_method.length > 0 ? assessment_method.join(",") : null;
       matrix.category_id = category_id;
-      matrix.creator = (req as any).user?.id || null;
+      matrix.creator = (req as any).user?._id || null;
       
       const savedMatrix = await matrixRepository.save(matrix);
       
@@ -208,7 +208,7 @@ export class MatrixController {
       matrix.standard = standard;
       matrix.assessment_method = assessment_method ? assessment_method.join(",") : "";
       matrix.category_id = category_id;
-      matrix.updater = (req as any).user?.id || null;
+      matrix.updater = (req as any).user?._id || null;
       matrix.update_time = new Date();
       
       const updatedMatrix = await matrixRepository.save(matrix);

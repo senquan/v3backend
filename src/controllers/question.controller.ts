@@ -104,7 +104,7 @@ export class QuestionController {
         options
       } = req.body;
       
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?._id;
       
       // 开始事务
       const queryRunner = AppDataSource.createQueryRunner();
@@ -180,7 +180,7 @@ export class QuestionController {
         options
       } = req.body;
       
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?._id;
       
       // 开始事务
       const queryRunner = AppDataSource.createQueryRunner();

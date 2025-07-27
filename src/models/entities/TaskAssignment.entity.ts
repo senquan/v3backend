@@ -17,7 +17,8 @@ export enum AssignmentStatus {
   IN_PROGRESS = 1,  // 进行中
   COMPLETED = 2,    // 已完成
   OVERDUE = 3,      // 已逾期
-  EXEMPTED = 4      // 已免除
+  EXEMPTED = 4,     // 已免除
+  CANCELLED = 5     // 已取消
 }
 
 @Entity('tr_task_assignments')

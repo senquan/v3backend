@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { AppDataSource } from "../config/database";
 import { Branch } from "../models/entities/Branch.entity";
+import { Project } from "../models/entities/Project.entity";
 import { logger } from "../utils/logger";
 import { errorResponse, successResponse } from "../utils/response";
 
@@ -14,6 +15,7 @@ export class BranchController {
       const queryBuilder = AppDataSource.getRepository(Branch)
         .createQueryBuilder("branch")
         .where("branch.enabled = :enabled", { enabled: true });
+
       
       // 添加筛选条件
       if (keyword) {
@@ -23,10 +25,20 @@ export class BranchController {
       if (format === "opt") {
         // 查询所有部门
         const branches = await queryBuilder.getMany();
+              
+        const projects = await AppDataSource.getRepository(Project)
+          .createQueryBuilder('project')
+          .getMany();
+          
         const options = branches.map(branch => ({
           id: branch._id,
           parentId: 0,
-          name: branch.name
+          name: branch.name,
+          children: projects.filter(project => project.branch === branch._id).map(project => ({
+            id: project._id,
+            parentId: branch._id,
+            name: project.name
+          }))
         }));
         return successResponse(res, {
           branches: options

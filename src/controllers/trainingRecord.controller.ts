@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
-import { In } from 'typeorm';
+import { In, Not } from 'typeorm';
+import { parseTime } from '../utils';
 import { AppDataSource } from '../config/database';
+import { Certificate } from '../models/entities/Certificate.entity';
 import { errorResponse, successResponse } from '../utils/response';
 import { Material } from '../models/entities/Material.entity';
 import { TrainingPlanScope } from '../models/entities/TrainingPlanScope.entity';
@@ -11,8 +13,21 @@ import { TrainingRecordContent } from '../models/entities/TrainingRecordContent.
 import { TrainingPlan } from '../models/entities/TrainingPlan.entity';
 import { Branch } from '../models/entities/Branch.entity';
 import { User } from '../models/entities/User.entity';
+import { TaskAssignment } from '../models/entities/TaskAssignment.entity';
 import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity';
 import { ExamRecord } from '../models/entities/ExamRecord.entity';
+
+export interface MyTask {
+    id: number;
+    type: number;
+    title: string;
+    description: string | null;
+    trainer: string;
+    progress: number;
+    duration: number;
+    result: boolean;
+    assessmentMethod: number;
+}
 
 export class TrainingRecordController {
   
@@ -225,8 +240,8 @@ export class TrainingRecordController {
                 trainingRecord.content_notes = contents || '';
                 trainingRecord.content_type = trainingPlan.training_category;
                 trainingRecord.status = 1;
-                trainingRecord.creator = (req as any).user?.id;
-                trainingRecord.updater = (req as any).user?.id;
+                trainingRecord.creator = (req as any).user?._id;
+                trainingRecord.updater = (req as any).user?._id;
                 
                 const savedRecord = await queryRunner.manager.save(trainingRecord);
 
@@ -385,8 +400,103 @@ export class TrainingRecordController {
 
     async getMyStat(req: Request, res: Response): Promise<Response> {
         try {
-            const id = req.params.id;
-            return successResponse(res, id, '获取培训统计成功');
+            const userId = (req as any).user._id;
+            // 获取用户信息
+            const userRepository = AppDataSource.getRepository(User);
+            const user = await userRepository.findOne({
+                where: { _id: userId },
+                relations: ['branchEntity']
+            });
+            if (!user) {
+                return errorResponse(res, 404, '用户不存在', null);
+            }
+            const tasks = [] as MyTask[];
+            // 获取我的任务
+            const taskAssignmentRepository = AppDataSource.getRepository(TaskAssignment);
+            const assignments = await taskAssignmentRepository.find({
+                where: { user_id: userId, task: { status: Not(0) } },
+                relations: ['task']
+            });
+            for (const assignment of assignments) {
+                tasks.push({
+                    id: assignment.task._id,
+                    type: 1,
+                    title: assignment.task.title,
+                    description: assignment.task.description,
+                    trainer: "",
+                    progress: assignment.progress,
+                    duration: assignment.study_duration,
+                    result: assignment.is_passed,
+                    assessmentMethod: 0,
+                })
+            }
+            // 获取培训
+            const trainingParticipantRepository = AppDataSource.getRepository(TrainingRecordParticipant);
+            const trainingRecords = await trainingParticipantRepository.find({
+                where: { user_id: userId },
+                relations: ['training_record', 'training_record.training_plan']
+            });
+            for (const record of trainingRecords) {
+                tasks.push({
+                    id: record.id,
+                    type: 2,
+                    title: record.training_record?.training_plan?.name || '',
+                    description: "",
+                    trainer: "",
+                    progress: 0,
+                    duration: record.training_record?.training_plan?.training_hours || 0,
+                    result: false,
+                    assessmentMethod: record.training_record?.training_plan?.assessment_method || 0,
+                })
+            }
+            tasks.sort((a, b) => {
+                if (a.result !== b.result) {
+                    return a.result ? 1 : -1;
+                }
+                return 0;
+            })
+            // 获取我的证书
+            const certificateRepository = AppDataSource.getRepository(Certificate);
+            const certificatesData = await certificateRepository.find({
+                where: { user_id: userId, is_deleted: false },
+                relations: ['template']
+            });
+            const certificates = certificatesData.slice(-10).map(cert => ({
+                id: cert.id,
+                type: cert.template?.cer_type,
+                title: cert.template?.name || '',
+                awardTime: cert.issue_date,
+            }))
+
+            const stats = {
+                totalTrainings: trainingRecords.length,
+                completedTrainings: 0,
+                totalHours: 0,
+                passedExams: 0,
+                averageScore: 0,
+                recentTrainings: [],
+                certificateCount: certificates.length
+            }
+            const profile = {
+                name: user.name,
+                realname: user.realname,
+                email: user.email,
+                phone: user.phone,
+                branch: {
+                    name: user.branchEntity?.name || '',
+                },
+                joinDate: user.join_date ? parseTime(new Date(user.join_date), "{y}-{m}-{d}") : "",
+                oa_id: user.oa_id,
+                age: user.age,
+                married: user.married,
+            }
+            
+            return successResponse(res, {
+                stats,
+                profile,
+                tasks,
+                certificates
+            }, '获取培训统计成功');
         } catch (error) {
             console.error('获取培训统计失败:', error);
             return errorResponse(res, 500, '服务器内部错误', null);

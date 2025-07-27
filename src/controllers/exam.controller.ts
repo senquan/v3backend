@@ -116,7 +116,7 @@ export class ExamController {
         selectionConfig = this.getDefaultSelectionConfig()
       } = req.body;
 
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?._id;
 
       // 开始事务
       const queryRunner = AppDataSource.createQueryRunner();
@@ -374,7 +374,7 @@ export class ExamController {
         .leftJoinAndSelect("exam.creatorEntity", "creator")
         .where("exam.status != :status", { status: 0 });
 
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?._id;
 
       // 添加筛选条件
       if (keyword) {
@@ -419,7 +419,7 @@ export class ExamController {
 
   async getMyList(req: Request, res: Response): Promise<Response> {
     try {
-      const userId = (req as any).user?.id || 1393;
+      const userId = (req as any).user?._id || 1393;
       const { page = 1, pageSize = 20 } = req.query;
 
       const queryBuilder = AppDataSource.getRepository(ExamRecord)
@@ -479,7 +479,7 @@ export class ExamController {
     try {
       const { id } = req.params;
       const { settings } = req.body;
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?._id;
 
       const exam = await AppDataSource.getRepository(Exam).findOne({
         where: { _id: Number(id) }

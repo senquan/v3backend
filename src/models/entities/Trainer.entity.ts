@@ -29,6 +29,24 @@ export class Trainer {
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone: string | null = null;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  wechat: string | null = null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  position: string | null = null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  title: string | null = null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  idcard: string | null = null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  bank: string | null = null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  bankcard: string | null = null;
+
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   fee: number | null = null; // 讲师课酬
 
