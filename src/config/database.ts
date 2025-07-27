@@ -54,21 +54,22 @@ export const AppDataSource = new DataSource({
   schema: process.env.DB_SCHEMA || 'public',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [Category, Certificate, CertificateTemplate, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Question
+  entities: [Branch, ConstructionWorker, Project, ProjectDepartmentMember, User
+    , Category, Certificate, CertificateTemplate, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Question
     , QuestionOption, Survey, SurveyQuestion, SurveyQuestionOption, SurveySubmission, SurveyAnswer, Tag, Task, TaskAssignment, TaskItem, TaskProgress
     , Trainer, TrainerTag, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordParticipant ],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });
 
-export const ReadOnlyDataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASS || 'password',
-  database: process.env.DB_NAME || 'training',
-  synchronize: false, // 永不同步
-  logging: false,
-  entities: [Branch, ConstructionWorker, Project, ProjectDepartmentMember, User],
-});
+// export const ReadOnlyDataSource = new DataSource({
+//   type: 'postgres',
+//   host: process.env.DB_HOST || 'localhost',
+//   port: parseInt(process.env.DB_PORT || '5432'),
+//   username: process.env.DB_USER || 'postgres',
+//   password: process.env.DB_PASS || 'password',
+//   database: process.env.DB_NAME || 'training',
+//   synchronize: false, // 永不同步
+//   logging: false,
+//   entities: [Branch, ConstructionWorker, Project, ProjectDepartmentMember, User],
+// });
