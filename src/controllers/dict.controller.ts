@@ -9,8 +9,8 @@ export class DictController {
   // 获取字典列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, keyword, group = 0 } = req.query;
-      
+      const { page = 1, pageSize = 20, keyword, group } = req.query;
+
       // 构建查询条件
       const queryBuilder = AppDataSource.getRepository(Dict)
         .createQueryBuilder('a')
