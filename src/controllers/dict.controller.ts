@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Dict } from '../models/dict.model';
+import { PlatformTags } from '../models/platform-tags.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
-import { Not } from 'typeorm';
+import { Not, In } from 'typeorm';
 
 export class DictController {
   // 获取字典列表
@@ -112,7 +113,7 @@ export class DictController {
   // 创建字典
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { name, value, icon, group, remark } = req.body;
+      const { name, value, icon, group, remark, tagIds } = req.body;
       
       if (!name) {
         return errorResponse(res, 400, '字典名称不能为空', null);
@@ -142,8 +143,25 @@ export class DictController {
       dict.icon = icon;
       dict.group = Number(group);
       if (remark) dict.remark = remark;
-      
+
       const savedDict = await dictRepository.save(dict);
+
+      if (tagIds && Array.isArray(tagIds) && tagIds.length > 0) {
+        for (const tagId of tagIds) {
+          const tag = await AppDataSource.getRepository(PlatformTags).findOne({
+            where: {
+              platformId: Number(value),
+              tagId: tagId
+            }
+          });
+          if (!tag) {
+            const platformTag = new PlatformTags();
+            platformTag.platformId = Number(value);
+            platformTag.tagId = tagId;
+            await AppDataSource.getRepository(PlatformTags).save(platformTag);
+          }
+        }
+      }
       
       return successResponse(res, savedDict, '创建字典成功');
     } catch (error) {
@@ -156,7 +174,7 @@ export class DictController {
   async update(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
-      const { name, value, icon, group, remark } = req.body;
+      const { name, value, icon, group, remark, tagIds } = req.body;
       
       if (!name) {
         return errorResponse(res, 400, '字典名称不能为空', null);
@@ -199,6 +217,50 @@ export class DictController {
       dict.remark = remark || null;
       
       const updatedDict = await dictRepository.save(dict);
+
+      // 更新平台标签
+      if (Number(group) === 1) {
+        
+        const tags = await AppDataSource.getRepository(PlatformTags).find({
+          where: {
+            platformId: Number(value)
+          }
+        });
+
+        const oldTags = tags.map(tag => tag.tagId) || [];
+        const newTags = tagIds.filter((tag: any) => typeof tag === "number");
+
+        if (oldTags.length !== newTags.length) {
+
+          if (JSON.stringify([...oldTags].sort()) !== JSON.stringify([...newTags].sort())) {
+
+            const tagsToDelete = oldTags.filter((tag: any) => !newTags.includes(tag));
+            if (tagsToDelete.length > 0) {
+              await AppDataSource.getRepository(PlatformTags).delete({
+                platformId: Number(value),
+                tagId: In(tagsToDelete)
+              });
+            }
+
+            // 添加新标签
+            const tagsToAdd = newTags.filter((tag: any) => !oldTags.includes(tag));
+            for (const tagId of tagsToAdd) {
+              const tag = await AppDataSource.getRepository(PlatformTags).findOne({
+                where: {
+                  platformId: Number(value),
+                  tagId: tagId
+                }
+              });
+              if (!tag) {
+                const platformTag = new PlatformTags();
+                platformTag.platformId = Number(value);
+                platformTag.tagId = tagId;
+                await AppDataSource.getRepository(PlatformTags).save(platformTag);
+              }
+            }
+          }
+        }
+      }
       
       return successResponse(res, updatedDict, '更新字典成功');
     } catch (error) {
