@@ -26,4 +26,10 @@ router.put('/:id/settings', examController.updateSettings.bind(examController));
 // 重新生成考试题目
 router.post('/:id/regenerate', examController.regenerateExam.bind(examController));
 
+// 提交考卷
+router.post('/:id/submit', examController.submitExam.bind(examController));
+
+// 获取考试结果
+router.get('/:id/result', examController.getResult.bind(examController));
+
 export default router;

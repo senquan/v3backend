@@ -380,7 +380,7 @@ export class TrainingRecordController {
             const participants = [...users, ...workers].map(participant => {
                 return {
                     id: participant._id,
-                    name: participant.name,
+                    name: participant instanceof User ? participant.realname : participant.name,
                     type: participant instanceof User ? participant.type : 0,
                     gender: participant instanceof User ? 0 : participant.sex,
                     age: participant instanceof User ? participant.age : 0,

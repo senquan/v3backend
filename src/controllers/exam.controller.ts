@@ -9,6 +9,7 @@ import { TrainingRecordParticipant } from "../models/entities/TrainingRecordPart
 import { QuestionOption } from "../models/entities/QuestionOption.entity";
 import { logger } from "../utils/logger";
 import { errorResponse, successResponse } from "../utils/response";
+import { ExamAnswer } from "../models/entities/ExamAnswer.entity";
 
 // 考试设置参数接口
 interface ExamSettings {
@@ -580,4 +581,311 @@ export class ExamController {
       return errorResponse(res, 500, "重新生成考卷失败");
     }
   }
+
+  // 提交考卷
+  async submitExam(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const { answers } = req.body;
+      const userId = (req as any).user?._id;
+
+      // 开始事务
+      const queryRunner = AppDataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        // 获取考试信息
+        const exam = await queryRunner.manager
+          .createQueryBuilder(Exam, "exam")
+          .leftJoinAndSelect("exam.examQuestions", "examQuestion")
+          .leftJoinAndSelect("examQuestion.questionEntity", "question")
+          .leftJoinAndSelect("question.options", "options")
+          .where("exam._id = :examId", { examId: Number(id) })
+          .getOne();
+
+        if (!exam) {
+          await queryRunner.rollbackTransaction();
+          return errorResponse(res, 404, "考试不存在");
+        }
+
+        // 检查答案是否完整
+        if (!answers || answers.length === 0) {
+          await queryRunner.rollbackTransaction();
+          return errorResponse(res, 400, "答案不能为空");
+        }
+
+        // 获取或创建考试记录
+        let examRecord = await queryRunner.manager
+          .createQueryBuilder(ExamRecord, "record")
+          .where("record.exam_id = :examId", { examId: exam._id })
+          .andWhere("record.participant_id IN (SELECT p.id FROM training.tr_training_record_participants p WHERE p.user_id = :userId)", { userId })
+          .getOne();
+
+        if (!examRecord) {
+          // 查找参与者ID
+          const participant = await queryRunner.manager
+            .createQueryBuilder(TrainingRecordParticipant, "participant")
+            .where("participant.user_id = :userId", { userId })
+            .andWhere("participant.training_record_id = (SELECT r.training_record_id FROM training.tr_exam_records r WHERE r.exam_id = :examId LIMIT 1)", { examId: exam._id })
+            .getOne();
+
+          if (!participant) {
+            await queryRunner.rollbackTransaction();
+            return errorResponse(res, 403, "您不是该考试的参与者");
+          }
+
+          // 创建新的考试记录
+          examRecord = new ExamRecord();
+          examRecord.exam_id = exam._id;
+          examRecord.participant_id = participant.id;
+          examRecord.training_record_id = participant.training_record_id;
+          examRecord.start_time = new Date();
+          examRecord = await queryRunner.manager.save(examRecord);
+        }
+
+        // 设置结束时间
+        examRecord.end_time = new Date();
+
+        // 计算得分
+        let totalScore = 0;
+        let correctCount = 0;
+
+        // 删除之前的答案记录（如果有）
+        await queryRunner.manager
+          .createQueryBuilder()
+          .delete()
+          .from(ExamAnswer)
+          .where("exam_record_id = :recordId", { recordId: examRecord._id })
+          .execute();
+
+        // 保存新的答案并计算得分
+        for (const answer of answers) {
+          const { questionId, userAnswer } = answer;
+          
+          // 查找题目和分数
+          const examQuestion = exam.examQuestions.find(eq => eq.question_id === questionId);
+          if (!examQuestion) continue;
+          
+          const question = examQuestion.questionEntity;
+          const questionScore = examQuestion.question_score || 0;
+          
+          // 判断答案是否正确
+          let isCorrect = false;
+          let score = 0;
+          
+          if (question.question_type === '判断' || question.question_type === '单选') {
+            // 单选题比较选项
+            const correctOption = question.options.find(opt => opt.is_correct);
+            if (question.question_type === '判断') {
+              isCorrect = correctOption ? userAnswer === correctOption.option_content : false;
+            } else {
+              isCorrect = correctOption ? userAnswer === correctOption.option_label : false;
+            }
+            score = isCorrect ? questionScore : 0;
+          } else if (question.question_type === '多选') {
+            // 多选题比较选项集合
+            const userAnswers = userAnswer.split(',').map((a: any) => a.trim()).sort();
+            const correctOptions = question.options
+              .filter(opt => opt.is_correct)
+              .map(opt => opt.option_label)
+              .sort();
+            
+            // 完全匹配才得满分，部分匹配得部分分
+            const correctAnswers = JSON.stringify(userAnswers) === JSON.stringify(correctOptions);
+            if (correctAnswers) {
+              isCorrect = true;
+              score = questionScore;
+            } else {
+              // 部分正确给一半分数
+              const correctCount = userAnswers.filter((a: any) => correctOptions.includes(a)).length;
+              const incorrectCount = userAnswers.filter((a: any) => !correctOptions.includes(a)).length;
+              
+              if (correctCount > 0 && incorrectCount === 0 && correctCount < correctOptions.length) {
+                score = Math.floor(questionScore * 0.5);
+                isCorrect = false;
+              } else {
+                score = 0;
+                isCorrect = false;
+              }
+            }
+          } else if (question.question_type === '填空') {
+            // 填空题比较关键词
+            const standardAnswers = question.answer?.split('|') || [];
+            isCorrect = standardAnswers.some(ans => 
+              userAnswer.toLowerCase().trim() === ans.toLowerCase().trim()
+            );
+            score = isCorrect ? questionScore : 0;
+          } else if (question.question_type === '简答') {
+            // 简答题需要人工评分，先设为0分
+            isCorrect = false;
+            score = 0;
+          }
+          
+          // 保存答案记录
+          const examAnswer = new ExamAnswer();
+          examAnswer.exam_record_id = examRecord._id;
+          examAnswer.question_id = questionId;
+          examAnswer.user_answer = userAnswer;
+          examAnswer.is_correct = isCorrect;
+          examAnswer.score = score;
+          
+          await queryRunner.manager.save(examAnswer);
+          
+          // 累计得分
+          if (isCorrect) correctCount++;
+          totalScore += Number(score);
+        }
+        
+        // 更新考试记录的得分
+        examRecord.score = totalScore;
+        examRecord.is_passed = totalScore >= exam.pass_score;
+        await queryRunner.manager.save(examRecord);
+        
+        await queryRunner.commitTransaction();
+        
+        return successResponse(res, {
+          examId: exam._id,
+          recordId: examRecord._id,
+          totalScore,
+          correctCount,
+          totalCount: exam.examQuestions.length,
+          isPassed: examRecord.is_passed
+        }, "提交成功");
+
+      } catch (error) {
+        await queryRunner.rollbackTransaction();
+        throw error;
+      } finally {
+        await queryRunner.release();
+      }
+    } catch (error) {
+      logger.error("提交考卷失败:", error);
+      return errorResponse(res, 500, "提交考卷失败");
+    }
+  }
+
+  // 获取考试结果
+  async getResult(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?._id;
+
+      // 获取考试信息
+      const exam = await AppDataSource.getRepository(Exam)
+        .createQueryBuilder("exam")
+        .leftJoinAndSelect("exam.examQuestions", "examQuestion")
+        .leftJoinAndSelect("examQuestion.questionEntity", "question")
+        .leftJoinAndSelect("question.options", "options")
+        .where("exam._id = :examId", { examId: Number(id) })
+        .getOne();
+
+      if (!exam) {
+        return errorResponse(res, 404, "考试不存在");
+      }
+
+      // 获取用户的考试记录
+      const examRecord = await AppDataSource.getRepository(ExamRecord)
+        .createQueryBuilder("record")
+        .leftJoinAndSelect("record.participant", "participant")
+        .where("record.exam_id = :examId", { examId: exam._id })
+        .andWhere("participant.user_id = :userId", { userId })
+        .getOne();
+
+      if (!examRecord) {
+        return errorResponse(res, 404, "未找到您的考试记录");
+      }
+
+      // 获取用户的答案
+      const examAnswers = await AppDataSource.getRepository(ExamAnswer)
+        .createQueryBuilder("answer")
+        .leftJoinAndSelect("answer.questionEntity", "question")
+        .leftJoinAndSelect("question.options", "options")
+        .where("answer.exam_record_id = :recordId", { recordId: examRecord._id })
+        .getMany();
+
+      // 整理考试结果数据
+      const questionResults = exam.examQuestions.map(examQuestion => {
+        const question = examQuestion.questionEntity;
+        const userAnswer = examAnswers.find(a => a.question_id === question._id);
+        
+        // 获取正确答案
+        let correctAnswer = '';
+        if (question.question_type === '判断') {
+          correctAnswer = question.answer || '';
+        } else if (['单选', '多选'].includes(question.question_type)) {
+          correctAnswer = question.options
+            .filter(opt => opt.is_correct)
+            .map(opt => opt.option_label)
+            .join(', ');
+        } else {
+          correctAnswer = question.answer || '';
+        }
+        
+        return {
+          questionId: question._id,
+          questionType: question.question_type,
+          content: question.content,
+          options: question.options,
+          correctAnswer,
+          userAnswer: userAnswer?.user_answer || '',
+          isCorrect: userAnswer?.is_correct,
+          score: userAnswer?.score || 0,
+          maxScore: examQuestion.question_score,
+          analysis: question.analysis
+        };
+      });
+
+      // 计算统计数据
+      const totalQuestions = questionResults.length;
+      const correctCount = questionResults.filter(q => q.isCorrect === true).length;
+      const incorrectCount = questionResults.filter(q => q.isCorrect === false).length;
+      const pendingCount = questionResults.filter(q => q.isCorrect === null).length;
+      
+      // 按题型分类统计
+      const typeStats = {} as Record<string, any>;
+      questionResults.forEach(q => {
+        if (!typeStats[q.questionType]) {
+          typeStats[q.questionType] = {
+            total: 0,
+            correct: 0,
+            incorrect: 0,
+            pending: 0,
+            score: 0,
+            maxScore: 0
+          };
+        }
+        
+        typeStats[q.questionType].total += 1;
+        typeStats[q.questionType].maxScore += q.maxScore;
+        typeStats[q.questionType].score += q.score;
+        
+        if (q.isCorrect === true) typeStats[q.questionType].correct += 1;
+        else if (q.isCorrect === false) typeStats[q.questionType].incorrect += 1;
+        else typeStats[q.questionType].pending += 1;
+      });
+
+      return successResponse(res, {
+        exam,
+        examRecord,
+        questions: questionResults,
+        statistics: {
+          totalQuestions,
+          correctCount,
+          incorrectCount,
+          pendingCount,
+          score: examRecord.score,
+          maxScore: exam.total_score,
+          isPassed: examRecord.is_passed,
+          passScore: exam.pass_score,
+          typeStats
+        }
+      }, "获取考试结果成功");
+
+    } catch (error) {
+      logger.error("获取考试结果失败:", error);
+      return errorResponse(res, 500, "获取考试结果失败");
+    }
+  }
+
 }
