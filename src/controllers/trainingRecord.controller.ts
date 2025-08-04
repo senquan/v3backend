@@ -379,7 +379,8 @@ export class TrainingRecordController {
                     hours: 0,
                     examRecordId: examRecordMap.get(participant.id)?._id,
                     passed: examRecordMap.get(participant.id)?.is_passed,
-                    score: examRecordMap.get(participant.id)?.score
+                    score: examRecordMap.get(participant.id)?.score,
+                    paperUrl: examRecordMap.get(participant.id)?.offline_paper,
                 }
             })
             return successResponse(res, participants, '获取培训记录人员成功');
