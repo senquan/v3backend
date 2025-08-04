@@ -8,7 +8,7 @@ export class CategoryController {
   // 获取分类列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, keyword, format = "" } = req.query;
+      const { page = 1, pageSize = 20, keyword, format = "", type = 0 } = req.query;
       
       // 构建查询条件
       const queryBuilder = AppDataSource.getRepository(Category)
@@ -18,6 +18,10 @@ export class CategoryController {
       // 添加筛选条件
       if (keyword) {
         queryBuilder.andWhere('category.name LIKE :keyword', { keyword: `%${keyword}%` });
+      }
+
+      if (type !== undefined) {
+        queryBuilder.andWhere('category.type = :type', { type: Number(type) });
       }
 
       if (format === 'opt') {
@@ -97,7 +101,7 @@ export class CategoryController {
   // 创建分类
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { name, parentId, ref, description = '', sort } = req.body;
+      const { type, name, parentId, ref, description = '', sort } = req.body;
       
       if (!name) {
         return errorResponse(res, 400, '分类名称不能为空', null);
@@ -115,6 +119,7 @@ export class CategoryController {
 
       // 创建新分类
       const category = new Category();
+      category.type = type || 0;
       category.name = name;
       category.description = description;
       category.sort = sort;

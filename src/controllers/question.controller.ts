@@ -15,6 +15,7 @@ export class QuestionController {
       const queryBuilder = AppDataSource.getRepository(Question)
         .createQueryBuilder("question")
         .leftJoinAndSelect("question.creatorEntity", "creator")
+        .leftJoinAndSelect("question.categoryEntity", "category")
         .leftJoinAndSelect("question.options", "options")
         .where("question.status = :status", { status: true });
       

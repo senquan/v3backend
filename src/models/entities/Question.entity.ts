@@ -1,4 +1,5 @@
 import { CreateDateColumn, Entity, PrimaryGeneratedColumn, Column, JoinColumn, OneToMany, ManyToOne, UpdateDateColumn } from "typeorm";
+import { Category } from "./Category.entity";
 import { User } from "./User.entity";
 import { QuestionOption } from "./QuestionOption.entity";
 
@@ -70,6 +71,10 @@ export class Question {
   })
   @JoinColumn({ name: "updater" })
   updaterEntity!: User;
+
+  @ManyToOne(() => Category)
+  @JoinColumn({ name: "category_id" })
+  categoryEntity!: Category;
 
   @OneToMany(() => QuestionOption, questionOption => questionOption.questionEntity)
   options!: QuestionOption[];

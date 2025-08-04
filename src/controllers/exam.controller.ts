@@ -101,7 +101,14 @@ export class ExamController {
     settings.examCategory = 101;
 
     req.body.settings = settings;
-    return this.generateExam(req, res);
+    
+    const response = await this.generateExam(req, res);
+    if (response.statusCode === 200) {
+      trainingRecord.exam_status = 1;
+      await AppDataSource.getRepository(TrainingRecord).save(trainingRecord);
+    }
+    
+    return response;
   }
 
   // 自动生成考卷
@@ -134,9 +141,9 @@ export class ExamController {
         exam.training_category = trainingCategory;
         exam.level = settings.level;
         exam.total_score = settings.totalScore;
-        exam.pass_score = Math.floor(settings.totalScore * 0.6); // 默认60%及格
-        exam.duration = 120; // 默认120分钟
-        exam.status = true;
+        exam.pass_score = settings.passScore || Math.floor(settings.totalScore * 0.6); // 默认60%及格
+        exam.duration = settings.duration || 120; // 默认120分钟
+        exam.status = false;
         exam.creator = userId;
         exam.updater = userId;
 
@@ -427,7 +434,8 @@ export class ExamController {
         .createQueryBuilder("record")
         .leftJoinAndSelect("record.participant", "participant")
         .leftJoinAndSelect("record.examEntity", "exam")
-        .leftJoinAndSelect("exam.examQuestions", "examQuestion");
+        .leftJoinAndSelect("exam.examQuestions", "examQuestion")
+        .where("exam.status = :status", { status: true });
 
       if (userId) {
         queryBuilder.andWhere("participant.user_id = :userId", { userId });
@@ -510,6 +518,7 @@ export class ExamController {
     try {
       const { id } = req.params;
       const { settings, selectionConfig } = req.body;
+      const userId = (req as any).user?._id;
 
       const exam = await AppDataSource.getRepository(Exam).findOne({
         where: { _id: Number(id) }
@@ -532,6 +541,7 @@ export class ExamController {
         const newSettings = { ...this.getDefaultExamSettings(), ...settings };
         const newConfig = { ...this.getDefaultSelectionConfig(), ...selectionConfig };
         
+        console.log("settings", settings);
         const selectedQuestions = await this.smartSelectQuestions(
           newSettings,
           newConfig,
@@ -554,6 +564,14 @@ export class ExamController {
 
           await queryRunner.manager.save(examQuestion);
         }
+
+        // 4. 更新考试设置
+        exam.total_score = newSettings.totalScore;
+        exam.pass_score = newSettings.passScore || Math.floor(newSettings.totalScore * 0.6); // 默认60%及格
+        exam.duration = newSettings.duration || 120; // 默认120分钟
+        exam.updater = userId;
+
+        await queryRunner.manager.save(exam);
 
         await queryRunner.commitTransaction();
 
@@ -888,4 +906,56 @@ export class ExamController {
     }
   }
 
+  // 发布试卷
+  async publishExam(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const exam = await AppDataSource.getRepository(Exam).findOneBy({ _id: Number(id) });
+      if (!exam) {
+        return errorResponse(res, 404, "考试不存在");
+      }
+      exam.status = true;
+      await AppDataSource.getRepository(Exam).save(exam);
+      return successResponse(res, exam, "发布成功");
+    } catch (error) {
+      logger.error("发布试卷失败:", error);
+      return errorResponse(res, 500, "发布试卷失败");
+    }
+  }
+
+  // 上报成绩
+  async reportScore(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const { paper_path, score } = req.body;
+
+      const examRecord = await AppDataSource.getRepository(ExamRecord).findOne({
+        where: { _id: Number(id) },
+        relations: ["examEntity"]
+      });
+      
+      if (!examRecord) {
+        return errorResponse(res, 404, "考试记录不存在");
+      }
+      
+      examRecord.score = score;
+      if (paper_path && paper_path.length > 0) {
+        examRecord.offline_paper = JSON.stringify(paper_path);
+      }
+      
+      // 添加空值检查
+      if (examRecord.examEntity && examRecord.examEntity.pass_score) {
+        examRecord.is_passed = score >= examRecord.examEntity.pass_score;
+      } else {
+        const defaultPassScore = 60; // 可以根据业务需求设置默认通过分数
+        examRecord.is_passed = score >= defaultPassScore;
+      }
+      
+      await AppDataSource.getRepository(ExamRecord).save(examRecord);
+      return successResponse(res, examRecord, "上报成绩成功");
+    } catch (error) {
+      logger.error("上报成绩失败:", error);
+      return errorResponse(res, 500, "上报成绩失败");
+    }
+  }
 }

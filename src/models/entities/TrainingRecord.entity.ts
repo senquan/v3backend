@@ -32,6 +32,9 @@ export class TrainingRecord {
   @Column({ type: 'smallint', default: 0 })
   status!: number;
 
+  @Column({ type: 'smallint', default: 0 })
+  exam_status!: number;
+
   @Column({ type: 'text', nullable: true })
   remarks: string | null = null;
 

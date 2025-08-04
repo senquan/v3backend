@@ -30,6 +30,9 @@ export class ExamRecord {
   @Column({ type: "boolean", nullable: true, comment: "是否通过" })
   is_passed: boolean | null = null;
 
+  @Column({ type: "varchar", nullable: true, comment: "线下考卷路径" })
+  offline_paper: string | null = null;
+
   @Column({ type: "text", nullable: true, comment: "考试记录备注" })
   notes: string | null = null;
 

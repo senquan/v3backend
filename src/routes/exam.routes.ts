@@ -17,9 +17,6 @@ router.get('/mylist', examController.getMyList.bind(examController));
 // 获取考试列表
 router.get('/list', examController.getList.bind(examController));
 
-// 获取考试详情
-router.get('/:id', examController.getDetail.bind(examController));
-
 // 更新考试设置
 router.put('/:id/settings', examController.updateSettings.bind(examController));
 
@@ -31,5 +28,14 @@ router.post('/:id/submit', examController.submitExam.bind(examController));
 
 // 获取考试结果
 router.get('/:id/result', examController.getResult.bind(examController));
+
+// 发布试卷
+router.put('/:id/publish', examController.publishExam.bind(examController));
+
+// 上报成绩
+router.post('/:id/report', examController.reportScore.bind(examController));
+
+// 获取考试详情
+router.get('/:id', examController.getDetail.bind(examController));
 
 export default router;

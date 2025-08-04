@@ -87,6 +87,7 @@ export class TrainingRecordController {
               training_hours: record.training_plan.training_hours,
               assessment_method: record.training_plan.assessment_method,
               exam_method: record.training_plan.exam_method,
+              exam_status: record.exam_status,
               status: record.training_plan.status,
               actual_participants: 0,
               passed: 0,
@@ -99,7 +100,7 @@ export class TrainingRecordController {
               total,
               page: Number(page),
               pageSize: Number(pageSize)
-            }, '获取课件列表成功');
+            }, '获取培训记录列表成功');
         } catch (error) {
             return errorResponse(res, 500, '服务器内部错误', null);
         }
@@ -194,7 +195,7 @@ export class TrainingRecordController {
               total,
               page: Number(page),
               pageSize: Number(pageSize)
-            }, '获取课件列表成功');
+            }, '获取培训记录分组列表成功');
         } catch (error) {
             return errorResponse(res, 500, '服务器内部错误', null);
         }
@@ -351,23 +352,12 @@ export class TrainingRecordController {
             const id = req.params.id;
             const participantRepository = AppDataSource.getRepository(TrainingRecordParticipant);
             const trainingRecordParticipants = await participantRepository.find({
-                where: { training_record_id: Number(id) }
+                where: { training_record_id: Number(id) },
+                relations: ['user', 'worker', 'user.branchEntity', 'worker.branchEntity']
             });
             if (!trainingRecordParticipants) {
                 return errorResponse(res, 404, '培训记录人员不存在', null);
             }
-            const userIds = trainingRecordParticipants.map(participant => participant.user_id);
-            const workerIds = trainingRecordParticipants.map(participant => participant.worker_id);
-            const userRepository = AppDataSource.getRepository(User);
-            const workerRepository = AppDataSource.getRepository(ConstructionWorker);
-            const users = await userRepository.find({
-                where: { _id: In(userIds) },
-                relations: ['branchEntity']
-            });
-            const workers = await workerRepository.find({
-                where: { _id: In(workerIds) },
-                relations: ['branchEntity']
-            });
             // 获取考试记录
             const examRecordRepository = AppDataSource.getRepository(ExamRecord);
             const examRecords = await examRecordRepository.find({
@@ -377,20 +367,21 @@ export class TrainingRecordController {
             examRecords.forEach(record => {
                 examRecordMap.set(record.participant_id, record);
             })
-            const participants = [...users, ...workers].map(participant => {
+            const participants = trainingRecordParticipants.map(participant => {
                 return {
-                    id: participant._id,
-                    name: participant instanceof User ? participant.realname : participant.name,
-                    type: participant instanceof User ? participant.type : 0,
-                    gender: participant instanceof User ? 0 : participant.sex,
-                    age: participant instanceof User ? participant.age : 0,
-                    organization: participant.branchEntity?.name || '',
+                    id: participant.id,
+                    name: participant.user?.realname || participant.worker?.name,
+                    type: participant.user?.type || 0,
+                    gender: participant.worker?.sex || 0,
+                    age: participant.user?.age || 0,
+                    organization: participant.user?.branchEntity?.name || participant.worker?.branchEntity?.name || '',
                     idcard: 0,
                     hours: 0,
-                    passed: examRecordMap.get(participant._id)?.is_passed,
-                    score: examRecordMap.get(participant._id)?.score
+                    examRecordId: examRecordMap.get(participant.id)?._id,
+                    passed: examRecordMap.get(participant.id)?.is_passed,
+                    score: examRecordMap.get(participant.id)?.score
                 }
-            });
+            })
             return successResponse(res, participants, '获取培训记录人员成功');
         } catch (error) {
             console.error('获取培训记录人员失败:', error);
