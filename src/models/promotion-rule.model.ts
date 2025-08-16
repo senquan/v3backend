@@ -24,7 +24,7 @@ export class PromotionRule {
   @Column({ name: 'condition', type: 'json', comment: '规则条件, JSON' })
   condition!: string;
 
-  @Column({ name: 'discount_value', type: 'decimal', precision: 5, scale: 2, nullable: true, comment: '折扣率, 如8.5表示85折' })
+  @Column({ name: 'discount_value', type: 'decimal', precision: 8, scale: 4, nullable: true, comment: '折扣率, 如8.5表示85折' })
   discountValue!: number;
 
   @Column({ name: 'promotion_id' })

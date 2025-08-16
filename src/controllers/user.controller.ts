@@ -431,6 +431,7 @@ export class UserController {
         permissions = await AppDataSource.getRepository(Permission)
           .createQueryBuilder('permission')
           .where('permission.status = :status', { status: 1 })
+          .orderBy('permission.sort', 'ASC')
           .getMany();
       } else {
         // 获取角色权限
@@ -439,6 +440,7 @@ export class UserController {
           .leftJoinAndSelect('rolePermission.permission', 'permission')
           .where('rolePermission.roleId IN (:...roleIds)', { roleIds })
           .andWhere('permission.status = :status', { status: 1 })
+          .orderBy('permission.sort', 'ASC')
           .getMany();
         
         // 去重，获取直接分配的权限ID

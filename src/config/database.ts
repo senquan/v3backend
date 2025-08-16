@@ -19,8 +19,10 @@ import { ProductModel } from '../models/product-model.model';
 import { ProductSeries } from '../models/product-series.model';
 import { ProductSeriesTag } from '../models/product-series-tag.model';
 import { Promotion } from '../models/promotion.model';
+import { PromotionV3 } from '../models/promotion-v3.model';
 import { PromotionPlatforms } from '../models/promotion-platforms.motel';
 import { PromotionRule } from '../models/promotion-rule.model';
+import { PromotionRuleV3 } from '../models/promotion-rule-v3.model';
 import { ReturnOrder } from '../models/return-order.model';
 import { ReturnOrderItem } from '../models/return-order-item.model';
 import { Role } from '../models/role.model';
@@ -52,7 +54,9 @@ export const AppDataSource = new DataSource({
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
   entities: [Category, Coupon, CouponUser, Customer, Dict, InviteCode, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag, ProductTag,
-    Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, User, UserRole],
+    Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, User, UserRole,
+    PromotionV3, PromotionRuleV3
+  ],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });
