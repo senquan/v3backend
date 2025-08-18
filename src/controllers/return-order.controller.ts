@@ -70,8 +70,8 @@ export class ReturnOrderController {
 
         // 计算退货金额
         const returnAmount = (orderItem.unitPrice * returnQty);
-        if (returnAmount != item.refund) {
-          return errorResponse(res, 400, '退货金额与原订单金额不一致', null);
+        if (returnAmount < item.refund) {
+          return errorResponse(res, 400, '退货金额不能多于原订单支付金额', null);
         }
         
         // 创建退货商品明细
@@ -80,12 +80,12 @@ export class ReturnOrderController {
         returnItem.productId = orderItem.productId;
         returnItem.unitPrice = orderItem.unitPrice;
         returnItem.quantity = returnQty;
-        returnItem.totalPrice = returnAmount;
+        returnItem.totalPrice = item.refund;
         returnItem.reason = item.reason || reason;
         
         returnItems.push(returnItem);
         totalQuantity += returnQty;
-        totalAmount += returnAmount;
+        totalAmount += item.refund;
       }
 
       if (returnItems.length === 0) {
@@ -105,6 +105,7 @@ export class ReturnOrderController {
       await queryRunner.manager.save(ReturnOrderItem, returnItems);
 
       // 更新原订单状态
+      const previousStatus = order.status;
       order.status = 5; // 售后中
       await queryRunner.manager.save(order);
 
@@ -120,6 +121,16 @@ export class ReturnOrderController {
         operatorName,
         operation,
         remark
+      )
+      await this.orderStatusLogService.logStatusChange(
+        orderId,
+        0,
+        previousStatus,
+        order.status,
+        userId,
+        operatorName,
+        operation,
+        `${reason} - ${remark}`
       )
       
       await queryRunner.commitTransaction();
