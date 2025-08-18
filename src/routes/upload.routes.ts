@@ -40,15 +40,22 @@ const uploadMiddleware = multer.default({
 });
 
 // 单文件上传路由
-router.post('/image', uploadMiddleware.single('image'), (req, res) => {
+router.post('/image', uploadMiddleware.single('image'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({
             code: 1,
             message: '未接收到文件'
         });
     }
-    const result = uploadController.uploadImage(req.file);
-    return res.json(result);
+    try {
+        const result = await uploadController.uploadImage(req.file);
+        return res.json(result);
+    } catch (error) {
+        return res.status(500).json({
+            code: 1,
+            message: '文件上传处理失败'
+        });
+    }
 });
 
 // 多文件上传路由

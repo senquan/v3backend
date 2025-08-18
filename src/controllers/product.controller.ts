@@ -8,11 +8,14 @@ import { ProductSeriesTag } from '../models/product-series-tag.model';
 import { ProductTag } from '../models/product-tag.model';
 import { SpecItem } from '../models/spec-item.model';
 import { Category } from '../models/category.model';
+import { Gallery } from '../models/gallery.model';
 import { OrderItem } from '../models/order-item.model';
 import { Tag } from '../models/tag.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { PlatformTags } from '../models/platform-tags.model';
+import * as path from 'path';
+import sharp from 'sharp';
 
 export class ProductController {
   // 获取商品列表
@@ -446,7 +449,35 @@ export class ProductController {
       }
 
       if (Array.isArray(productData.imageFiles) && productData.imageFiles.length > 0) {
-        productData.imageUrls = productData.imageFiles.join(',');
+        const urls: string[] = []
+        const galleries: Gallery[] = [];
+        for (const file of productData.imageFiles) {
+          urls.push(file.url)
+          try {
+            // 插入图库记录
+            const gallery = new Gallery();
+            gallery.title = productData.name || "";
+            gallery.description = productData.remark || "";
+            gallery.fileName = file.name || "";
+            gallery.filePath = file.url || "";
+            gallery.fileUrl = file.url || "";
+            gallery.fileSize = file.size || 0;
+            gallery.fileType = gallery.filePath.split(".")[1] || "";
+            gallery.mimeType = file.type || "application/octet-stream";
+            gallery.width = file.width || 0;
+            gallery.height = file.height || 0;
+            gallery.thumbnailUrl = gallery.fileUrl.replace('uploads/', 'uploads/thumb/');
+            gallery.categoryId = 1;
+            gallery.altText = gallery.fileName;
+            gallery.sortOrder = 0;
+            gallery.uploadBy = userId;
+            galleries.push(gallery);
+          } catch (error) {
+            logger.warn(`获取图片信息失败: ${error}`);
+          }
+        }
+        await AppDataSource.getRepository(Gallery).save(galleries);
+        productData.imageUrls = urls.join(',');
       }
       
       // 创建新商品
@@ -577,10 +608,40 @@ export class ProductController {
 
       // 检查图片文件列表是否有变化
       const oldFiles = product.imageUrls ? product.imageUrls.split(',') : [];
-      const newFiles = productData.imageFiles ? productData.imageFiles : [];
+      const newFiles = productData.imageFiles ? productData.imageFiles.map((file: any) => file.url) : [];
 
       if (JSON.stringify(oldFiles.sort()) !== JSON.stringify(newFiles.sort())) {
-        product.imageUrls = productData.imageFiles.join(',');
+        product.imageUrls = newFiles.join(',');
+        const newImages: Gallery[] = [];
+        for (const file of productData.imageFiles) {
+          if (file.size) {
+            try {
+              // 插入图库记录
+              const gallery = new Gallery();
+              gallery.title = productData.name || "";
+              gallery.description = productData.remark || "";
+              gallery.fileName = file.name || "";
+              gallery.filePath = file.url || "";
+              gallery.fileUrl = file.url || "";
+              gallery.fileSize = file.size || 0;
+              gallery.fileType = gallery.filePath.split(".")[1] || "";
+              gallery.mimeType = file.type || "application/octet-stream";
+              gallery.width = file.width || 0;
+              gallery.height = file.height || 0;
+              gallery.thumbnailUrl = gallery.fileUrl.replace('uploads/', 'uploads/thumb/');
+              gallery.categoryId = 1;
+              gallery.altText = gallery.fileName;
+              gallery.sortOrder = 0;
+              gallery.uploadBy = userId;
+              newImages.push(gallery);
+            } catch (error) {
+              logger.warn(`获取图片信息失败: ${error}`);
+            }
+            if (newImages.length > 0) {
+              await AppDataSource.getRepository(Gallery).save(newImages);
+            }
+          }
+        }
       }
 
       const { modelType, serie, tags, ...updateData } = productData;
@@ -617,7 +678,6 @@ export class ProductController {
         await queryRunner.manager.insert(ProductTag, tagRelations);
         delete productData.tags;
       }
-
 
       await queryRunner.commitTransaction();
       return successResponse(res, updatedProduct, '更新商品成功');

@@ -1,13 +1,28 @@
 import { Logger } from '@nestjs/common';
 import { ImageProcessorController } from './image-processor.controller';
 import * as path from 'path';
+import sharp from 'sharp';
 
 export class UploadController {
     private readonly logger = new Logger(UploadController.name);
     private readonly imageProcessor = new ImageProcessorController();
     
-    uploadImage(file: Express.Multer.File) {
+    async uploadImage(file: Express.Multer.File) {
       this.logger.log(`文件上传成功: ${file.filename}`);
+      
+      // 获取图片尺寸信息
+      let width: number | undefined;
+      let height: number | undefined;
+      
+      try {
+        const uploadsDir = process.env.UPLOAD_PATH || './uploads';
+        const filePath = path.join(process.cwd(), uploadsDir, file.filename);
+        const metadata = await sharp(filePath).metadata();
+        width = metadata.width;
+        height = metadata.height;
+      } catch (error) {
+        this.logger.warn(`获取图片尺寸失败: ${error}`);
+      }
       
       // 异步生成缩略图，不阻塞响应
       setImmediate(() => {
@@ -18,7 +33,14 @@ export class UploadController {
       
       return {
         code: 0,
-        data: { url: `/uploads/${file.filename}` }
+        data: {
+          url: `/uploads/${file.filename}`,
+          size: file.size,
+          name: file.originalname,
+          type: file.mimetype,
+          width,
+          height
+        }
       };
     }
     

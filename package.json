@@ -8,6 +8,7 @@
         "build": "tsc",
         "lint": "eslint . --ext .ts",
         "process-images": "ts-node src/scripts/process-images.ts",
+        "process-gallery": "ts-node src/scripts/process-gallery.ts",
         "generate-thumbnails": "ts-node src/scripts/generate-thumbnails.ts",
         "upgrade-ticket-priority": "ts-node src/scripts/upgrade-ticket-priority.ts",
         "test-ticket-priority": "ts-node src/scripts/test-ticket-priority.ts"

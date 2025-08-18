@@ -37,7 +37,7 @@ router.get('/:id', async (req, res, next) => {
   }, productController.getDetail);
 
 // 创建商品
-router.post('/', productController.create);
+router.post('/', productController.create.bind(productController));
 
 // 批量更新商品
 router.put('/batch', productController.batchUpdatePrices);

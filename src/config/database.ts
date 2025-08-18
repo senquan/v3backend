@@ -39,6 +39,7 @@ import { TicketAttachment } from '../models/ticket-attachment.model';
 import { TicketComment } from '../models/ticket-comment.model';
 import { User } from '../models/user.model';
 import { UserRole } from '../models/user-roles.model';
+import { Gallery } from '../models/gallery.model';
 
 // 加载环境变量
 dotenv.config();
@@ -53,7 +54,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'cardbug',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [Category, Coupon, CouponUser, Customer, Dict, InviteCode, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag, ProductTag,
+  entities: [Category, Coupon, CouponUser, Customer, Dict, Gallery, InviteCode, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag, ProductTag,
     Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, User, UserRole,
     PromotionV3, PromotionRuleV3
   ],

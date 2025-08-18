@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn, ManyToMany } 
 import { Product } from "./product.model";
 import { ProductSeries } from "./product-series.model";
 import { Role } from './role.model';
+import { Gallery } from './gallery.model';
 
 @Entity("tags")
 export class Tag {
@@ -28,4 +29,7 @@ export class Tag {
 
   @ManyToMany(() => Role, role => role.tags)
   roles!: Role[];
+
+  @ManyToMany(() => Gallery, gallery => gallery.tags)
+  galleries!: Gallery[];
 }
