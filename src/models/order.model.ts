@@ -8,6 +8,7 @@ import { User } from './user.model';
 export enum OrderType {
   COMMON = 1,
   PROJECT = 2,
+  V3 = 3,
 }
 
 @Entity("orders")

@@ -131,7 +131,7 @@ export class OrderController {
     const userId = (req as any).user.id;
     try {
       const { id } = req.params;
-      const { name, type, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs } = req.body;
+      const { name, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs } = req.body;
 
       // 验证必要字段
       if (!name ||!platformId ||!products?.length) {
@@ -148,7 +148,6 @@ export class OrderController {
       }
 
       // 更新订单信息
-      order.type = type || 1;
       order.name = name;
       order.platformId = platformId;
       order.customerId = 0;
@@ -244,8 +243,12 @@ export class OrderController {
       const queryBuilder = AppDataSource.getRepository(Order)
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.user', 'user')
-        .leftJoinAndSelect('user.staff', 'staff')
-        .where('order.type = :type', { type });
+        .leftJoinAndSelect('user.staff', 'staff');
+      
+      if (type === 2)
+        queryBuilder.where('order.type = 2');
+      else
+        queryBuilder.where('order.type != 2');
 
       // 添加新的查询条件
       if (status && Array.isArray(status) && status.length > 0) queryBuilder.andWhere('order.status IN (:...status)', { status: status.map(Number) });
