@@ -219,6 +219,7 @@ export class TicketController {
       const ticket = await AppDataSource.getRepository(Ticket)
         .createQueryBuilder('ticket')
         .leftJoinAndSelect('ticket.creator', 'creator')
+        .leftJoinAndSelect('creator.staff', 'creatorStaff')
         .leftJoinAndSelect('ticket.assignee', 'assignee')
         .leftJoinAndSelect('ticket.comments', 'comments', 'comments.isDeleted = 0')
         .leftJoinAndSelect('comments.user', 'commentUser')
