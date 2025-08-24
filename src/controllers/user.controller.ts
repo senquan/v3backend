@@ -2,12 +2,26 @@ import { Request, Response } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { AppDataSource } from '../config/database';
 import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity';
+import { Courseware } from '../models/entities/Courseware.entity';
+import { ExamRecord } from '../models/entities/ExamRecord.entity';
 import { User } from '../models/entities/User.entity';
 import { ProjectDepartmentMember } from '../models/entities/ProjectDepartmentMember.entity';
+import { TrainingRecordCourseware } from '../models/entities/TrainingRecordCourseware.entity';
+import { TrainingRecordParticipant } from '../models/entities/TrainingRecordParticipant.entity';
+import { TrainingRecordProgress } from '../models/entities/TrainingRecordProgress.entity';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 
 const authController = require('../controllers/auth.controller');
+
+const WECHAT_CONFIG = {
+  appId: process.env.WECHAT_APP_ID || '',
+  appSecret: process.env.WECHAT_APP_SECRET || '',
+  grantType: 'authorization_code'
+};
+
+const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-key';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 export class UserController {
   // 用户登录
@@ -41,20 +55,17 @@ export class UserController {
       );
 
       // 返回用户信息和令牌
-      return res.json({
-        code: 0,
-        message: '登录成功',
-        data: {
-          token,
-          user: {
-            id: user._id,
-            realname: user.realname,
-            name: user.name,
-            email: user.email,
-            phone: user.phone
-          }
+      return successResponse(res, {
+        token,
+        user: {
+          id: user._id,
+          type: 1,
+          realname: user.realname,
+          name: user.name,
+          email: user.email,
+          phone: user.phone
         }
-      });
+        }, '登录成功');
     } catch (error) {
       logger.error('登录失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -235,5 +246,325 @@ export class UserController {
       logger.error('获取用户详情失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
+  }
+
+  // 微信用户登录
+  async wechatLogin(req: Request, res: Response): Promise<Response> {
+    try {
+      const { code } = req.body;
+      
+      if (!code) {
+        return errorResponse(res, 400, '缺少微信登录凭证');
+      }
+      
+      if (!WECHAT_CONFIG.appId || !WECHAT_CONFIG.appSecret) {
+        return errorResponse(res, 500, '缺少微信配置，请提供 appId 和 appSecret');
+      }
+
+      const user = {
+        id: 'wechat_test',
+        type: 2,
+        nickname: 'Test User',
+        avatar: 'https://example.com/avatar.png',
+        wechat_openid: 'wechat_test_openid',
+      }
+      const token = this.generateJwtToken(user, 'wechat');
+
+      return successResponse(res, {
+        token,
+        userInfo: {
+          id: user.id,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          openid: user.wechat_openid,
+          loginType: 'wechat'
+        }
+      }, '微信登录成功');
+      
+    } catch (error: any) {
+      logger.error('WeChat login error:', error);
+      
+      // Handle specific error types
+      if (error?.message?.includes('invalid_grant')) {
+        return errorResponse(res, 400, 'Invalid or expired authorization code');
+      } else if (error?.message?.includes('rate limit')) {
+        return errorResponse(res, 429, 'WeChat API rate limit exceeded, please try again later');
+      } else if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND') {
+        return errorResponse(res, 503, 'WeChat service temporarily unavailable');
+      } else {
+        return errorResponse(res, 500, 'WeChat login failed');
+      }
+    } 
+  }
+
+  // 获取用户培训计划详情
+  async myPlanDetail(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+
+      const user = (req as any).user;
+      if (!user) {
+        return errorResponse(res, 401, '未认证', null);
+      }
+
+      const userType = user.type === 2 ? 2 : 1;      
+      const planBuilder = AppDataSource.getRepository(TrainingRecordParticipant)
+        .createQueryBuilder('participant')
+        .innerJoinAndSelect('participant.training_record', 'record')
+        .innerJoinAndSelect('record.training_plan', 'plan')
+        .innerJoinAndSelect('plan.trainer', 'trainer')
+        .where('record.status = 1')
+        .andWhere('plan.is_deleted = 0');
+        
+      if (userType === 1) {
+        planBuilder.andWhere('participant.user_id = :userId', { userId: user.id });
+      } else {
+        planBuilder.andWhere('participant.worker_id = :workerId', { workerId: user.id });
+      }
+
+      const plan = await planBuilder
+        .andWhere('participant.id = :participantId', { participantId: id })
+        .getOne();
+
+      if (!plan) {
+        return errorResponse(res, 404, '培训计划不存在', null);
+      }
+
+      // 获取培训记录对应课件列表
+      const coursewareData = await AppDataSource.getRepository(TrainingRecordCourseware)
+        .createQueryBuilder('recordCourseware')
+        .innerJoinAndSelect('recordCourseware.courseware', 'courseware')
+        .where('recordCourseware.training_record_id = :recordId', { recordId: plan.training_record_id })
+        .andWhere('courseware.is_deleted = :is_deleted', { is_deleted: 0 })
+        .andWhere('courseware.status = :status', { status: 1 })
+        .orderBy('recordCourseware.sort', 'ASC')
+        .getMany();
+
+      // 获取培训记录对应进度列表
+      const progressData = await AppDataSource.getRepository(TrainingRecordProgress)
+        .createQueryBuilder('progress')
+        .where('progress.training_record_participant_id = :participantId', { participantId: plan.id })
+        .getMany();
+      // 合并进度数据
+      const progressMap = new Map(progressData.map(item => [item.courseware_id, item]));
+
+      let totalDuration = 0
+      const coursewares = coursewareData.map(item => {
+        totalDuration += item.courseware.duration;
+        const progress = progressMap.get(item.courseware_id)?.progress || 0;
+        return {
+          id: item.courseware._id,
+          title: item.courseware.title,
+          description: item.courseware.description,
+          duration: item.courseware.duration,
+          type: item.courseware.type,
+          isCompleted: progress >= 100,
+          isLocked: progressMap.get(item.courseware_id)?.is_locked,
+          progress
+        }
+      });
+
+      // 获取考试记录
+      const exam = await AppDataSource.getRepository(ExamRecord)
+        .createQueryBuilder('record')
+        .innerJoinAndSelect('record.examEntity', 'exam')
+        .where('record.training_record_id = :recordId', { recordId: id })
+        .andWhere('record.participant_id = :participant', { participant: plan.id })
+        .getOne();
+
+      // 计算总进度
+      const eachProgress = 100 / (coursewares.length + (exam ? 1 : 0));
+      let totalProgress = 0
+      coursewares.forEach(item => {
+        totalProgress += Math.round(eachProgress * (item.progress / 100));
+      })
+
+      const formattedPlanDetail = {
+					id: plan.id,
+					title: plan.training_record.training_plan.name,
+					description: plan.training_record.training_plan.description,
+					fullDescription: plan.training_record.training_plan.full_description,
+					cover: plan.training_record.training_plan.cover,
+					status: totalProgress >= 100 ? 'completed' : 'in_progress',
+					progress: totalProgress,
+          isSignin: plan.is_signin,
+					courseCount: coursewares.length,
+					totalDuration,
+					difficulty: plan.training_record.training_plan.difficulty,
+					type: plan.training_record.training_plan.training_category,
+					startDate: plan.training_record.training_plan.planned_time,
+					deadline: plan.training_record.training_plan.planned_time,
+					instructor: plan.training_record.training_plan.trainer.name,
+					isFavorited: false,
+					tags: [],
+					objectives: plan.training_record.training_plan.objectives?.split(",,"),
+					hasExam: exam ? true : false,
+					examTitle: exam?.examEntity.title,
+					examDesc: exam?.examEntity.description,
+					examQuestionCount: exam?.examEntity.question_count,
+					examDuration: exam?.examEntity.duration,
+					examPassScore: exam?.examEntity.pass_score,
+					courses: coursewares
+				}
+
+      return successResponse(res, formattedPlanDetail, '获取培训计划详情成功');
+    } catch (error) {
+      logger.error('获取培训计划详情失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 获取用户培训计划列表
+  async myPlanList(req: Request, res: Response): Promise<Response> {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return errorResponse(res, 401, '未认证', null);
+      }
+
+      const userType = user.type === 2 ? 2 : 1;      
+      const planBuilder = AppDataSource.getRepository(TrainingRecordParticipant)
+        .createQueryBuilder('participant')
+        .innerJoinAndSelect('participant.training_record', 'record', 'record.status = :status', { status: 1 })
+        .innerJoinAndSelect('record.training_plan', 'plan', 'plan.is_deleted = :is_deleted', { is_deleted: 0 })
+        .innerJoinAndSelect('plan.trainer', 'trainer');
+        
+      if (userType === 1) {
+        planBuilder.where('participant.user_id = :userId', { userId: user.id });
+      } else {
+        planBuilder.where('participant.worker_id = :workerId', { workerId: user.id });
+      }
+
+      const plans = await planBuilder
+        .orderBy('record.create_time', 'DESC')
+        .getMany();
+
+      const formattedPlans = plans.map(item => ({
+        id: item.id,
+        title: item.training_record.training_plan.name,
+        description: item.training_record.training_plan.description,
+        status: this.getPlansStatus(item.progress),
+        progress: item.progress,
+        courseCount: item.course_count,
+        deadline: item.training_record.training_plan.planned_end_time,
+      }))
+
+      return successResponse(res, {
+        plans: formattedPlans
+      }, '获取培训计划列表成功');
+    } catch (error) {
+      logger.error('获取培训计划列表失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 获取培训计划状态
+  private getPlansStatus(progress: number) {
+    if (progress >= 100) {
+      return 'completed';
+    } else if (progress > 0) {
+      return 'in_progress';
+    } else {
+      return 'not_started';
+    }
+  }
+
+  // 获取用户最近学习记录
+  async myRecordList(req: Request, res: Response): Promise<Response> {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return errorResponse(res, 401, '未认证', null);
+      }
+      const userType = user.type === 2 ? 2 : 1;      
+
+      const builder = AppDataSource.getRepository(TrainingRecordProgress)
+        .createQueryBuilder('progress')
+        .innerJoinAndSelect('progress.training_record_participant', 'participant')
+        .innerJoinAndSelect('progress.courseware', 'courseware')
+
+      if (userType === 1) {
+        builder.where('participant.user_id = :userId', { userId: user.id });
+      } else {
+        builder.where('participant.worker_id = :workerId', { workerId: user.id });
+      }
+      
+      const records = await builder.orderBy('progress.update_time', 'DESC').getMany();
+
+      const formattedRecords = records.map(item => ({
+        id: item.courseware_id,
+        title: item.courseware.title,
+        cover: item.courseware.cover,
+        progress: item.progress,
+        lastLearnTime: item.update_time,
+      }))
+
+      return successResponse(res, {
+        records: formattedRecords
+      }, '获取最近学习记录成功');
+
+    } catch (error) {
+      logger.error('获取最近学习记录失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 用户签到
+  async signin(req: Request, res: Response): Promise<Response> {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return errorResponse(res, 401, '未认证', null);
+      }
+      const userType = user.type === 2 ? 2 : 1;      
+      const id = req.params.id;
+      const plan = await AppDataSource.getRepository(TrainingRecordParticipant)
+        .createQueryBuilder('participant')
+        .where('participant.id = :participantId', { participantId: id })
+        .getOne();
+
+      if (!plan) {
+        return errorResponse(res, 404, '培训计划不存在', null);
+      }
+
+      if (userType === 1) {
+        if (plan.user_id !== user.id) {
+          return errorResponse(res, 403, '无权限', null);
+        }
+      } else {
+        if (plan.worker_id !== user.id) {
+          return errorResponse(res, 403, '无权限', null);
+        }
+      }
+
+      if (plan.is_signin) {
+        return errorResponse(res, 400, '已签到', null);
+      }
+      plan.is_signin = 1;
+      await AppDataSource.getRepository(TrainingRecordParticipant).save(plan);
+      return successResponse(res, null, '签到成功');
+    } catch (error) {
+      logger.error('签到失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  /**
+   * 生成用户 JWT 令牌
+   */
+  private generateJwtToken(user: any, type: string): string {
+
+    const payload = {
+      userId: user.id,
+      openid: user.wechat_openid,
+      loginType: 'wechat',
+      iat: Math.floor(Date.now() / 1000)
+    };
+    
+    const options: jwt.SignOptions = {
+      expiresIn: '7d' // Fixed expiration time
+    };
+    
+    return jwt.sign(payload, JWT_SECRET, options);
   }
 }

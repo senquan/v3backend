@@ -11,7 +11,7 @@ import recordRoutes from './record.routes';
 import surveyRoutes from './survey.routes';
 import tagRoutes from './tag.routes';
 import trainerRoutes from './trainer.routes';
-import trainingMatrixRoutes from './trainingMatrix.routes';
+import trainingMatrixRoutes from './matrix.routes';
 import certificateRoutes from './certificate.routes';
 import taskRoutes from './task.routes';
 import uploadRoutes  from './upload.routes';

@@ -16,6 +16,9 @@ export class TrainingRecordCourseware {
   @Index('idx_training_record_courseware_courseware_id')
   courseware_id!: number;
 
+  @Column({ type: 'integer', default: 0 })
+  sort!: number;
+
   @Column({ type: 'integer', nullable: true })
   creator: number | null = null;
 

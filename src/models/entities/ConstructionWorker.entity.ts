@@ -25,6 +25,9 @@ export class ConstructionWorker {
   @Column({ type: 'smallint', nullable: true })
   employee_type: number | null = null;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  identity!: string;
+
   @Column({ type: 'boolean', nullable: true })
   sex: boolean | null = null;
 

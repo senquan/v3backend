@@ -12,6 +12,7 @@
         "@nestjs/platform-express": "^11.1.0",
         "@nestjs/typeorm": "^11.0.0",
         "@types/md5": "^2.3.5",
+        "axios": "1.8.4",
         "bcryptjs": "^2.4.3",
         "cors": "^2.8.5",
         "date-fns": "^4.1.0",

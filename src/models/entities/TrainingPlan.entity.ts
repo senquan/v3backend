@@ -23,6 +23,9 @@ export class TrainingPlan {
   @Column({ type: 'timestamp', nullable: true })
   planned_time: Date | null = null;
 
+  @Column({ type: 'timestamp', nullable: true })
+  planned_end_time: Date | null = null;
+
   @Column({ type: 'decimal', precision: 5, scale: 1, default: 0  })
   training_hours!: number;
 
@@ -31,6 +34,21 @@ export class TrainingPlan {
 
   @Column({ type: 'smallint', default: 0 })
   exam_method!: number;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  cover: string | null = null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  description: string | null = null;
+
+  @Column({ type: 'text', nullable: true })
+  full_description: string | null = null;
+
+  @Column({ type: 'smallint', default: 0 })
+  difficulty!: number;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  objectives: string | null = null;
 
   @Column({ type: 'integer', default: 0 })
   status!: number;

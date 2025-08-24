@@ -56,6 +56,7 @@ exports.generateCaptcha = (req: Request, res: Response) => {
  */
 exports.verifyCaptcha = (captchaId: string, captchaText: string) => {
   const captchaData = captchaStore.get(captchaId);
+  if (!captchaText) return false;
   
   // 验证码不存在或已过期
   if (!captchaData || Date.now() > captchaData.expireAt) {

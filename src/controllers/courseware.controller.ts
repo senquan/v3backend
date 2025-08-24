@@ -16,7 +16,7 @@ export class CoursewareController {
       // 构建查询条件
       const queryBuilder = AppDataSource.getRepository(Courseware)
         .createQueryBuilder('courseware')
-        .where('courseware.is_deleted = :is_deleted', { is_deleted: 0 });
+        .where('courseware.is_deleted = :is_deleted', { is_deleted: 0 })
       
       // 添加筛选条件
       if (keyword) {

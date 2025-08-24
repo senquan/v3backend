@@ -254,6 +254,9 @@ export class TrainingRecordController {
                         participant.user_id = userId;
                         participant.is_qualified = 0;
                         participant.is_trainer = 0;
+                        participant.is_signin = 0;
+                        participant.progress = 0;
+                        participant.course_count = coursewares?.length || 0;
                         return participant;
                     });
                     await queryRunner.manager.save(participantEntities);
@@ -375,7 +378,7 @@ export class TrainingRecordController {
                     gender: participant.worker?.sex || 0,
                     age: participant.user?.age || 0,
                     organization: participant.user?.branchEntity?.name || participant.worker?.branchEntity?.name || '',
-                    idcard: 0,
+                    idcard: participant.worker?.identity || '',
                     hours: 0,
                     examRecordId: examRecordMap.get(participant.id)?._id,
                     passed: examRecordMap.get(participant.id)?.is_passed,

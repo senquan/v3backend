@@ -27,6 +27,9 @@ export class Exam {
   @Column({ type: "smallint", nullable: true, comment: "考试级别" })
   level: number | null = null;
 
+  @Column({ type: "integer", default: 10, comment: "考试题目数量" })
+  question_count!: number;
+
   @Column({ type: "integer", default: 100, comment: "总分" })
   total_score!: number;
 

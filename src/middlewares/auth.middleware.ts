@@ -50,6 +50,8 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     
     // 将用户信息添加到请求对象中
     (req as any).user = user;
+    (req as any).user.id = user._id;
+
     // 将角色和标签信息添加到请求对象中
     if (decoded.roles) {
       (req as any).userRoles = decoded.roles;

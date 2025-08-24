@@ -11,6 +11,12 @@ export class Courseware {
   @Column({ type: 'varchar', length: 100, nullable: false })
   title!: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  cover: string | null = null;
+
+  @Column({ type: 'smallint', default: 1 })
+  type!: number;
+
   @Column({ type: 'text', nullable: true })
   description: string | null = null;
 
@@ -22,6 +28,9 @@ export class Courseware {
 
   @Column({ type: 'integer', default: 0 })
   status!: number;
+
+  @Column({ type: 'integer', default: 0 })
+  duration!: number;
 
   @Column({ type: 'integer', default: 0 })
   view_count!: number;

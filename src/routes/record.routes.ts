@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
-import { TrainingRecordController } from '../controllers/trainingRecord.controller';
+import { TrainingRecordController } from '../controllers/record.controller';
 
 const router = Router();
 const recordController = new TrainingRecordController();

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
-import { TrainingPlanController } from '../controllers/trainingPlan.controller';
+import { TrainingPlanController } from '../controllers/plan.controller';
 
 const router = Router();
 const planController = new TrainingPlanController();

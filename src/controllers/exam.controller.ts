@@ -140,6 +140,7 @@ export class ExamController {
         exam.category_id = settings.examCategory;
         exam.training_category = trainingCategory;
         exam.level = settings.level;
+        exam.question_count = settings.questionCount;
         exam.total_score = settings.totalScore;
         exam.pass_score = settings.passScore || Math.floor(settings.totalScore * 0.6); // 默认60%及格
         exam.duration = settings.duration || 120; // 默认120分钟

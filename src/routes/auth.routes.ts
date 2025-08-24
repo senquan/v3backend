@@ -37,4 +37,7 @@ router.post('/refresh-token', (req: Request, res: Response) => {
 
 router.get('/captcha', authController.generateCaptcha);
 
+// 微信用户登录
+router.post('/wechat-login', userController.wechatLogin.bind(userController));
+
 export default router;
