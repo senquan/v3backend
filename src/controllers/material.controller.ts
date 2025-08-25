@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
-import { getRepository, In } from 'typeorm';
+import { In } from 'typeorm'
+import { AppDataSource } from '../config/database';
 import { Material } from '../models/entities/Material.entity';
 import { User } from '../models/entities/User.entity';
 import { Courseware } from '../models/entities/Courseware.entity';
 import { CoursewareMaterial } from '../models/entities/CoursewareMaterial.entity';
 import { logger } from '../utils/logger';
+import { errorResponse, successResponse } from '../utils/response';
 
 export class MaterialController {
   // 获取培训资料列表
@@ -14,7 +16,7 @@ export class MaterialController {
       const skip = (Number(page) - 1) * Number(pageSize);
       const take = Number(pageSize);
 
-      const materialRepository = getRepository(Material);
+      const materialRepository = AppDataSource.getRepository(Material);
       
       // 构建查询条件
       const queryBuilder = materialRepository.createQueryBuilder('material')
@@ -62,37 +64,25 @@ export class MaterialController {
   }
 
   // 获取培训资料详情
-  async getDetail(req: Request, res: Response): Promise<void> {
+  async getDetail(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
       
-      const materialRepository = getRepository(Material);
+      const materialRepository = AppDataSource.getRepository(Material);
       const material = await materialRepository.findOne({
-        where: { _id: Number(id), is_deleted: 0 },
-        relations: ['creator', 'updater', 'coursewares']
+        where: { _id: Number(id), is_deleted: 0 }
       });
       
       if (!material) {
-        res.status(404).json({
-          code: 404,
-          message: '培训资料不存在',
-          data: null
-        });
-        return;
+        return errorResponse(res, 404, '培训资料不存在', null);
       }
       
-      res.status(200).json({
-        code: 200,
-        message: '获取培训资料详情成功',
-        data: material
-      });
+      return successResponse(res, {
+        material
+      }, '获取培训资料详情成功');
     } catch (error) {
       logger.error('获取培训资料详情失败', error);
-      res.status(500).json({
-        code: 500,
-        message: '获取培训资料详情失败',
-        data: null
-      });
+      return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
 
@@ -111,8 +101,8 @@ export class MaterialController {
         return;
       }
       
-      const materialRepository = getRepository(Material);
-      const userRepository = getRepository(User);
+      const materialRepository = AppDataSource.getRepository(Material);
+      const userRepository = AppDataSource.getRepository(User);
       
       const user = await userRepository.findOne({
         where: { _id: userId }
@@ -162,8 +152,8 @@ export class MaterialController {
       const { title, description, file_path, file_type, file_size } = req.body;
       const userId = 0 // req.user?.id;
       
-      const materialRepository = getRepository(Material);
-      const userRepository = getRepository(User);
+      const materialRepository = AppDataSource.getRepository(Material);
+      const userRepository = AppDataSource.getRepository(User);
       
       const material = await materialRepository.findOne({
         where: { _id: Number(id), is_deleted: 0 }
@@ -222,8 +212,8 @@ export class MaterialController {
       const { id } = req.params;
       const userId = 0 // req.user?.id;
       
-      const materialRepository = getRepository(Material);
-      const userRepository = getRepository(User);
+      const materialRepository = AppDataSource.getRepository(Material);
+      const userRepository = AppDataSource.getRepository(User);
       
       const material = await materialRepository.findOne({
         where: { _id: Number(id), is_deleted: 0 }
@@ -287,8 +277,8 @@ export class MaterialController {
         return;
       }
       
-      const materialRepository = getRepository(Material);
-      const userRepository = getRepository(User);
+      const materialRepository = AppDataSource.getRepository(Material);
+      const userRepository = AppDataSource.getRepository(User);
       
       const user = await userRepository.findOne({
         where: { _id: userId }
@@ -337,9 +327,9 @@ export class MaterialController {
         return;
       }
       
-      const materialRepository = getRepository(Material);
-      const coursewareRepository = getRepository(Courseware);
-      const coursewareMaterialRepository = getRepository(CoursewareMaterial);
+      const materialRepository = AppDataSource.getRepository(Material);
+      const coursewareRepository = AppDataSource.getRepository(Courseware);
+      const coursewareMaterialRepository = AppDataSource.getRepository(CoursewareMaterial);
       
       // 检查培训资料是否存在
       const material = await materialRepository.findOne({
@@ -402,7 +392,7 @@ export class MaterialController {
     try {
       const { id } = req.params;
       
-      const materialRepository = getRepository(Material);
+      const materialRepository = AppDataSource.getRepository(Material);
       
       const material = await materialRepository.findOne({
         where: { _id: Number(id), is_deleted: 0 },

@@ -169,7 +169,7 @@ export class CoursewareController {
       if (files && files.length > 0) {
         const contentPromises = files.map(async (content: { name: string, url: string }) => {
             const material = new Material();
-            material.title = content.name;
+            material.title = content.name.replace(/\.[^/.]+$/, '');
             material.file_path = content.url;
             const savedMaterial = await materialRepository.save(material);
             const coursewareMaterial = new CoursewareMaterial();
@@ -419,30 +419,36 @@ export class CoursewareController {
       
       const coursewareRepository = AppDataSource.getRepository(Courseware);
       
-      // 检查课件是否存在
+      // 检查课件是否存在并获取关联的材料
       const courseware = await coursewareRepository.findOne({
         where: { _id: Number(id), is_deleted: 0 },
-        relations: ['materials']
+        relations: ['coursewareMaterials', 'coursewareMaterials.material']
       });
       
       if (!courseware) {
         return errorResponse(res, 404, '课件不存在', null);
       }
       
-      const formattedMaterials = null
       // 格式化返回数据
-      // const formattedMaterials = courseware.materials.map(material => ({
-      //   id: material._id,
-      //   title: material.title,
-      //   description: material.description,
-      //   file_path: material.file_path,
-      //   file_type: material.file_type,
-      //   file_size: material.file_size,
-      //   created_time: material.created_time,
-      //   updated_time: material.updated_time
-      // }));
+      const formattedMaterials = courseware.coursewareMaterials.map(cm => ({
+        id: cm.material._id,
+        title: cm.material.title,
+        description: cm.material.description,
+        file_path: cm.material.file_path,
+        file_type: cm.material.file_type,
+        file_size: cm.material.file_size,
+        duration: cm.material.duration,
+        created_time: cm.material.created_time,
+        updated_time: cm.material.updated_time
+      }));
       
-      return successResponse(res, formattedMaterials, '获取关联培训资料成功');
+      const responseData = {
+        title: courseware.title,
+        description: courseware.description,
+        materials: formattedMaterials
+      };
+      
+      return successResponse(res, responseData, '获取关联培训资料成功');
     } catch (error) {
       logger.error('获取关联培训资料失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);

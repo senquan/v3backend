@@ -39,6 +39,7 @@ import { TrainingRecord } from '../models/entities/TrainingRecord.entity';
 import { TrainingRecordContent } from '../models/entities/TrainingRecordContent.entity';
 import { TrainingRecordCourseware } from '../models/entities/TrainingRecordCourseware.entity';
 import { TrainingRecordProgress } from '../models/entities/TrainingRecordProgress.entity';
+import { TrainingRecordProgressDetail } from '../models/entities/TrainingRecordProgressDetail.entity';
 import { TrainingRecordParticipant } from '../models/entities/TrainingRecordParticipant.entity';
 
 // 加载环境变量
@@ -58,7 +59,8 @@ export const AppDataSource = new DataSource({
   entities: [Branch, ConstructionWorker, Project, ProjectDepartmentMember, User
     , Category, Certificate, CertificateTemplate, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Question
     , QuestionOption, Survey, SurveyQuestion, SurveyQuestionOption, SurveySubmission, SurveyAnswer, Tag, Task, TaskAssignment, TaskItem, TaskProgress
-    , Trainer, TrainerTag, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordProgress, TrainingRecordParticipant ],
+    , Trainer, TrainerTag, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordProgress
+    , TrainingRecordProgressDetail,TrainingRecordParticipant ],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });

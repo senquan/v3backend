@@ -15,6 +15,9 @@ export class CoursewareMaterial {
   @Index('idx_courseware_materials_material_id')
   material_id!: number;
 
+  @Column({ type: 'integer', default: 0 })
+  sort!: number;
+
   // 关联关系
   @ManyToOne(() => Courseware)
   @JoinColumn({ name: 'courseware_id' })

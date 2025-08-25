@@ -21,6 +21,9 @@ export class Material {
 
   @Column({ type: 'integer', nullable: true })
   file_size: number | null = null;
+  
+  @Column({ type: 'integer', default: 0 })
+  duration!: number;
 
   @Column({ type: 'integer', default: 0 })
   is_deleted!: number;

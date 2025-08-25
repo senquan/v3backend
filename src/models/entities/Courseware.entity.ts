@@ -12,6 +12,9 @@ export class Courseware {
   title!: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
+  subtitle: string | null = null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
   cover: string | null = null;
 
   @Column({ type: 'smallint', default: 1 })

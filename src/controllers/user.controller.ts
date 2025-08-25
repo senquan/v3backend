@@ -4,6 +4,8 @@ import { AppDataSource } from '../config/database';
 import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity';
 import { Courseware } from '../models/entities/Courseware.entity';
 import { ExamRecord } from '../models/entities/ExamRecord.entity';
+import { CoursewareMaterial } from '../models/entities/CoursewareMaterial.entity';
+import { TrainingRecordProgressDetail } from '../models/entities/TrainingRecordProgressDetail.entity';
 import { User } from '../models/entities/User.entity';
 import { ProjectDepartmentMember } from '../models/entities/ProjectDepartmentMember.entity';
 import { TrainingRecordCourseware } from '../models/entities/TrainingRecordCourseware.entity';
@@ -323,7 +325,7 @@ export class UserController {
       }
 
       const plan = await planBuilder
-        .andWhere('participant.id = :participantId', { participantId: id })
+        .andWhere('participant.training_record_id = :recordId', { recordId: id })
         .getOne();
 
       if (!plan) {
@@ -355,7 +357,7 @@ export class UserController {
         return {
           id: item.courseware._id,
           title: item.courseware.title,
-          description: item.courseware.description,
+          description: item.courseware.subtitle,
           duration: item.courseware.duration,
           type: item.courseware.type,
           isCompleted: progress >= 100,
@@ -414,6 +416,69 @@ export class UserController {
     }
   }
 
+  // 获取用户学习统计
+  async getLearningStats(req: Request, res: Response): Promise<Response> {
+
+    const user = (req as any).user;
+    if (!user) {
+      return errorResponse(res, 401, '未认证', null);
+    }
+    const userType = user.type === 2 ? 2 : 1;
+      
+    try{
+      // 已完成课程
+      const completedCoursesBuilder = AppDataSource.getRepository(TrainingRecordProgress)
+        .createQueryBuilder('progress')
+        .innerJoinAndSelect('progress.training_record_participant', 'participant')
+        .innerJoinAndSelect('progress.courseware', 'courseware')
+
+      if (userType === 1) {
+        completedCoursesBuilder.where('participant.user_id = :userId', { userId: user.id });
+      } else {
+        completedCoursesBuilder.where('participant.worker_id = :workerId', { workerId: user.id });
+      }
+
+      let completed = 0;
+      let totalStudy = 0;
+      const progressData = await completedCoursesBuilder.getMany();
+      progressData.forEach(item => {
+        if (item.progress >= 100) {
+          completed++;
+          totalStudy += item.courseware.duration;
+        } else {
+          totalStudy += Math.round(item.courseware.duration * item.progress / 100);
+        }
+      })
+
+      const examBuilder = AppDataSource.getRepository(ExamRecord)
+        .createQueryBuilder('examRecord')
+        .innerJoin('examRecord.participant', 'participant')
+
+      if (userType === 1) {
+        examBuilder.where('participant.user_id = :userId', { userId: user.id });
+      } else {
+        examBuilder.where('participant.worker_id = :workerId', { workerId: user.id });
+      }
+
+      examBuilder.andWhere('examRecord.is_passed = :is_passed', { is_passed: true })
+      const examPassed = await examBuilder.getCount();
+
+      const learningStats = {
+        completedCourses: completed,
+        passedExams: examPassed,
+        totalStudyTime: totalStudy,
+        achievements: 0
+      }
+
+      return successResponse(res, {
+        stats: learningStats
+      }, '获取用户学习统计成功');
+    } catch (error) {
+      logger.error('获取培训计划列表失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
   // 获取用户培训计划列表
   async myPlanList(req: Request, res: Response): Promise<Response> {
     try {
@@ -440,7 +505,7 @@ export class UserController {
         .getMany();
 
       const formattedPlans = plans.map(item => ({
-        id: item.id,
+        id: item.training_record.id,
         title: item.training_record.training_plan.name,
         description: item.training_record.training_plan.description,
         status: this.getPlansStatus(item.progress),
@@ -493,6 +558,7 @@ export class UserController {
 
       const formattedRecords = records.map(item => ({
         id: item.courseware_id,
+        partId: item.training_record_participant_id,
         title: item.courseware.title,
         cover: item.courseware.cover,
         progress: item.progress,
@@ -508,6 +574,114 @@ export class UserController {
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
+
+  // 获取用户课程详情
+  async myCourseDetail(req: Request, res: Response): Promise<Response> {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return errorResponse(res, 401, '未认证', null);
+      }
+      const courseId = req.params.courseId;
+      const partId = req.params.partId;
+      const course = await AppDataSource.getRepository(Courseware)
+        .createQueryBuilder('courseware')
+        .where('courseware._id = :coursewareId', { coursewareId: courseId })
+        .getOne();
+
+      if (!course) {
+        return errorResponse(res, 404, '课程不存在', null);
+      }
+
+      const progressBuilder = AppDataSource.getRepository(TrainingRecordProgress)
+        .createQueryBuilder('progress')
+        .where('progress.courseware_id = :coursewareId', { coursewareId: courseId })
+        .andWhere('progress.training_record_participant_id = :partId', { partId: partId });
+      
+      let progressId = 0;
+      const progress = await progressBuilder.getOne();
+
+      if (!progress) {
+        const newProgress = new TrainingRecordProgress();
+        newProgress.courseware_id = Number(courseId);
+        newProgress.training_record_participant_id = Number(partId);
+        newProgress.progress = 0;
+        const savedProgress = await AppDataSource.manager.save(newProgress);
+        progressId = savedProgress.id || 0;
+      } else {
+        progressId = progress.id || 0;
+      }
+
+      // chapters
+      const chaptersData = await AppDataSource.getRepository(CoursewareMaterial)
+        .createQueryBuilder('coursewareMaterial')
+        .innerJoinAndSelect('coursewareMaterial.material', 'material')
+        .where('coursewareMaterial.courseware_id = :coursewareId', { coursewareId: courseId })
+        .andWhere('material.is_deleted = :isDeleted', { isDeleted: 0 })
+        .orderBy('coursewareMaterial.sort', 'ASC')
+        .getMany();
+
+      const chapterProgressMap = new Map<number, TrainingRecordProgressDetail>();
+      if (progress) {
+        const detailsBuilder = AppDataSource.getRepository(TrainingRecordProgressDetail)
+          .createQueryBuilder('detail')
+          .where('detail.training_record_progress_id = :progressId', { progressId: progressId })
+          .andWhere('detail.material_id = :materialId', { materialId: partId });
+        
+        const details = await detailsBuilder.getMany();
+        details.forEach(item => {
+          chapterProgressMap.set(item.material_id, item);
+        })
+      }
+      
+      const chapters = chaptersData.map(item => ({
+        id: item.material_id,
+        title: item.material.title,
+        duration: item.material.duration || 0,
+        type: item.material.file_type,
+        isCompleted: (chapterProgressMap.get(item.material_id)?.progress || 0) >= 100,
+        isLocked: chapterProgressMap.get(item.material_id)?.is_locked === 1
+      }))
+
+      const formattedCourse = {
+        id: courseId,
+        title: course.title,
+        subtitle: course.subtitle,
+        cover: course.cover,
+        duration: course.duration,
+        studentCount: course.view_count,
+        progress: progress?.progress || 0,
+        progressId,
+        isCompleted: (progress?.progress || 0) >= 100,
+        // isFavorited: false,
+        description: course.description,
+        tags: [],
+        objectives: [],
+        chapters
+      }
+
+      return successResponse(res, {
+        course: formattedCourse
+      }, '获取课程详情成功');
+    } catch (error) {
+      logger.error('获取用户课程详情失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }    
+  }
+
+  // 获取用户相关课程
+  async getRelatedCourses(req: Request, res: Response): Promise<Response> {
+    try {
+      const courseId = req.params.courseId;
+      const courses = [] as Courseware[];
+      return successResponse(res, {
+        courses
+      }, '获取相关课程成功');
+    } catch (error) {
+      logger.error('获取相关课程失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }  
 
   // 用户签到
   async signin(req: Request, res: Response): Promise<Response> {
@@ -545,6 +719,96 @@ export class UserController {
       return successResponse(res, null, '签到成功');
     } catch (error) {
       logger.error('签到失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 更新用户课程章节学习进度
+  async updateChapterProgress(req: Request, res: Response): Promise<Response> {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return errorResponse(res, 401, '未认证', null);
+      }
+      const chapterId = req.params.chapterId;
+      const progress = req.body;
+
+      const progressId = Number(progress.progressId) || 0;
+      const isCompleted = Number(progress.progress) >= 100 ? true : false;
+      if (progressId === 0) {
+        return errorResponse(res, 400, '参数错误', null);
+      }
+
+      const progressEntity = await AppDataSource.getRepository(TrainingRecordProgressDetail)
+        .createQueryBuilder('progress')
+        .where('progress.training_record_progress_id = :progressId', { progressId: progressId })
+        .andWhere('progress.material_id = :materialId', { materialId: chapterId })
+        .getOne();
+
+      if (!progressEntity) {
+        const progressDetail = new TrainingRecordProgressDetail();
+        progressDetail.training_record_progress_id = progressId;
+        progressDetail.material_id = Number(chapterId);
+        progressDetail.progress = Number(progress.progress);
+        progressDetail.update_time = new Date();
+        if (isCompleted) {
+          progressDetail.end_time = new Date();
+        }
+        progressDetail.is_locked = 0;
+        await AppDataSource.getRepository(TrainingRecordProgressDetail).save(progressDetail);
+      } else {
+        if (progressEntity.progress < 100) {
+          progressEntity.progress = Number(progress.progress);
+          progressEntity.update_time = new Date();
+          if (isCompleted) {
+            progressEntity.end_time = new Date();
+          }
+          await AppDataSource.getRepository(TrainingRecordProgressDetail).save(progressEntity);
+        }
+      }
+      // 更新课程进度
+      // const progressRecord = await AppDataSource.getRepository(TrainingRecordProgress)
+      //   .createQueryBuilder('progress')
+      //   .where('progress.id = :progressId', { progressId: progressId })
+      //   .getOne();
+      // if (progressRecord) {
+      //   progressRecord.progress = Number(progress.progress);
+      //   await AppDataSource.getRepository(TrainingRecordProgress).save(progressRecord);
+      // }
+
+      return successResponse(res, null, '更新课程章节学习进度成功');
+    } catch (error) {
+      logger.error('更新课程章节学习进度失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 完成用户课程章节
+  async completeChapter(req: Request, res: Response): Promise<Response> {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return errorResponse(res, 401, '未认证', null);
+      }
+      const chapterId = req.params.chapterId;
+      const progressId = req.params.progressId;
+
+      const progressEntity = await AppDataSource.getRepository(TrainingRecordProgressDetail)
+        .createQueryBuilder('progress')
+        .where('progress.training_record_progress_id = :progressId', { progressId: progressId })
+        .andWhere('progress.material_id = :materialId', { materialId: chapterId })
+        .getOne();
+      if (!progressEntity) {
+        return errorResponse(res, 404, '学习进度不存在', null);
+      }
+      progressEntity.progress = 100;
+      progressEntity.end_time = new Date();
+      progressEntity.update_time = new Date();
+
+      await AppDataSource.getRepository(TrainingRecordProgressDetail).save(progressEntity);
+      return successResponse(res, null, '完成课程章节成功');
+    } catch (error) {
+      logger.error('完成课程章节失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
