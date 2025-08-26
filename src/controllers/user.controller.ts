@@ -401,6 +401,7 @@ export class UserController {
 					tags: [],
 					objectives: plan.training_record.training_plan.objectives?.split(",,"),
 					hasExam: exam ? true : false,
+          examId: exam?.exam_id,
 					examTitle: exam?.examEntity.title,
 					examDesc: exam?.examEntity.description,
 					examQuestionCount: exam?.examEntity.question_count,
@@ -424,7 +425,7 @@ export class UserController {
       return errorResponse(res, 401, '未认证', null);
     }
     const userType = user.type === 2 ? 2 : 1;
-      
+
     try{
       // 已完成课程
       const completedCoursesBuilder = AppDataSource.getRepository(TrainingRecordProgress)
