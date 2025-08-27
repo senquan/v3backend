@@ -17,6 +17,9 @@ router.get('/list', recordController.getList);
 // 获取培训计划人员列表
 router.get('/:id/participants', recordController.getParticipants);
 
+// 生成二维码
+router.get('/:id/qrcode', recordController.generateQRCode);
+
 // 获取培训计统计
 router.get('/my-stats', recordController.getMyStat);
 

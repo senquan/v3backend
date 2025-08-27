@@ -16,6 +16,8 @@ import { User } from '../models/entities/User.entity';
 import { TaskAssignment } from '../models/entities/TaskAssignment.entity';
 import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity';
 import { ExamRecord } from '../models/entities/ExamRecord.entity';
+import { generateMiniProgramQRCode } from '../utils/wechat';
+import { logger } from '../utils/logger';
 
 export interface MyTask {
     id: number;
@@ -92,7 +94,8 @@ export class TrainingRecordController {
               actual_participants: 0,
               passed: 0,
               created_time: record.training_plan.created_time,
-              updated_time: record.training_plan.updated_time
+              updated_time: record.training_plan.updated_time,
+              qr_code_path: record.qr_code_path,
             }));
       
             return successResponse(res, {
@@ -315,6 +318,20 @@ export class TrainingRecordController {
                         await queryRunner.manager.save(matrixContentEntities);
                     }
                 }
+
+                // 预生成微信小程序二维码
+                try {
+                    const qrCodePath = await generateMiniProgramQRCode(savedRecord.id.toString());
+                    if (qrCodePath) {
+                        savedRecord.qr_code_path = qrCodePath;
+                        await queryRunner.manager.save(savedRecord);
+                        logger.info(`QR code generated: ${qrCodePath}`);
+                    } else {
+                        logger.warn(`Failed to generate QR code for training record: ${savedRecord.id}`);
+                    }
+                } catch (error) {
+                    logger.error(`Error generating QR code for training record ${savedRecord.id}:`, error);
+                }
             
                 // 提交事务
                 await queryRunner.commitTransaction();
@@ -507,4 +524,34 @@ export class TrainingRecordController {
             return errorResponse(res, 500, '服务器内部错误', null);
         }
     }
+
+    // 生成二维码
+    async generateQRCode(req: Request, res: Response): Promise<Response> {
+        try {
+            const id = req.params.id;
+            if (!id) {
+                return errorResponse(res, 400, '缺少参数', null);
+            }
+
+            const qrCodePath = await generateMiniProgramQRCode(id);
+            if (!qrCodePath) {
+                return errorResponse(res, 500, '生成二维码失败', null);
+            }
+            // 更新记录
+            const recordRepository = AppDataSource.getRepository(TrainingRecord);
+            const record = await recordRepository.findOne({
+                where: { id: Number(id) },
+            });
+            if (!record) {
+                return errorResponse(res, 404, '培训记录不存在', null);
+            }
+            record.qr_code_path = qrCodePath;
+            await recordRepository.save(record);
+
+            return successResponse(res, qrCodePath, '生成二维码成功');
+        } catch (error) {
+            return errorResponse(res, 500, '服务器内部错误', null);
+        }
+    }
+
 }

@@ -40,4 +40,7 @@ router.get('/captcha', authController.generateCaptcha);
 // 微信用户登录
 router.post('/wechat-login', userController.wechatLogin.bind(userController));
 
+// 绑定微信手机号
+router.post('/bind-wechat-phone', userController.bindWechatPhone.bind(userController));
+
 export default router;

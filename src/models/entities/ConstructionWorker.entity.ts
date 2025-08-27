@@ -31,6 +31,9 @@ export class ConstructionWorker {
   @Column({ type: 'boolean', nullable: true })
   sex: boolean | null = null;
 
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  phone: string | null = null;
+
   @Column({ type: 'smallint', default: 90 })
   status!: number;
 

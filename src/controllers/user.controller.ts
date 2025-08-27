@@ -1,11 +1,13 @@
 import { Request, Response } from 'express';
 import * as jwt from 'jsonwebtoken';
+import axios from 'axios';
 import { AppDataSource } from '../config/database';
 import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity';
 import { Courseware } from '../models/entities/Courseware.entity';
 import { ExamRecord } from '../models/entities/ExamRecord.entity';
 import { CoursewareMaterial } from '../models/entities/CoursewareMaterial.entity';
 import { TrainingRecordProgressDetail } from '../models/entities/TrainingRecordProgressDetail.entity';
+import { TrainingUser } from '../models/entities/TrainingUser.entity';
 import { User } from '../models/entities/User.entity';
 import { ProjectDepartmentMember } from '../models/entities/ProjectDepartmentMember.entity';
 import { TrainingRecordCourseware } from '../models/entities/TrainingRecordCourseware.entity';
@@ -13,6 +15,26 @@ import { TrainingRecordParticipant } from '../models/entities/TrainingRecordPart
 import { TrainingRecordProgress } from '../models/entities/TrainingRecordProgress.entity';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
+
+interface WechatUserInfo {
+  openid: string;
+  nickname?: string;
+  sex?: number;
+  province?: string;
+  city?: string;
+  country?: string;
+  headimgurl?: string;
+  unionid?: string;
+}
+
+interface WechatTokenResponse {
+  access_token: string;
+  expires_in: number;
+  refresh_token: string;
+  openid: string;
+  scope: string;
+  unionid?: string;
+}
 
 const authController = require('../controllers/auth.controller');
 
@@ -263,23 +285,49 @@ export class UserController {
         return errorResponse(res, 500, '缺少微信配置，请提供 appId 和 appSecret');
       }
 
-      const user = {
-        id: 'wechat_test',
-        type: 2,
-        nickname: 'Test User',
-        avatar: 'https://example.com/avatar.png',
-        wechat_openid: 'wechat_test_openid',
+      const tokenData = await this.exchangeCodeForToken(code);
+      if (!tokenData) {
+        return errorResponse(res, 400, 'Failed to exchange authorization code for access token');
       }
+      
+      logger.info(`Successfully obtained access token for openid: ${tokenData.openid}`);
+
+      // Step 2: Get user information from WeChat
+      const userInfo = await this.getWechatUserInfo(tokenData.access_token, tokenData.openid);
+      
+      // Step 3: Find or create user in database
+      const user = await this.findUser({
+        openid: tokenData.openid,
+        unionid: tokenData.unionid,
+        nickname: userInfo?.nickname,
+        avatar: userInfo?.headimgurl,
+        province: userInfo?.province,
+        city: userInfo?.city,
+        country: userInfo?.country
+      });
+
+      if (!user) {
+        return successResponse(res, null, '用户未绑定，请授权手机号码', 1);
+      }
+      
+      // Step 4: Generate JWT token
       const token = this.generateJwtToken(user, 'wechat');
+      
+      // Step 5: Update user's last login time
+      // await this.updateLastLogin(user.id);
+      
+      logger.info(`WeChat login successful for user: ${user.id}`);
 
       return successResponse(res, {
         token,
-        userInfo: {
-          id: user.id,
-          nickname: user.nickname,
-          avatar: user.avatar,
-          openid: user.wechat_openid,
-          loginType: 'wechat'
+        user: {
+          id: user.global_id,
+          learner_id: user.id,
+          type: 2,
+          realname: user.realname,
+          name: user.name,
+          email: user.email,
+          phone: user.phone
         }
       }, '微信登录成功');
       
@@ -815,6 +863,169 @@ export class UserController {
   }
 
   /**
+   * Exchange authorization code for access token using axios
+   */
+  private async exchangeCodeForToken(code: string): Promise<WechatTokenResponse | null> {
+    try {
+      const tokenUrl = 'https://api.weixin.qq.com/sns/oauth2/access_token';
+      const params = {
+        appid: WECHAT_CONFIG.appId,
+        secret: WECHAT_CONFIG.appSecret,
+        code: code,
+        grant_type: WECHAT_CONFIG.grantType
+      };
+      
+      logger.debug('Requesting WeChat access token:', { appid: params.appid, code: code.substring(0, 10) + '...' });
+      
+      const response = await axios.get(tokenUrl, {
+        params,
+        timeout: 10000
+      });
+      
+      const data = response.data;
+      
+      // Check for WeChat API errors
+      if (data.errcode) {
+        logger.error('WeChat token exchange error:', { errcode: data.errcode, errmsg: data.errmsg });
+        throw new Error(`WeChat API error: ${data.errmsg} (${data.errcode})`);
+      }
+      
+      // Validate required fields
+      if (!data.access_token || !data.openid) {
+        logger.error('Invalid token response from WeChat:', data);
+        throw new Error('Invalid token response from WeChat API');
+      }
+      
+      logger.debug('Token exchange successful:', { openid: data.openid, expires_in: data.expires_in });
+      
+      return data;
+    } catch (error) {
+      logger.error('Error exchanging code for token:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user information from WeChat API using axios
+   */
+  private async getWechatUserInfo(accessToken: string, openid: string): Promise<WechatUserInfo | null> {
+    try {
+      const userInfoUrl = 'https://api.weixin.qq.com/sns/userinfo';
+      const params = {
+        access_token: accessToken,
+        openid: openid,
+        lang: 'zh_CN'
+      };
+      
+      logger.debug('Requesting WeChat user info:', { openid });
+      
+      const response = await axios.get(userInfoUrl, {
+        params,
+        timeout: 10000
+      });
+      
+      const data = response.data;
+      
+      // Check for WeChat API errors
+      if (data.errcode) {
+        logger.warn('WeChat user info error (non-critical):', { errcode: data.errcode, errmsg: data.errmsg });
+        // User info is optional, return null if fails
+        return null;
+      }
+      
+      logger.debug('User info retrieved successfully:', { openid: data.openid, nickname: data.nickname });
+      
+      return data;
+    } catch (error) {
+      logger.warn('Error getting WeChat user info (non-critical):', error);
+      // User info is optional, return null if fails
+      return null;
+    }
+  }
+
+  /**
+   * Find existing user or create new user
+   */
+  private async findUser(wechatData: {
+    openid: string;
+    unionid?: string;
+    nickname?: string;
+    avatar?: string;
+    province?: string;
+    city?: string;
+    country?: string;
+  }): Promise<any> {
+    try {      
+      // 1, try to find user by openid
+      let user = await this.findUserByOpenid(wechatData.openid);
+      if (user) {
+        // Update user info if needed
+        await this.updateUserInfo(user.id, {
+          nickname: wechatData.nickname || user.nickname,
+          avatar: wechatData.avatar || user.avatar,
+          wechat_unionid: wechatData.unionid || user.wechat_unionid,
+          province: wechatData.province || user.province,
+          city: wechatData.city || user.city,
+          country: wechatData.country || user.country
+        });
+        
+        logger.info(`Existing user found and updated: ${user.id}`);
+        return user;
+      }
+      
+      // If unionid exists, try to find by unionid
+      if (wechatData.unionid) {
+        user = await this.findUserByUnionid(wechatData.unionid);
+        if (user) {
+          // Link this openid to existing user
+          await this.updateUserInfo(user.id, {
+            wechat_openid: wechatData.openid,
+            nickname: wechatData.nickname || user.nickname,
+            avatar: wechatData.avatar || user.avatar
+          });
+          
+          logger.info(`User found by unionid and linked: ${user.id}`);
+          return user;
+        }
+      }
+      return user;
+    } catch (error) {
+      logger.error('Error in findUser:', error);
+      return null;
+    }
+  }
+
+    private async findUserByOpenid(openid: string): Promise<any> {
+    try {
+      const userRepository = AppDataSource.getRepository(TrainingUser);
+      return await userRepository.findOne({ where: { wechat_openid: openid } });
+    } catch (error) {
+      logger.error('Error finding user by openid:', error);
+      return null;
+    }
+  }
+
+  private async findUserByUnionid(unionid: string): Promise<any> {
+    try {
+      const userRepository = AppDataSource.getRepository(TrainingUser);
+      return await userRepository.findOne({ where: { wechat_unionid: unionid } });
+    } catch (error) {
+      logger.error('Error finding user by unionid:', error);
+      throw error;
+    }
+  }
+
+  private async updateUserInfo(userId: any, updateData: any): Promise<any> {
+    try {
+      const userRepository = AppDataSource.getRepository(TrainingUser);
+      return await userRepository.update(userId, { ...updateData, updated_at: new Date() });
+    } catch (error) {
+      logger.error('Error updating user info:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 生成用户 JWT 令牌
    */
   private generateJwtToken(user: any, type: string): string {
@@ -831,5 +1042,218 @@ export class UserController {
     };
     
     return jwt.sign(payload, JWT_SECRET, options);
+  }
+
+  /**
+   * 绑定微信手机号
+   */
+  async bindWechatPhone(req: Request, res: Response): Promise<Response> {
+    try {
+      const { wechatCode, phoneCode } = req.body;
+      
+      // 验证输入参数
+      if (!wechatCode) {
+        return errorResponse(res, 400, '微信授权码不能为空');
+      }
+      
+      if (!phoneCode) {
+        return errorResponse(res, 400, '手机号授权码不能为空');
+      }
+      
+      logger.info(`开始绑定微信手机号，wechatCode: ${wechatCode}, phoneCode: ${phoneCode}`);
+      
+      // 1. 通过微信授权码获取用户信息
+      const wechatTokenData = await this.exchangeCodeForToken(wechatCode);
+      if (!wechatTokenData) {
+        return errorResponse(res, 400, '微信授权码无效或已过期');
+      }
+      
+      const wechatUserInfo = await this.getWechatUserInfo(wechatTokenData.access_token, wechatTokenData.openid);
+      if (!wechatUserInfo) {
+        return errorResponse(res, 400, '获取微信用户信息失败');
+      }
+      
+      // 2. 通过手机号授权码获取手机号
+      const phoneInfo = await this.getWechatPhoneNumber(phoneCode);
+      if (!phoneInfo) {
+        return errorResponse(res, 400, '获取手机号失败');
+      }
+      
+      // 3. 检查手机号是否已被其他用户绑定
+      const existingUser = await this.findUserByPhone(phoneInfo.phoneNumber);
+      if (existingUser) {
+        return errorResponse(res, 400, '该手机号已被其他用户绑定');
+      }
+      
+      // 4. 创建或更新用户信息
+      let user = await this.findUser({
+        openid: wechatUserInfo.openid,
+        unionid: wechatUserInfo.unionid,
+        nickname: wechatUserInfo.nickname,
+        avatar: wechatUserInfo.headimgurl,
+        province: wechatUserInfo.province,
+        city: wechatUserInfo.city,
+        country: wechatUserInfo.country
+      });
+      
+      if (user) {
+        // 更新现有用户的手机号
+        await this.updateUserInfo(user.id, {
+          phone: phoneInfo.phoneNumber,
+          updated_at: new Date()
+        });
+      } else {
+        // 创建新用户
+        user = await this.createUserWithPhone({
+          wechat_openid: wechatUserInfo.openid,
+          wechat_unionid: wechatUserInfo.unionid,
+          nickname: wechatUserInfo.nickname || '微信用户',
+          avatar: wechatUserInfo.headimgurl,
+          phone: phoneInfo.phoneNumber,
+          province: wechatUserInfo.province,
+          city: wechatUserInfo.city,
+          country: wechatUserInfo.country
+        });
+      }
+      
+      // 5. 生成JWT token
+      const token = this.generateJwtToken(user, 'user');
+      
+      logger.info(`微信手机号绑定成功，用户ID: ${user.id}`);
+      
+      return successResponse(res, {
+        token,
+        userInfo: {
+          id: user.id,
+          username: user.username || user.nickname,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          phone: phoneInfo.phoneNumber,
+          openid: wechatUserInfo.openid,
+          loginType: 'wechat'
+        }
+      }, '手机号绑定成功');
+      
+    } catch (error) {
+      logger.error('微信手机号绑定失败:', error);
+      
+      // if (error?.response?.data?.errcode) {
+      //   const errcode = error.response.data.errcode;
+      //   const errmsg = error.response.data.errmsg || '微信API调用失败';
+        
+      //   if (errcode === 40029) {
+      //     return errorResponse(res, 400, '授权码无效');
+      //   } else if (errcode === 40163) {
+      //     return errorResponse(res, 400, '授权码已使用');
+      //   } else {
+      //     return errorResponse(res, 400, `微信API错误: ${errmsg}`);
+      //   }
+      // }
+      
+      return errorResponse(res, 500, '手机号绑定失败');
+    }
+  }
+  
+  /**
+   * 获取微信手机号
+   */
+  private async getWechatPhoneNumber(code: string): Promise<{ phoneNumber: string } | null> {
+    try {
+      // 获取access_token
+      const tokenResponse = await axios.get('https://api.weixin.qq.com/cgi-bin/token', {
+        params: {
+          grant_type: 'client_credential',
+          appid: WECHAT_CONFIG.appId,
+          secret: WECHAT_CONFIG.appSecret
+        }
+      });
+      
+      if (tokenResponse.data.errcode) {
+        logger.error('获取微信access_token失败:', tokenResponse.data);
+        return null;
+      }
+      
+      const accessToken = tokenResponse.data.access_token;
+      
+      // 获取手机号
+      const phoneResponse = await axios.post(
+        `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${accessToken}`,
+        { code }
+      );
+      
+      if (phoneResponse.data.errcode !== 0) {
+        logger.error('获取微信手机号失败:', phoneResponse.data);
+        return null;
+      }
+      
+      return {
+        phoneNumber: phoneResponse.data.phone_info.phoneNumber
+      };
+      
+    } catch (error) {
+      logger.error('获取微信手机号异常:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * 根据手机号查找用户
+   */
+  private async findUserByPhone(phone: string): Promise<any> {
+    try {
+      // 先查找User表
+      const user = await AppDataSource.getRepository(User)
+        .findOne({ where: { phone } });
+      
+      if (user) {
+        return { ...user, type: 'user' };
+      }
+      
+      // 再查找ConstructionWorker表
+      const worker = await AppDataSource.getRepository(ConstructionWorker)
+        .findOne({ where: { phone } });
+      
+      if (worker) {
+        return { ...worker, type: 'worker' };
+      }
+      
+      return null;
+    } catch (error) {
+      logger.error('根据手机号查找用户失败:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * 创建带手机号的用户
+   */
+  private async createUserWithPhone(userData: any): Promise<any> {
+    try {
+      const userRepository = AppDataSource.getRepository(TrainingUser);
+      
+      const newUser = userRepository.create({
+        id: userData.id,
+        global_id: userData.global_id,
+        name: userData.phone,
+        nickname: userData.nickname,
+        phone: userData.phone,
+        avatar: userData.avatar,
+        wechat_openid: userData.wechat_openid,
+        wechat_unionid: userData.wechat_unionid,
+        province: userData.province,
+        city: userData.city,
+        country: userData.country,
+        is_deleted: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+      
+      const savedUser = await userRepository.save(newUser);
+      return { ...savedUser, type: 'training_user' };
+      
+    } catch (error) {
+      logger.error('创建用户失败:', error);
+      throw error;
+    }
   }
 }

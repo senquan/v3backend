@@ -92,6 +92,7 @@ export class TrainingPlanController {
           training_category: plan.training_category,
           planned_participants: plan.planned_participants,
           planned_time: plan.planned_time,
+          planned_end_time: plan.planned_end_time,
           training_hours: plan.training_hours,
           assessment_method: plan.assessment_method,
           exam_method: plan.exam_method,
@@ -197,9 +198,12 @@ export class TrainingPlanController {
         training_category: plan.training_category,
         planned_participants: plan.planned_participants,
         planned_time: plan.planned_time,
+        planned_end_time: plan.planned_end_time,
         training_hours: plan.training_hours,
         assessment_method: plan.assessment_method,
         exam_method: plan.exam_method,
+        objectives: plan.objectives,
+        description: plan.description,
         status: plan.status,
         created_time: plan.created_time,
         updated_time: plan.updated_time
@@ -222,10 +226,13 @@ export class TrainingPlanController {
         training_mode, 
         training_category, 
         planned_participants, 
-        planned_time, 
+        planned_time,
+        planned_end_time,
         training_hours, 
         assessment_method, 
-        exam_method 
+        exam_method,
+        objectives,
+        description
       } = req.body;
       
       if (!name) {
@@ -270,10 +277,13 @@ export class TrainingPlanController {
         plan.training_category = training_category;
         plan.planned_participants = planned_participants;
         plan.planned_time = planned_time ? new Date(planned_time) : null;
+        plan.planned_end_time = planned_end_time ? new Date(planned_end_time) : null;
         plan.training_hours = training_hours;
         plan.assessment_method = assessment_method;
         plan.exam_method = exam_method;
         plan.status = 0; // 初始状态
+        plan.objectives = objectives ? objectives : '';
+        plan.description = description ? description : '';
         
         const savedPlan = await queryRunner.manager.save(plan);
         
@@ -327,9 +337,12 @@ export class TrainingPlanController {
         training_category, 
         planned_participants, 
         planned_time, 
+        planned_end_time,
         training_hours, 
         assessment_method, 
-        exam_method 
+        exam_method,
+        objectives,
+        description
       } = req.body;
       
       if (!name) {
@@ -381,9 +394,12 @@ export class TrainingPlanController {
         plan.training_category = training_category;
         plan.planned_participants = planned_participants;
         plan.planned_time = planned_time ? new Date(planned_time) : null;
+        plan.planned_end_time = planned_end_time ? new Date(planned_end_time) : null;
         plan.training_hours = training_hours;
         plan.assessment_method = assessment_method;
         plan.exam_method = exam_method;
+        plan.objectives = objectives ? objectives : '';
+        plan.description = description ? description : '';
         
         await queryRunner.manager.save(plan);
         

@@ -38,6 +38,9 @@ export class TrainingRecord {
   @Column({ type: 'text', nullable: true })
   remarks: string | null = null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  qr_code_path: string | null = null;
+
   @Column({ type: 'integer', nullable: true })
   creator: number | null = null;
 

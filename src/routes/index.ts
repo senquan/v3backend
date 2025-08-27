@@ -16,6 +16,7 @@ import certificateRoutes from './certificate.routes';
 import taskRoutes from './task.routes';
 import uploadRoutes  from './upload.routes';
 import userRoutes from './user.routes';
+import studyRoutes from './study.routes';
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.use('/v1/certificate', certificateRoutes);
 router.use('/v1/task', taskRoutes);
 router.use('/v1/upload', uploadRoutes);
 router.use('/v1/user', userRoutes);
+router.use('/v1/study', studyRoutes);
 
 // 处理404情况 - 当没有匹配到路由时
 router.use('*', (req: Request, res: Response) => {

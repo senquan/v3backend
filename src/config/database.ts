@@ -21,6 +21,8 @@ import { Material } from '../models/entities/Material.entity';
 import { Matrix } from '../models/entities/Matrix.entity';
 import { Question } from '../models/entities/Question.entity';
 import { QuestionOption } from '../models/entities/QuestionOption.entity';
+import { StudyPlan } from '../models/entities/StudyPlan.entity';
+import { StudyCourseware } from '../models/entities/StudyCourseware.entity';
 import { Survey } from '../models/entities/Survey.entity';
 import { SurveyQuestion } from '../models/entities/SurveyQuestion.entity';
 import { SurveyQuestionOption } from '../models/entities/SurveyQuestionOption.entity';
@@ -41,6 +43,8 @@ import { TrainingRecordCourseware } from '../models/entities/TrainingRecordCours
 import { TrainingRecordProgress } from '../models/entities/TrainingRecordProgress.entity';
 import { TrainingRecordProgressDetail } from '../models/entities/TrainingRecordProgressDetail.entity';
 import { TrainingRecordParticipant } from '../models/entities/TrainingRecordParticipant.entity';
+import { TrainingUser } from '../models/entities/TrainingUser.entity';
+
 
 // 加载环境变量
 dotenv.config();
@@ -58,9 +62,9 @@ export const AppDataSource = new DataSource({
   logging: process.env.NODE_ENV !== 'production',
   entities: [Branch, ConstructionWorker, Project, ProjectDepartmentMember, User
     , Category, Certificate, CertificateTemplate, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Question
-    , QuestionOption, Survey, SurveyQuestion, SurveyQuestionOption, SurveySubmission, SurveyAnswer, Tag, Task, TaskAssignment, TaskItem, TaskProgress
+    , QuestionOption, StudyPlan, StudyCourseware, Survey, SurveyQuestion, SurveyQuestionOption, SurveySubmission, SurveyAnswer, Tag, Task, TaskAssignment, TaskItem, TaskProgress
     , Trainer, TrainerTag, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordProgress
-    , TrainingRecordProgressDetail,TrainingRecordParticipant ],
+    , TrainingRecordProgressDetail,TrainingRecordParticipant, TrainingUser],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });
