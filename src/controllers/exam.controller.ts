@@ -441,21 +441,18 @@ export class ExamController {
   async getList(req: Request, res: Response): Promise<Response> {
     try {
       const { page = 1, pageSize = 20, keyword, type, category_id, level } = req.query;
+      const userId = (req as any).user?._id;
+      const examType = type ? 1 : type;
 
       const queryBuilder = AppDataSource.getRepository(Exam)
         .createQueryBuilder("exam")
         .leftJoinAndSelect("exam.creatorEntity", "creator")
-        .where("exam.status != :status", { status: 0 });
-
-      const userId = (req as any).user?._id;
+        .where("exam.status != :status", { status: 0 })
+        .andWhere("exam.type = :type", { type: examType });
 
       // 添加筛选条件
       if (keyword) {
         queryBuilder.andWhere("exam.title LIKE :keyword", { keyword: `%${keyword}%` });
-      }
-
-      if (type) {
-        queryBuilder.andWhere("exam.type = :type", { type });
       }
 
       if (category_id) {
