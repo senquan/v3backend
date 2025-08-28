@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { In } from "typeorm";
 import { AppDataSource } from "../config/database";
+import { Exam } from "../models/entities/Exam.entity";
 import { StudyPlan } from "../models/entities/StudyPlan.entity";
 import { StudyCourseware } from "../models/entities/StudyCourseware.entity";
-import { MockExam } from "../models/entities/MockExam.entity";
 import { StudyExamRecord } from "../models/entities/StudyExamRecord.entity";
 import { User } from "../models/entities/User.entity";
 import { logger } from "../utils/logger";
@@ -41,9 +41,9 @@ export class StudyPlanController {
         queryBuilder.andWhere("plan.level = :level", { level: Number(level) });
       }
 
-      if (status !== undefined) {
-        queryBuilder.andWhere("plan.status = :status", { status: Number(status) });
-      }
+      // if (status !== undefined) {
+      //   queryBuilder.andWhere("plan.status = :status", { status: Number(status) });
+      // }
 
       // 计算分页
       const pageNum = Number(page);
@@ -86,6 +86,7 @@ export class StudyPlanController {
         .createQueryBuilder("plan")
         .leftJoinAndSelect("plan.creatorEntity", "creator")
         .leftJoinAndSelect("plan.coursewares", "coursewares")
+        .leftJoinAndSelect("coursewares.courseware", "courseware")
         // .leftJoinAndSelect("plan.mockExams", "mockExams")
         // .leftJoinAndSelect("plan.examRecords", "examRecords")
         .where("plan.id = :id", { id })
@@ -180,6 +181,8 @@ export class StudyPlanController {
 
   // 更新自学计划
   async update(req: Request, res: Response): Promise<Response> {
+
+    const queryRunner = AppDataSource.createQueryRunner();
     try {
       const { id } = req.params;
       const userId = (req as any).user?.id;
@@ -188,14 +191,45 @@ export class StudyPlanController {
         return errorResponse(res, 401, "用户未登录");
       }
 
-      const studyPlanRepo = AppDataSource.getRepository(StudyPlan);
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      const studyPlanRepo = queryRunner.manager.getRepository(StudyPlan);
       
       const existingPlan = await studyPlanRepo.findOne({
-        where: { id: Number(id), creator: userId, is_deleted: 0 }
+        where: { id: Number(id), creator: userId, is_deleted: 0 },
+        relations: ["coursewares"]
       });
 
       if (!existingPlan) {
         return errorResponse(res, 404, "自学计划不存在");
+      }
+
+      const oldCoursewares = existingPlan.coursewares?.map(sc => sc.courseware_id) || [];
+      const newCoursewares: number[] = req.body.coursewares || [];
+
+      // 对比变化
+      if (oldCoursewares.sort().join(',') !== newCoursewares.sort().join(',')) {
+        const deleteCoursewares = oldCoursewares.filter(c => !newCoursewares.includes(c));
+        const addCoursewares = newCoursewares.filter(c => !oldCoursewares.includes(c));
+        const studyCoursewaresRepository = queryRunner.manager.getRepository(StudyCourseware);
+        if (deleteCoursewares.length > 0) {
+          await studyCoursewaresRepository.delete({
+            study_plan_id: existingPlan.id,
+            courseware_id: In(deleteCoursewares)
+          });
+        }
+        if (addCoursewares.length > 0) {
+          for (const coursewareId of addCoursewares) {
+            const studyCourseware = studyCoursewaresRepository.create({
+              study_plan_id: existingPlan.id,
+              courseware_id: coursewareId,
+              creator: userId,
+              create_time: new Date(),
+              update_time: new Date()
+            });
+            await studyCoursewaresRepository.save(studyCourseware);
+          }
+        }
       }
 
       const {
@@ -213,33 +247,41 @@ export class StudyPlanController {
         end_time
       } = req.body;
 
-      // 更新字段
-      if (title !== undefined) existingPlan.title = title;
-      if (description !== undefined) existingPlan.description = description;
-      if (category !== undefined) existingPlan.category = Number(category);
-      if (level !== undefined) existingPlan.level = Number(level);
-      if (study_hours !== undefined) existingPlan.study_hours = Number(study_hours);
-      if (target_score !== undefined) existingPlan.target_score = Number(target_score);
-      if (status !== undefined) existingPlan.status = Number(status);
-      if (progress !== undefined) existingPlan.progress = Number(progress);
-      if (objectives !== undefined) existingPlan.objectives = objectives;
-      if (requirements !== undefined) existingPlan.requirements = requirements;
-      if (start_time !== undefined) existingPlan.start_time = start_time ? new Date(start_time) : null;
-      if (end_time !== undefined) existingPlan.end_time = end_time ? new Date(end_time) : null;
-      
-      existingPlan.updater = userId;
+      // 构建更新数据对象
+      const updateData: any = {
+        updater: userId,
+        update_time: new Date()
+      };
+
+      // 只更新提供的字段
+      if (title !== undefined) updateData.title = title;
+      if (description !== undefined) updateData.description = description;
+      if (category !== undefined) updateData.category = Number(category);
+      if (level !== undefined) updateData.level = Number(level);
+      if (study_hours !== undefined) updateData.study_hours = Number(study_hours);
+      if (target_score !== undefined) updateData.target_score = Number(target_score);
+      if (status !== undefined) updateData.status = Number(status);
+      if (progress !== undefined) updateData.progress = Number(progress);
+      if (objectives !== undefined) updateData.objectives = objectives;
+      if (requirements !== undefined) updateData.requirements = requirements;
+      if (start_time !== undefined) updateData.start_time = start_time ? new Date(start_time) : null;
+      if (end_time !== undefined) updateData.end_time = end_time ? new Date(end_time) : null;
 
       // 如果状态变为已完成，设置完成时间
       if (status === 2 && existingPlan.status !== 2) {
-        existingPlan.completed_time = new Date();
+        updateData.completed_time = new Date();
       }
 
-      const updatedPlan = await studyPlanRepo.save(existingPlan);
-
+      // 使用queryRunner.manager.update更新记录
+      const updatedPlan = await queryRunner.manager.update(StudyPlan, existingPlan.id, updateData);
+      await queryRunner.commitTransaction();
       return successResponse(res, updatedPlan, "更新自学计划成功");
     } catch (error) {
       logger.error("更新自学计划失败:", error);
+      await queryRunner.rollbackTransaction();
       return errorResponse(res, 500, "更新自学计划失败");
+    } finally {
+      await queryRunner.release();
     }
   }
 
@@ -422,6 +464,49 @@ export class StudyPlanController {
     } catch (error) {
       logger.error("更新学习进度失败:", error);
       return errorResponse(res, 500, "更新学习进度失败");
+    }
+  }
+
+  // 获取自学计划考试记录列表
+  async getRecords(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+      const { page = 1, pageSize = 10 } = req.query;
+
+      if (!userId) {
+        return errorResponse(res, 401, "用户未登录");
+      }
+
+      const queryBuilder = AppDataSource.getRepository(StudyExamRecord)
+        .createQueryBuilder("record")
+        .where("record.study_plan_id = :planId", { planId: Number(id) })
+        .andWhere("record.user_id = :userId", { userId })
+        .andWhere("record.is_deleted = 0")
+      
+      // 计算分页
+      const pageNum = Number(page);
+      const pageSizeNum = Number(pageSize);
+      const skip = (pageNum - 1) * pageSizeNum;
+
+      // 排序
+      queryBuilder.orderBy("record.create_time", "DESC");
+
+      // 执行查询
+      const [records, total] = await queryBuilder
+        .skip(skip)
+        .take(pageSizeNum)
+        .getManyAndCount();
+
+      return successResponse(res, {
+        records,
+        total,
+        page: pageNum,
+        pageSize: pageSizeNum,
+      }, "获取自学计划考试记录列表成功");
+    } catch (error) {
+      logger.error("获取自学计划考试记录列表失败:", error);
+      return errorResponse(res, 500, "获取自学计划考试记录列表失败");
     }
   }
 }

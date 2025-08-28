@@ -4,9 +4,10 @@ import { Exam } from "../models/entities/Exam.entity";
 import { ExamQuestion } from "../models/entities/ExamQuestion.entity";
 import { Question } from "../models/entities/Question.entity";
 import { ExamRecord } from "../models/entities/ExamRecord.entity";
+import { StudyExamRecord } from "../models/entities/StudyExamRecord.entity";
+import { StudyPlan } from "../models/entities/StudyPlan.entity";
 import { TrainingRecord } from "../models/entities/TrainingRecord.entity";
 import { TrainingRecordParticipant } from "../models/entities/TrainingRecordParticipant.entity";
-import { QuestionOption } from "../models/entities/QuestionOption.entity";
 import { logger } from "../utils/logger";
 import { errorResponse, successResponse } from "../utils/response";
 import { ExamAnswer } from "../models/entities/ExamAnswer.entity";
@@ -84,6 +85,7 @@ export class ExamController {
 
     const recordId = req.params.id;
     req.body.recordId = recordId;
+    const { settings } = req.body;
 
     // 查找培训记录
     const trainingRecord = await AppDataSource.getRepository(TrainingRecord).findOne({
@@ -97,15 +99,46 @@ export class ExamController {
     req.body.description = "培训记录编号：" + trainingRecord.id;
     req.body.trainingCategory = trainingRecord.training_plan.training_category;
 
-    let settings = this.getDefaultExamSettings();
-    settings.examCategory = 101;
-
-    req.body.settings = settings;
+    if (!settings) {
+      req.body.settings = this.getDefaultExamSettings();
+    }
+    req.body.settings.examCategory = 101;
     
     const response = await this.generateExam(req, res);
     if (response.statusCode === 200) {
       trainingRecord.exam_status = 1;
       await AppDataSource.getRepository(TrainingRecord).save(trainingRecord);
+    }
+    
+    return response;
+  }
+
+  async generateExamByStudyPlan(req: Request, res: Response): Promise<Response> {
+
+    const planId = req.params.id;
+    req.body.recordId = planId;
+    const { settings } = req.body;
+
+    // 查找学习计划记录
+    const planRecord = await AppDataSource.getRepository(StudyPlan).findOne({
+      where: { id: Number(planId) }
+    });
+    if (!planRecord) {
+      return errorResponse(res, 400, "学习计划记录不存在");
+    }
+    req.body.title = planRecord.title + "考试";
+    req.body.description = "学习计划编号：" + planRecord.id;
+    req.body.trainingCategory = planRecord.category;
+
+    if (!settings) {
+      req.body.settings = this.getDefaultExamSettings();
+    }
+    req.body.settings.examCategory = 101;
+    
+    const response = await this.generateExam(req, res);
+    if (response.statusCode === 200) {
+      planRecord.status = 1;
+      await AppDataSource.getRepository(StudyPlan).save(planRecord);
     }
     
     return response;
@@ -175,7 +208,13 @@ export class ExamController {
         }
 
         // 4. 生成考生考试记录
-        if (recordId) await this.generateExamRecord(queryRunner, recordId, savedExam._id);
+        if (recordId) {
+          if (examType === 2) {
+            await this.generateMockExamRecord(queryRunner, recordId, savedExam);
+          } else {
+            await this.generateExamRecord(queryRunner, recordId, savedExam._id);
+          }
+        }
 
         // 5. 获取生成的考卷信息（在事务提交前）
         const examWithQuestions = await this.getExamWithQuestionsInTransaction(queryRunner, savedExam._id);
@@ -236,6 +275,23 @@ export class ExamController {
     }
   }
 
+  private async generateMockExamRecord(
+    queryRunner: any,
+    recordId: number,
+    exam: Exam
+  ): Promise<void> {
+    try {
+      const examRecord = new StudyExamRecord();
+        examRecord.study_plan_id = recordId;
+        examRecord.exam_id = exam._id;
+        examRecord.user_id = exam.creator || 0;
+        examRecord.total_score = exam.total_score;
+        await queryRunner.manager.save(examRecord);
+    } catch (error) {
+      logger.error("生成考试记录失败:", error);
+    }
+  }
+
   // 智能选题算法
   private async smartSelectQuestions(
     settings: ExamSettings,
@@ -243,6 +299,14 @@ export class ExamController {
     queryRunner: any
   ): Promise<Question[]> {
     try {
+      const questionTypesMap = {
+        single_choice: "单选",
+        multiple_choice: "多选",
+        true_false: "判断",
+        fill_blank: "填空",
+        short_answer: "简答"
+      }
+
       // 1. 构建基础查询
       let queryBuilder = queryRunner.manager
         .createQueryBuilder(Question, "question")
@@ -252,7 +316,7 @@ export class ExamController {
       // 2. 应用筛选条件
       if (settings.questionTypes && settings.questionTypes.length > 0) {
         queryBuilder.andWhere("question.question_type IN (:...types)", {
-          types: settings.questionTypes
+          types: settings.questionTypes.map(type => questionTypesMap[type as keyof typeof questionTypesMap])
         });
       }
 

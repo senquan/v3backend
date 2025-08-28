@@ -1,8 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from "typeorm";
 import { User } from "./User.entity";
 import { StudyCourseware } from "./StudyCourseware.entity";
-// import { MockExam } from "./MockExam.entity";
-// import { StudyExamRecord } from "./StudyExamRecord.entity";
+import { StudyExamRecord } from "./StudyExamRecord.entity";
 
 @Entity("tr_study_plans")
 export class StudyPlan {
@@ -79,9 +78,6 @@ export class StudyPlan {
   @OneToMany(() => StudyCourseware, courseware => courseware.studyPlan)
   coursewares!: StudyCourseware[];
 
-  // @OneToMany(() => MockExam, exam => exam.studyPlan)
-  // mockExams!: MockExam[];
-
-  // @OneToMany(() => StudyExamRecord, record => record.studyPlan)
-  // examRecords!: StudyExamRecord[];
+  @OneToMany(() => StudyExamRecord, record => record.studyPlan)
+  examRecords!: StudyExamRecord[];
 }

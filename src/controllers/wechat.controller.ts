@@ -64,55 +64,13 @@ export class WechatController {
       // TODO: 移除测试代码
       // 返回测试信息
 
-      const user = {
-        id: 'wechat_test',
-        nickname: 'Test User',
-        avatar: 'https://example.com/avatar.png',
-        wechat_openid: 'wechat_test_openid',
-      }
-      const token = this.generateJwtToken(user);
-      return successResponse(res, {
-        token,
-        userInfo: {
-          id: user.id,
-          nickname: user.nickname,
-          avatar: user.avatar,
-          openid: user.wechat_openid,
-          loginType: 'wechat'
-        }
-      }, 'WeChat login successful');
-      
-      // // Step 1: Exchange authorization code for access token
-      // const tokenData = await this.exchangeCodeForToken(code);
-      // if (!tokenData) {
-      //   return errorResponse(res, 400, 'Failed to exchange authorization code for access token');
+      // const user = {
+      //   id: 'wechat_test',
+      //   nickname: 'Test User',
+      //   avatar: 'https://example.com/avatar.png',
+      //   wechat_openid: 'wechat_test_openid',
       // }
-      
-      // logger.info(`Successfully obtained access token for openid: ${tokenData.openid}`);
-      
-      // // Step 2: Get user information from WeChat
-      // const userInfo = await this.getWechatUserInfo(tokenData.access_token, tokenData.openid);
-      
-      // // Step 3: Find or create user in database
-      // const user = await this.findOrCreateUser({
-      //   openid: tokenData.openid,
-      //   unionid: tokenData.unionid,
-      //   nickname: userInfo?.nickname,
-      //   avatar: userInfo?.headimgurl,
-      //   province: userInfo?.province,
-      //   city: userInfo?.city,
-      //   country: userInfo?.country
-      // });
-      
-      // // Step 4: Generate JWT token
       // const token = this.generateJwtToken(user);
-      
-      // // Step 5: Update user's last login time
-      // await this.updateLastLogin(user.id);
-      
-      // logger.info(`WeChat login successful for user: ${user.id}`);
-      
-      // // Return success response with token and user info
       // return successResponse(res, {
       //   token,
       //   userInfo: {
@@ -123,6 +81,48 @@ export class WechatController {
       //     loginType: 'wechat'
       //   }
       // }, 'WeChat login successful');
+      
+      // Step 1: Exchange authorization code for access token
+      const tokenData = await this.exchangeCodeForToken(code);
+      if (!tokenData) {
+        return errorResponse(res, 400, 'Failed to exchange authorization code for access token');
+      }
+      
+      logger.info(`Successfully obtained access token for openid: ${tokenData.openid}`);
+      
+      // Step 2: Get user information from WeChat
+      const userInfo = await this.getWechatUserInfo(tokenData.access_token, tokenData.openid);
+      
+      // Step 3: Find or create user in database
+      const user = await this.findOrCreateUser({
+        openid: tokenData.openid,
+        unionid: tokenData.unionid,
+        nickname: userInfo?.nickname,
+        avatar: userInfo?.headimgurl,
+        province: userInfo?.province,
+        city: userInfo?.city,
+        country: userInfo?.country
+      });
+      
+      // Step 4: Generate JWT token
+      const token = this.generateJwtToken(user);
+      
+      // Step 5: Update user's last login time
+      await this.updateLastLogin(user.id);
+      
+      logger.info(`WeChat login successful for user: ${user.id}`);
+      
+      // Return success response with token and user info
+      return successResponse(res, {
+        token,
+        userInfo: {
+          id: user.id,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          openid: user.wechat_openid,
+          loginType: 'wechat'
+        }
+      }, 'WeChat login successful');
       
     } catch (error: any) {
       logger.error('WeChat login error:', error);

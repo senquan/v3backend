@@ -11,6 +11,9 @@ router.use(authMiddleware);
 // 获取自学计划列表
 router.get("/list", studyPlanController.getList);
 
+// 获取自学计划考试记录列表
+router.get("/records/:id", studyPlanController.getRecords.bind(studyPlanController));
+
 // 获取自学计划详情
 router.get("/:id", studyPlanController.getDetail);
 

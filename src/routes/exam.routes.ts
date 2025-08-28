@@ -11,6 +11,9 @@ router.use(authMiddleware);
 // 生成考试
 router.post('/generate/:id', examController.generateExamByRecord.bind(examController));
 
+// 生成模拟考试
+router.post('/generate-mock/:id', examController.generateExamByStudyPlan.bind(examController));
+
 // 获取我的考试列表
 router.get('/mylist', examController.getMyList.bind(examController));
 

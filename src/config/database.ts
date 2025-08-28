@@ -6,8 +6,6 @@ import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity
 import { Project } from '../models/entities/Project.entity';
 import { ProjectDepartmentMember } from '../models/entities/ProjectDepartmentMember.entity';
 import { User } from '../models/entities/User.entity';
-
-
 import { Category } from '../models/entities/Category.entity';
 import { Certificate } from '../models/entities/Certificate.entity';
 import { CertificateTemplate } from '../models/entities/CertificateTemplate.entity';
@@ -21,8 +19,9 @@ import { Material } from '../models/entities/Material.entity';
 import { Matrix } from '../models/entities/Matrix.entity';
 import { Question } from '../models/entities/Question.entity';
 import { QuestionOption } from '../models/entities/QuestionOption.entity';
-import { StudyPlan } from '../models/entities/StudyPlan.entity';
 import { StudyCourseware } from '../models/entities/StudyCourseware.entity';
+import { StudyExamRecord } from '../models/entities/StudyExamRecord.entity';
+import { StudyPlan } from '../models/entities/StudyPlan.entity';
 import { Survey } from '../models/entities/Survey.entity';
 import { SurveyQuestion } from '../models/entities/SurveyQuestion.entity';
 import { SurveyQuestionOption } from '../models/entities/SurveyQuestionOption.entity';
@@ -45,7 +44,6 @@ import { TrainingRecordProgressDetail } from '../models/entities/TrainingRecordP
 import { TrainingRecordParticipant } from '../models/entities/TrainingRecordParticipant.entity';
 import { TrainingUser } from '../models/entities/TrainingUser.entity';
 
-
 // 加载环境变量
 dotenv.config();
 
@@ -62,7 +60,7 @@ export const AppDataSource = new DataSource({
   logging: process.env.NODE_ENV !== 'production',
   entities: [Branch, ConstructionWorker, Project, ProjectDepartmentMember, User
     , Category, Certificate, CertificateTemplate, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Question
-    , QuestionOption, StudyPlan, StudyCourseware, Survey, SurveyQuestion, SurveyQuestionOption, SurveySubmission, SurveyAnswer, Tag, Task, TaskAssignment, TaskItem, TaskProgress
+    , QuestionOption, StudyCourseware, StudyExamRecord, StudyPlan, Survey, SurveyQuestion, SurveyQuestionOption, SurveySubmission, SurveyAnswer, Tag, Task, TaskAssignment, TaskItem, TaskProgress
     , Trainer, TrainerTag, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordProgress
     , TrainingRecordProgressDetail,TrainingRecordParticipant, TrainingUser],
   migrations: [__dirname + '/../migrations/**/*.ts'],
