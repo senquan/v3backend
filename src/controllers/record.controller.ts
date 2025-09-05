@@ -206,20 +206,13 @@ export class TrainingRecordController {
 
     async create(req: Request, res: Response): Promise<Response> {
         try {
-            const { 
-                participants,
-                participants_outer,
+            const {
                 contents,
                 contents_select,
                 contents_matrix,
                 coursewares
             } = req.body;
             
-            // 检查表单数据
-            if ((!participants || participants.length === 0) && (!participants_outer || participants_outer.length === 0)) {
-                return errorResponse(res, 400, '参与人员不能为空', null);
-            }
-
             // 开始事务
             const queryRunner = AppDataSource.createQueryRunner();
             await queryRunner.connect();
@@ -239,7 +232,7 @@ export class TrainingRecordController {
                 const trainingRecord = new TrainingRecord();
                 trainingRecord.training_plan_id = trainingPlan._id;
                 trainingRecord.actual_time = new Date();
-                trainingRecord.actual_participants = (participants?.length || 0) + (participants_outer?.length || 0);
+                trainingRecord.actual_participants = 0;
                 trainingRecord.qualified_participants = 0; // 初始合格人数为0
                 trainingRecord.content_notes = contents || '';
                 trainingRecord.content_type = trainingPlan.training_category;
@@ -248,36 +241,7 @@ export class TrainingRecordController {
                 trainingRecord.updater = (req as any).user?._id;
                 
                 const savedRecord = await queryRunner.manager.save(trainingRecord);
-
-                // 插入参与人员
-                if (participants && participants.length > 0) {
-                    const participantEntities = participants.map((userId: number) => {
-                        const participant = new TrainingRecordParticipant();
-                        participant.training_record_id = savedRecord.id;
-                        participant.user_id = userId;
-                        participant.is_qualified = 0;
-                        participant.is_trainer = 0;
-                        participant.is_signin = 0;
-                        participant.progress = 0;
-                        participant.course_count = coursewares?.length || 0;
-                        return participant;
-                    });
-                    await queryRunner.manager.save(participantEntities);
-                }
                 
-                // 插入外部参与人员
-                if (participants_outer && participants_outer.length > 0) {
-                    const outerParticipantEntities = participants_outer.map((workerId: number) => {
-                        const participant = new TrainingRecordParticipant();
-                        participant.training_record_id = savedRecord.id;
-                        participant.worker_id = workerId;
-                        participant.is_qualified = 0;
-                        participant.is_trainer = 0;
-                        return participant;
-                    });
-                    await queryRunner.manager.save(outerParticipantEntities);
-                }
-
                 // 插入培训记录与课件关联
                 if (coursewares && coursewares.length > 0) {
                     const coursewareEntities = coursewares.map((coursewareId: number) => {

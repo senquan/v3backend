@@ -21,6 +21,9 @@ export class TrainingRecordProgress {
   @Column({ type: 'smallint', default: 0 })
   is_locked!: number;
 
+  @Column({ type: 'integer', default: 0 })
+  chapter_count!: number;
+
   @CreateDateColumn()
   start_time!: Date;
 
