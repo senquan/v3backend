@@ -5,7 +5,7 @@ export class TrainingUser {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'int', default: 0, comment: '全局ID，对应sb.user或crscs.construction_worker的_id' })
   global_id!: number;
 
   @Column({ type: 'varchar', length: 50, unique: true, nullable: false })

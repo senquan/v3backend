@@ -37,6 +37,12 @@ interface WechatTokenResponse {
   unionid?: string;
 }
 
+interface WechatSessionResponse {
+  openid: string;
+  session_key: string;
+  unionid?: string;
+}
+
 const authController = require('../controllers/auth.controller');
 
 const WECHAT_CONFIG = {
@@ -276,7 +282,7 @@ export class UserController {
   // 微信用户登录
   async wechatLogin(req: Request, res: Response): Promise<Response> {
     try {
-      const { code } = req.body;
+      const { code, type = 'miniprogram' } = req.body;
       
       if (!code) {
         return errorResponse(res, 400, '缺少微信登录凭证');
@@ -286,6 +292,36 @@ export class UserController {
         return errorResponse(res, 500, '缺少微信配置，请提供 appId 和 appSecret');
       }
 
+      logger.info(`Starting WeChat ${type} login process with code: ${code.substring(0, 10)}...`);
+
+      // 根据登录类型选择不同的处理方式
+      if (type === 'miniprogram') {
+        return await this.wechatMiniprogramLogin(req, res);
+      } else {
+        return await this.wechatWebLogin(req, res);
+      }
+      
+    } catch (error: any) {
+      logger.error('WeChat login error:', error);
+      
+      // Handle specific error types
+      if (error?.message?.includes('invalid_grant')) {
+        return errorResponse(res, 400, 'Invalid or expired authorization code');
+      } else if (error?.message?.includes('rate limit')) {
+        return errorResponse(res, 429, 'WeChat API rate limit exceeded, please try again later');
+      } else if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND') {
+        return errorResponse(res, 503, 'WeChat service temporarily unavailable');
+      } else {
+        return errorResponse(res, 500, 'WeChat login failed');
+      }
+    } 
+  }
+
+  // 微信网页登录
+  async wechatWebLogin(req: Request, res: Response): Promise<Response> {
+    try {
+      const { code } = req.body;
+      
       const tokenData = await this.exchangeCodeForToken(code);
       if (!tokenData) {
         return errorResponse(res, 400, 'Failed to exchange authorization code for access token');
@@ -308,16 +344,17 @@ export class UserController {
       });
 
       if (!user) {
-        return successResponse(res, null, '用户未绑定，请授权手机号码', 1);
+        return successResponse(res, {
+          needBindPhone: true,
+          openid: tokenData.openid,
+          unionid: tokenData.unionid
+        }, '用户未绑定，请授权手机号码');
       }
-      
+      user.id = user.global_id;
       // Step 4: Generate JWT token
       const token = this.generateJwtToken(user, 'wechat');
       
-      // Step 5: Update user's last login time
-      // await this.updateLastLogin(user.id);
-      
-      logger.info(`WeChat login successful for user: ${user.id}`);
+      logger.info(`WeChat web login successful for user: ${user.id}`);
 
       return successResponse(res, {
         token,
@@ -333,19 +370,59 @@ export class UserController {
       }, '微信登录成功');
       
     } catch (error: any) {
-      logger.error('WeChat login error:', error);
+      logger.error('WeChat web login error:', error);
+      throw error;
+    }
+  }
+
+  // 微信小程序登录
+  async wechatMiniprogramLogin(req: Request, res: Response): Promise<Response> {
+    try {
+      const { code } = req.body;
       
-      // Handle specific error types
-      if (error?.message?.includes('invalid_grant')) {
-        return errorResponse(res, 400, 'Invalid or expired authorization code');
-      } else if (error?.message?.includes('rate limit')) {
-        return errorResponse(res, 429, 'WeChat API rate limit exceeded, please try again later');
-      } else if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND') {
-        return errorResponse(res, 503, 'WeChat service temporarily unavailable');
-      } else {
-        return errorResponse(res, 500, 'WeChat login failed');
+      const sessionData = await this.exchangeJscodeForSession(code);
+      if (!sessionData) {
+        return errorResponse(res, 400, 'Failed to exchange jscode for session');
       }
-    } 
+      
+      logger.info(`Successfully obtained session for openid: ${sessionData.openid}`);
+
+      // Step 2: Find user in database (小程序登录不需要获取用户信息)
+      const user = await this.findUser({
+        openid: sessionData.openid,
+        unionid: sessionData.unionid
+      });
+
+      if (!user) {
+        return successResponse(res, {
+          needBindPhone: true,
+          openid: sessionData.openid,
+          unionid: sessionData.unionid
+        }, '用户未绑定，请授权手机号码');
+      }
+      user.id = user.global_id;
+      // Step 3: Generate JWT token
+      const token = this.generateJwtToken(user, 'wechat');
+      
+      logger.info(`WeChat miniprogram login successful for user: ${user.id}`);
+
+      return successResponse(res, {
+        token,
+        user: {
+          id: user.global_id,
+          learner_id: user.id,
+          type: 2,
+          realname: user.realname,
+          name: user.name,
+          email: user.email,
+          phone: user.phone
+        }
+      }, '微信登录成功');
+      
+    } catch (error: any) {
+      logger.error('WeChat miniprogram login error:', error);
+      throw error;
+    }
   }
 
   // 获取用户培训计划详情
@@ -996,6 +1073,49 @@ export class UserController {
   }
 
   /**
+   * Exchange jscode for session (for miniprogram)
+   */
+  private async exchangeJscodeForSession(jscode: string): Promise<WechatSessionResponse | null> {
+    try {
+      const sessionUrl = 'https://api.weixin.qq.com/sns/jscode2session';
+      const params = {
+        appid: WECHAT_CONFIG.appId,
+        secret: WECHAT_CONFIG.appSecret,
+        js_code: jscode,
+        grant_type: 'authorization_code'
+      };
+      
+      logger.debug('Requesting WeChat session:', { appid: params.appid, js_code: jscode.substring(0, 10) + '...' });
+      
+      const response = await axios.get(sessionUrl, {
+        params,
+        timeout: 10000
+      });
+      
+      const data = response.data;
+      
+      // Check for WeChat API errors
+      if (data.errcode) {
+        logger.error('WeChat jscode2session error:', { errcode: data.errcode, errmsg: data.errmsg });
+        throw new Error(`WeChat API error: ${data.errmsg} (${data.errcode})`);
+      }
+      
+      // Validate required fields
+      if (!data.session_key || !data.openid) {
+        logger.error('Invalid session response from WeChat:', data);
+        throw new Error('Invalid session response from WeChat API');
+      }
+      
+      logger.debug('Session exchange successful:', { openid: data.openid });
+      
+      return data;
+    } catch (error) {
+      logger.error('Error exchanging jscode for session:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get user information from WeChat API using axios
    */
   private async getWechatUserInfo(accessToken: string, openid: string): Promise<WechatUserInfo | null> {
@@ -1121,9 +1241,9 @@ export class UserController {
   private generateJwtToken(user: any, type: string): string {
 
     const payload = {
-      userId: user.id,
+      id: user.id,
       openid: user.wechat_openid,
-      loginType: 'wechat',
+      loginType: type,
       iat: Math.floor(Date.now() / 1000)
     };
     
@@ -1139,29 +1259,24 @@ export class UserController {
    */
   async bindWechatPhone(req: Request, res: Response): Promise<Response> {
     try {
-      const { wechatCode, phoneCode } = req.body;
+      const { openid, unionid, phoneCode } = req.body;
       
       // 验证输入参数
-      if (!wechatCode) {
-        return errorResponse(res, 400, '微信授权码不能为空');
+      if (!openid) {
+        return errorResponse(res, 400, '微信openid不能为空');
       }
       
       if (!phoneCode) {
         return errorResponse(res, 400, '手机号授权码不能为空');
       }
       
-      logger.info(`开始绑定微信手机号，wechatCode: ${wechatCode}, phoneCode: ${phoneCode}`);
+      logger.info(`开始绑定微信手机号，openid: ${openid.substring(0, 10)}..., phoneCode: ${phoneCode.substring(0, 10)}...`);
       
-      // 1. 通过微信授权码获取用户信息
-      const wechatTokenData = await this.exchangeCodeForToken(wechatCode);
-      if (!wechatTokenData) {
-        return errorResponse(res, 400, '微信授权码无效或已过期');
-      }
-      
-      const wechatUserInfo = await this.getWechatUserInfo(wechatTokenData.access_token, wechatTokenData.openid);
-      if (!wechatUserInfo) {
-        return errorResponse(res, 400, '获取微信用户信息失败');
-      }
+      // 构建微信用户信息
+      const wechatUserInfo = {
+        openid: openid,
+        unionid: unionid
+      };
       
       // 2. 通过手机号授权码获取手机号
       const phoneInfo = await this.getWechatPhoneNumber(phoneCode);
@@ -1169,21 +1284,17 @@ export class UserController {
         return errorResponse(res, 400, '获取手机号失败');
       }
       
-      // 3. 检查手机号是否已被其他用户绑定
+      // 3. 检查手机号是否在系统中登记
+      // console.log('phoneInfo:', phoneInfo);
       const existingUser = await this.findUserByPhone(phoneInfo.phoneNumber);
-      if (existingUser) {
-        return errorResponse(res, 400, '该手机号已被其他用户绑定');
+      if (!existingUser) {
+        return errorResponse(res, 400, '该手机号未在系统中登记');
       }
       
       // 4. 创建或更新用户信息
       let user = await this.findUser({
         openid: wechatUserInfo.openid,
-        unionid: wechatUserInfo.unionid,
-        nickname: wechatUserInfo.nickname,
-        avatar: wechatUserInfo.headimgurl,
-        province: wechatUserInfo.province,
-        city: wechatUserInfo.city,
-        country: wechatUserInfo.country
+        unionid: wechatUserInfo.unionid
       });
       
       if (user) {
@@ -1197,17 +1308,16 @@ export class UserController {
         user = await this.createUserWithPhone({
           wechat_openid: wechatUserInfo.openid,
           wechat_unionid: wechatUserInfo.unionid,
-          nickname: wechatUserInfo.nickname || '微信用户',
-          avatar: wechatUserInfo.headimgurl,
-          phone: phoneInfo.phoneNumber,
-          province: wechatUserInfo.province,
-          city: wechatUserInfo.city,
-          country: wechatUserInfo.country
+          nickname: '微信用户_' + existingUser.phoneNumber,
+          id: existingUser.global_id,
+          realname: existingUser.realname,
+          type: existingUser.type,
+          phone: phoneInfo.phoneNumber
         });
       }
       
-      // 5. 生成JWT token
-      const token = this.generateJwtToken(user, 'user');
+      // 生成JWT token
+      const token = this.generateJwtToken(user, 'wechat');
       
       logger.info(`微信手机号绑定成功，用户ID: ${user.id}`);
       
@@ -1296,7 +1406,13 @@ export class UserController {
         .findOne({ where: { phone } });
       
       if (user) {
-        return { ...user, type: 'user' };
+        return {
+          global_id: user._id,
+          realname: user.realname,
+          branch_id: user.branch,
+          project_id: 0,
+          type: 1
+        };
       }
       
       // 再查找ConstructionWorker表
@@ -1304,7 +1420,13 @@ export class UserController {
         .findOne({ where: { phone } });
       
       if (worker) {
-        return { ...worker, type: 'worker' };
+        return {
+          global_id: worker._id,
+          realname: worker.name,
+          branch_id: worker.branch,
+          project_id: worker.project,
+          type: 2
+        };
       }
       
       return null;
@@ -1325,14 +1447,16 @@ export class UserController {
         id: userData.id,
         global_id: userData.global_id,
         name: userData.phone,
+        realname: userData.realname,
+        type: userData.type,
         nickname: userData.nickname,
         phone: userData.phone,
-        avatar: userData.avatar,
+        avatar: userData.avatar || null,
         wechat_openid: userData.wechat_openid,
         wechat_unionid: userData.wechat_unionid,
-        province: userData.province,
-        city: userData.city,
-        country: userData.country,
+        province: userData.province || null,
+        city: userData.city || null,
+        country: userData.country || null,
         is_deleted: 0,
         created_at: new Date(),
         updated_at: new Date()
