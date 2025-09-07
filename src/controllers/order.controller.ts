@@ -243,12 +243,8 @@ export class OrderController {
       const queryBuilder = AppDataSource.getRepository(Order)
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.user', 'user')
-        .leftJoinAndSelect('user.staff', 'staff');
-      
-      if (type === 2)
-        queryBuilder.where('order.type = 2');
-      else
-        queryBuilder.where('order.type != 2');
+        .leftJoinAndSelect('user.staff', 'staff')
+        .where('order.type = :type', { type });
 
       // 添加新的查询条件
       if (status && Array.isArray(status) && status.length > 0) queryBuilder.andWhere('order.status IN (:...status)', { status: status.map(Number) });
