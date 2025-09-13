@@ -25,6 +25,10 @@ export class Order {
   @Column({ name: 'platform_id' })
   platformId!: number;
 
+  // 关联订单
+  @Column({ type: 'int',name: 'related_id', nullable: true })
+  relatedId: number | null = null;
+
   @Column({ name: 'auth_code', length: 50 })
   authCode!: string;
 

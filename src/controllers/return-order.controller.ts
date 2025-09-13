@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
+import { Dict } from '../models/dict.model';
 import { ReturnOrder } from '../models/return-order.model';
 import { ReturnOrderItem } from '../models/return-order-item.model';
 import { Order } from '../models/order.model';
@@ -148,11 +149,17 @@ export class ReturnOrderController {
   // 获取退货订单列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, status, customerId, orderId } = req.query;
+      const { page = 1, pageSize = 20, status, customerId, orderId, startDate, endDate, username } = req.query;
+
+      const userRoles = (req as any).userRoles || [];
+      const userPlatforms = (req as any).accessPlatforms || [];
+      const isAdmin = userRoles.includes('ADMIN');
       
       const queryBuilder = AppDataSource.getRepository(ReturnOrder)
         .createQueryBuilder('returnOrder')
-        .leftJoinAndSelect('returnOrder.items', 'items')
+        .leftJoinAndSelect('returnOrder.user', 'user')
+        .leftJoinAndSelect('user.staff', 'staff')
+        //.leftJoinAndSelect('returnOrder.items', 'items')
         .where('returnOrder.isDeleted = :isDeleted', { isDeleted: 0 });
 
       // 添加查询条件
@@ -163,9 +170,16 @@ export class ReturnOrderController {
       if (customerId) {
         queryBuilder.andWhere('returnOrder.customerId = :customerId', { customerId });
       }
+
+      if (startDate) queryBuilder.andWhere('returnOrder.createdAt >= :startDate', { startDate });
+      if (endDate) queryBuilder.andWhere('returnOrder.createdAt <= :endDate', { endDate: endDate + " 23:59:59" });
       
       if (orderId) {
         queryBuilder.andWhere('returnOrder.orderId = :orderId', { orderId });
+      }
+
+      if (username) {
+        queryBuilder.andWhere('(user.username LIKE :username OR staff.name LIKE :username)', { username: `%${username}%` });
       }
 
       // 分页查询
@@ -175,8 +189,15 @@ export class ReturnOrderController {
         .take(Number(pageSize))
         .getManyAndCount();
 
+      const dictQueryBuilder = AppDataSource.getRepository(Dict)
+      .createQueryBuilder('dict')
+      .where('dict.group = :group', { group: 1 });
+      const allPlatforms = await dictQueryBuilder.getMany();
+      const platforms = isAdmin ? allPlatforms : allPlatforms.filter((item) => userPlatforms.includes(Number(item.value)));
+
       return successResponse(res, {
         returnOrders,
+        platforms,
         total,
         page: Number(page),
         pageSize: Number(pageSize)
@@ -197,6 +218,7 @@ export class ReturnOrderController {
         .createQueryBuilder('returnOrder')
         .leftJoinAndSelect('returnOrder.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('product.modelType','model')
         .leftJoinAndSelect('returnOrder.order', 'order')
         .where('returnOrder.id = :id', { id })
         .andWhere('returnOrder.isDeleted = :isDeleted', { isDeleted: 0 })

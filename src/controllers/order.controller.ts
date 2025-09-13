@@ -31,7 +31,7 @@ export class OrderController {
     const userId = (req as any).user.id;
     try {
       // 修改请求参数解析
-      const { name, type, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs } = req.body;
+      const { name, type, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs, relatedId } = req.body;
 
 
       // 验证必要字段
@@ -47,6 +47,7 @@ export class OrderController {
       order.customerId = 0;
       order.userId = userId;
       order.remark = remark;
+      order.relatedId = relatedId || null;
 
       // 计算价格和数量
       let totalQuantity = 0;
@@ -131,7 +132,7 @@ export class OrderController {
     const userId = (req as any).user.id;
     try {
       const { id } = req.params;
-      const { name, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs } = req.body;
+      const { name, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs, relatedId } = req.body;
 
       // 验证必要字段
       if (!name ||!platformId ||!products?.length) {
@@ -153,6 +154,12 @@ export class OrderController {
       order.customerId = 0;
       order.userId = userId;
       order.remark = remark;
+
+      if (relatedId) {
+        order.relatedId = relatedId;
+      } else {
+        order.relatedId = null;
+      }
 
       // 计算价格和数量
       let totalQuantity = 0;

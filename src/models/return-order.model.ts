@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from "typeorm";
 import { ReturnOrderItem } from "./return-order-item.model";
 import { Order } from "./order.model";
+import { User } from "./user.model";
 
 @Entity("return_orders")
 export class ReturnOrder {
@@ -58,6 +59,11 @@ export class ReturnOrder {
 
   @Column({ name: 'is_deleted', type: 'tinyint', default: 0 })
   isDeleted!: number;
+
+  // 关系
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'user_id' })
+  user!: User;
 
   @OneToMany(() => ReturnOrderItem, item => item.returnOrder)
   items!: ReturnOrderItem[];
