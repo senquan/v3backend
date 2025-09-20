@@ -30,7 +30,7 @@ export class ReturnOrder {
   @Column({ name: 'reviewer_id', nullable: true })
   reviewerId?: number;
 
-  @Column()
+  @Column({ name: 'quantity', type: 'decimal', precision: 5, scale: 2 })
   quantity!: number;
 
   @Column({ name: 'return_amount', type: 'decimal', precision: 10, scale: 2 })

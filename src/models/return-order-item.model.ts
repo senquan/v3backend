@@ -32,7 +32,7 @@ export class ReturnOrderItem {
   @Column({ name: 'unit_price', type: 'decimal', precision: 10, scale: 2 })
   unitPrice!: number;
 
-  @Column()
+  @Column({ name: 'quantity', type: 'decimal', precision: 5, scale: 2 })
   quantity!: number;
 
   @Column({ name: 'total_price', type: 'decimal', precision: 12, scale: 2 })

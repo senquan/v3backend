@@ -9,6 +9,8 @@ export enum OrderType {
   COMMON = 1,
   PROJECT = 2,
   V3 = 3,
+  REPLENISHMENT = 4,
+  REFUND = 5,
 }
 
 @Entity("orders")

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import authRoutes from './auth.routes';
+import bulletinRoutes from './bulletin.routes';
 import couponRoutes from './coupon.routes';
 import customerRoutes from './customer.routes';
 import userRoutes from './user.routes';
@@ -24,6 +25,7 @@ const router = Router();
 
 // 注册各个模块的路由
 router.use('/v1/auth', authRoutes);
+router.use('/v1/bulletin', bulletinRoutes);
 router.use('/v1/coupon', couponRoutes);
 router.use('/v1/customer', customerRoutes);
 router.use('/v1/users', userRoutes);

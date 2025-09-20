@@ -219,6 +219,7 @@ export class ReturnOrderController {
         .leftJoinAndSelect('returnOrder.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('product.modelType','model')
+        .leftJoinAndSelect('product.serie','series')
         .leftJoinAndSelect('returnOrder.order', 'order')
         .where('returnOrder.id = :id', { id })
         .andWhere('returnOrder.isDeleted = :isDeleted', { isDeleted: 0 })

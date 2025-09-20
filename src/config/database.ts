@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
+import { Bulletin } from '../models/bulletin.model';
 import { Category } from '../models/category.model';
 import { Coupon } from '../models/coupon.model';
 import { CouponUser } from '../models/coupon-user.model';
@@ -54,7 +55,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'cardbug',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [Category, Coupon, CouponUser, Customer, Dict, Gallery, InviteCode, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag, ProductTag,
+  entities: [Bulletin, Category, Coupon, CouponUser, Customer, Dict, Gallery, InviteCode, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag, ProductTag,
     Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, User, UserRole,
     PromotionV3, PromotionRuleV3
   ],
