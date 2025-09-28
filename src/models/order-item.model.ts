@@ -20,6 +20,9 @@ export class OrderItem {
   @Column()
   quantity!: number;
 
+  @Column({ name: 'discount', type: 'decimal', precision: 5, scale: 4, nullable: false, default: 0, comment: '折扣率, 如0.85表示85折' })
+  discount!: number;
+
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   totalPrice!: number;
 

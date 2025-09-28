@@ -59,6 +59,7 @@ export class OrderController {
         orderItem.productId = item.id;
         orderItem.unitPrice = item.unitPrice;
         orderItem.quantity = item.quantity;
+        orderItem.discount = item.discount || 1;
         orderItem.totalPrice = itemTotal;
         return orderItem;
       });
