@@ -168,6 +168,7 @@ export class ExamController {
         // 1. 创建考试记录
         const exam = new Exam();
         exam.title = title;
+        exam.training_record_id = recordId ? Number(recordId) : null;
         exam.description = description;
         exam.type = examType;
         exam.category_id = settings.examCategory;
@@ -269,6 +270,9 @@ export class ExamController {
         examRecord.exam_id = examId;
         examRecord.participant_id = participant.id;
         await queryRunner.manager.save(examRecord);
+        participant.exam_count = 1;
+        participant.progress = Math.floor(participant.course_count * participant.progress / (participant.course_count + participant.exam_count));
+        await queryRunner.manager.save(TrainingRecordParticipant, participant);
       }
     } catch (error) {
       logger.error("生成考试记录失败:", error);
@@ -662,6 +666,63 @@ export class ExamController {
     }
   }
 
+  async getMyPaper(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?._id;
+
+      // 获取用户的考试记录
+      const examRecord = await AppDataSource.getRepository(ExamRecord)
+        .createQueryBuilder("record")
+        .leftJoinAndSelect("record.participant", "participant")
+        .where("record.exam_id = :examId", { examId: Number(id) })
+        .andWhere("participant.user_id = :userId", { userId })
+        .getOne();
+
+      if (!examRecord) {
+        return errorResponse(res, 404, "未找到您的考试记录");
+      }
+
+      // 获取用户的答案
+      const examAnswers = await AppDataSource.getRepository(ExamAnswer)
+        .createQueryBuilder("answer")
+        .where("answer.exam_record_id = :recordId", { recordId: examRecord._id })
+        .getMany();
+
+      return successResponse(res, {
+        examRecord,
+        examAnswers
+      }, "获取我的考卷成功");
+    } catch (error) {
+      logger.error("获取我的考卷失败:", error);
+      return errorResponse(res, 500, "获取我的考卷失败");
+    }
+  }
+
+  // 开始考试
+  async startExam(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?._id;
+
+      const examRecord = await AppDataSource.getRepository(ExamRecord)
+          .createQueryBuilder("record")
+          .where("record.exam_id = :examId", { examId: Number(id) })
+          .andWhere("record.participant_id IN (SELECT p.id FROM training.tr_training_record_participants p WHERE p.user_id = :userId)", { userId })
+          .getOne();
+
+      if (!examRecord) {
+        return errorResponse(res, 404, "考试记录不存在");
+      }
+      examRecord.start_time = new Date();
+      await AppDataSource.getRepository(ExamRecord).save(examRecord);
+      return successResponse(res, examRecord, "考试开始");
+    } catch (error) {
+      logger.error("考试开始失败:", error);
+      return errorResponse(res, 500, "考试开始失败");
+    }
+  }
+
   // 提交考卷
   async submitExam(req: Request, res: Response): Promise<Response> {
     try {
@@ -701,7 +762,7 @@ export class ExamController {
           .where("record.exam_id = :examId", { examId: exam._id })
           .andWhere("record.participant_id IN (SELECT p.id FROM training.tr_training_record_participants p WHERE p.user_id = :userId)", { userId })
           .getOne();
-
+        // console.log("examRecord", examRecord);
         if (!examRecord) {
           // 查找参与者ID
           const participant = await queryRunner.manager
@@ -724,20 +785,19 @@ export class ExamController {
           examRecord = await queryRunner.manager.save(examRecord);
         }
 
-        // 设置结束时间
+        // 设置结束时间及提交次数
+        examRecord.submit_count = (examRecord.submit_count || 0) + 1;
         examRecord.end_time = new Date();
 
         // 计算得分
         let totalScore = 0;
         let correctCount = 0;
 
-        // 删除之前的答案记录（如果有）
-        await queryRunner.manager
-          .createQueryBuilder()
-          .delete()
-          .from(ExamAnswer)
+        // 之前的答案记录（如果有）
+        const oldAnswers = await queryRunner.manager
+          .createQueryBuilder(ExamAnswer, "answer")
           .where("exam_record_id = :recordId", { recordId: examRecord._id })
-          .execute();
+          .getMany();
 
         // 保存新的答案并计算得分
         for (const answer of answers) {
@@ -745,6 +805,7 @@ export class ExamController {
           
           // 查找题目和分数
           const examQuestion = exam.examQuestions.find(eq => eq.question_id === questionId);
+          // console.log("examQuestion", questionId, examQuestion);
           if (!examQuestion) continue;
           
           const question = examQuestion.questionEntity;
@@ -758,11 +819,14 @@ export class ExamController {
             // 单选题比较选项
             const correctOption = question.options.find(opt => opt.is_correct);
             if (question.question_type === '判断') {
-              isCorrect = correctOption ? userAnswer === correctOption.option_content : false;
+              isCorrect = correctOption ? (userAnswer === (correctOption.option_content === "对" || correctOption.option_content === "正确" ? "true" : "false")) : false;
+              // console.log("result:", question.question_type, userAnswer, correctOption?.option_content);
             } else {
               isCorrect = correctOption ? userAnswer === correctOption.option_label : false;
+              // console.log("result:", question.question_type, userAnswer, correctOption?.option_label);
             }
             score = isCorrect ? questionScore : 0;
+            // console.log("score:", isCorrect, score);
           } else if (question.question_type === '多选') {
             // 多选题比较选项集合
             const userAnswers = userAnswer.split(',').map((a: any) => a.trim()).sort();
@@ -772,6 +836,7 @@ export class ExamController {
               .sort();
             
             // 完全匹配才得满分，部分匹配得部分分
+            // console.log("userAnswers:", JSON.stringify(userAnswers), "correctOptions:", JSON.stringify(correctOptions));
             const correctAnswers = JSON.stringify(userAnswers) === JSON.stringify(correctOptions);
             if (correctAnswers) {
               isCorrect = true;
@@ -780,15 +845,17 @@ export class ExamController {
               // 部分正确给一半分数
               const correctCount = userAnswers.filter((a: any) => correctOptions.includes(a)).length;
               const incorrectCount = userAnswers.filter((a: any) => !correctOptions.includes(a)).length;
+              // console.log("correctCount:", correctCount, "incorrectCount:", incorrectCount);
               
               if (correctCount > 0 && incorrectCount === 0 && correctCount < correctOptions.length) {
-                score = Math.floor(questionScore * 0.5);
+                score = Math.round(questionScore * 0.5 * 10) / 10;
                 isCorrect = false;
               } else {
                 score = 0;
                 isCorrect = false;
               }
             }
+            // console.log("result:", question.question_type, userAnswer, correctOptions, isCorrect, score);
           } else if (question.question_type === '填空') {
             // 填空题比较关键词
             const standardAnswers = question.answer?.split('|') || [];
@@ -796,21 +863,36 @@ export class ExamController {
               userAnswer.toLowerCase().trim() === ans.toLowerCase().trim()
             );
             score = isCorrect ? questionScore : 0;
+            // console.log("result:", question.question_type, userAnswer, standardAnswers, isCorrect, score);
           } else if (question.question_type === '简答') {
             // 简答题需要人工评分，先设为0分
             isCorrect = false;
             score = 0;
+            // console.log("result:", question.question_type, userAnswer);
           }
           
           // 保存答案记录
-          const examAnswer = new ExamAnswer();
-          examAnswer.exam_record_id = examRecord._id;
-          examAnswer.question_id = questionId;
-          examAnswer.user_answer = userAnswer;
-          examAnswer.is_correct = isCorrect;
-          examAnswer.score = score;
+          let oldAnswer: ExamAnswer | undefined;
+          if (oldAnswers.length > 0) {
+            oldAnswer = oldAnswers.find((answer: ExamAnswer) => answer.question_id === questionId);
+            if (oldAnswer) {
+              oldAnswer.user_answer = userAnswer;
+              oldAnswer.is_correct = isCorrect;
+              oldAnswer.score = score;
+              await queryRunner.manager.save(oldAnswer);
+            }
+          }
           
-          await queryRunner.manager.save(examAnswer);
+          if (!oldAnswer) {
+            const examAnswer = new ExamAnswer();
+            examAnswer.exam_record_id = examRecord._id;
+            examAnswer.question_id = questionId;
+            examAnswer.user_answer = userAnswer;
+            examAnswer.is_correct = isCorrect;
+            examAnswer.score = score;
+            
+            await queryRunner.manager.save(examAnswer);
+          }
           
           // 累计得分
           if (isCorrect) correctCount++;

@@ -57,7 +57,7 @@ export class TrainingRecordController {
                 queryBuilder.orderBy(`record.${field}`, order === "+" ? "ASC" : "DESC");
               }
             } else {
-              queryBuilder.orderBy('record.id', 'ASC');
+              queryBuilder.orderBy('record.id', 'DESC');
             }
 
             if (branchId > 0) {

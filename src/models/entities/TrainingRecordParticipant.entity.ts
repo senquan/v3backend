@@ -29,11 +29,14 @@ export class TrainingRecordParticipant {
   @Column({ type: 'smallint', default: 0 })
   is_signin!: number;
 
-  @Column({ type: 'smallint', default: 0 })
+  @Column({ type: "numeric", precision: 5, scale: 2, default: 0 })
   progress!: number;
 
   @Column({ type: 'smallint', default: 0 })
   course_count!: number;
+
+  @Column({ type: 'smallint', default: 0 })
+  exam_count!: number;
 
   // 关联关系
   @ManyToOne(() => TrainingRecord, record => record.participants)

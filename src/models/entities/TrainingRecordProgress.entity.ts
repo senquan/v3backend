@@ -15,7 +15,7 @@ export class TrainingRecordProgress {
   @Index('idx_training_record_progress_courseware_id')
   courseware_id!: number;
 
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: "numeric", precision: 5, scale: 2, default: 0 })
   progress!: number;
 
   @Column({ type: 'smallint', default: 0 })

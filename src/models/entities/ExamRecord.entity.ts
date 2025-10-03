@@ -36,6 +36,9 @@ export class ExamRecord {
   @Column({ type: "text", nullable: true, comment: "考试记录备注" })
   notes: string | null = null;
 
+  @Column({ type: "integer", nullable: true, comment: "提交次数" })
+  submit_count: number | null = null;
+
   @CreateDateColumn({ name: "create_time" })
   create_time!: Date;
 

@@ -1,6 +1,6 @@
-import { CreateDateColumn, Entity, PrimaryGeneratedColumn, Column, JoinColumn, OneToMany, ManyToOne, UpdateDateColumn } from "typeorm";
+import { CreateDateColumn, Entity, PrimaryGeneratedColumn, Column, JoinColumn, Index, OneToMany, ManyToOne, UpdateDateColumn } from "typeorm";
 import { User } from "./User.entity";
-import { Category } from "./Category.entity";
+import { TrainingRecord } from "./TrainingRecord.entity";
 import { ExamQuestion } from "./ExamQuestion.entity";
 import { ExamRecord } from "./ExamRecord.entity";
 
@@ -8,6 +8,10 @@ import { ExamRecord } from "./ExamRecord.entity";
 export class Exam {
   @PrimaryGeneratedColumn()
   _id!: number;
+
+  @Column({ type: 'integer', nullable: true })
+  @Index('idx_exam_record_id')
+  training_record_id: number | null = null;
 
   @Column({ type: "varchar", length: 100, nullable: false, comment: "试卷标题" })
   title!: string;
@@ -55,6 +59,10 @@ export class Exam {
   update_time!: Date;
 
   // 关联关系
+  // @ManyToOne(() => TrainingRecord)
+  // @JoinColumn({ name: 'training_record_id' })
+  // training_record!: TrainingRecord;
+  
   @ManyToOne(() => User, {
     createForeignKeyConstraints: false
   })

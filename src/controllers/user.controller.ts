@@ -4,6 +4,7 @@ import axios from 'axios';
 import { AppDataSource } from '../config/database';
 import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity';
 import { Courseware } from '../models/entities/Courseware.entity';
+import { Exam } from '../models/entities/Exam.entity';
 import { ExamRecord } from '../models/entities/ExamRecord.entity';
 import { CoursewareMaterial } from '../models/entities/CoursewareMaterial.entity';
 import { TrainingRecordProgressDetail } from '../models/entities/TrainingRecordProgressDetail.entity';
@@ -517,7 +518,7 @@ export class UserController {
         .getOne();
 
       // 计算总进度
-      const eachProgress = 100 / (coursewares.length + (exam ? 1 : 0));
+      const eachProgress = 100 / (coursewares.length + (participant.exam_count || 0));
       let totalProgress = 0
       coursewares.forEach(item => {
         totalProgress += Math.round(eachProgress * (item.progress / 100));
@@ -730,20 +731,20 @@ export class UserController {
         return errorResponse(res, 404, '课程不存在', null);
       }
 
+      // 获取课件进度
       const progressBuilder = AppDataSource.getRepository(TrainingRecordProgress)
         .createQueryBuilder('progress')
         .where('progress.courseware_id = :coursewareId', { coursewareId: courseId })
         .andWhere('progress.training_record_participant_id = :partId', { partId: partId });
       
       let progressId = 0;
-      const progress = await progressBuilder.getOne();
+      let progress = await progressBuilder.getOne();
 
       if (!progress) {
         // 查询课程章节数
         const chapterCount = await AppDataSource.getRepository(CoursewareMaterial)
           .createQueryBuilder('coursewareMaterial')
           .where('coursewareMaterial.courseware_id = :coursewareId', { coursewareId: courseId })
-          .andWhere('coursewareMaterial.is_deleted = :isDeleted', { isDeleted: 0 })
           .getCount();
 
         const newProgress = new TrainingRecordProgress();
@@ -751,11 +752,9 @@ export class UserController {
         newProgress.training_record_participant_id = Number(partId);
         newProgress.progress = 0;
         newProgress.chapter_count = chapterCount;
-        const savedProgress = await AppDataSource.manager.save(newProgress);
-        progressId = savedProgress.id || 0;
-      } else {
-        progressId = progress.id || 0;
-      }
+        progress = await AppDataSource.manager.save(newProgress);
+      } 
+      progressId = progress?.id || 0;
 
       // chapters
       const chaptersData = await AppDataSource.getRepository(CoursewareMaterial)
@@ -771,7 +770,6 @@ export class UserController {
         const detailsBuilder = AppDataSource.getRepository(TrainingRecordProgressDetail)
           .createQueryBuilder('detail')
           .where('detail.training_record_progress_id = :progressId', { progressId: progressId })
-          .andWhere('detail.material_id = :materialId', { materialId: partId });
         
         const details = await detailsBuilder.getMany();
         details.forEach(item => {
@@ -779,6 +777,8 @@ export class UserController {
         })
       }
       
+      // console.log("chapterProgressMap", chapterProgressMap);
+      // console.log("chaptersData", chaptersData);
       const chapters = chaptersData.map(item => ({
         id: item.material_id,
         title: item.material.title,
@@ -845,10 +845,22 @@ export class UserController {
         .select([
           'scope.branch_id',
           'scope.project_department_id',
-          'scope.ref_type'
+          'scope.ref_type',
+          'plan._id',
+          'plan.assessment_method',
         ])
         .where('record.id = :recordId', { recordId: id })
         .getRawMany();
+
+      let planId = 0;
+      let hasExam = false;
+      if (scopes.length > 0) {
+        planId = scopes[0].plan__id || 0;
+        hasExam = scopes[0].plan_assessment_method === 1;
+      }
+      if (planId === 0) {
+        return errorResponse(res, 400, '用户不属于培训范围', null);
+      }
 
       const userType = user.type === 2 ? 2 : 1;
       if (userType === 1) {
@@ -873,39 +885,71 @@ export class UserController {
           return errorResponse(res, 400, '用户不属于培训范围', null);
         }
       }
+
+      // 开始事务
+      const queryRunner = AppDataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
       
-      const participantBuilder = AppDataSource.getRepository(TrainingRecordParticipant)
-        .createQueryBuilder('participant')
-        .where('participant.training_record_id = :recordId', { recordId: id })
+      try {
+        const participantBuilder = queryRunner.manager
+          .createQueryBuilder(TrainingRecordParticipant, 'participant')
+          .where('participant.training_record_id = :recordId', { recordId: id })
 
-      if (userType === 1) {
-        participantBuilder.andWhere('participant.user_id = :userId', { userId: user.id });
-      } else {
-        participantBuilder.andWhere('participant.worker_id = :workerId', { workerId: user.id });
+        if (userType === 1) {
+          participantBuilder.andWhere('participant.user_id = :userId', { userId: user.id });
+        } else {
+          participantBuilder.andWhere('participant.worker_id = :workerId', { workerId: user.id });
+        }
+        const participant = await participantBuilder.getOne();
+
+        if (participant) {
+          throw new Error('已签到');
+        }
+
+        // 查询培训记录课程数
+        const courseCount = await queryRunner.manager
+          .createQueryBuilder(TrainingRecordCourseware,'courseware')
+          .where('courseware.training_record_id = :recordId', { recordId: id })
+          .getCount();
+
+        const newParticipant = new TrainingRecordParticipant();
+        newParticipant.training_record_id = Number(id);
+        if (userType === 1) {
+          newParticipant.user_id = user.id;
+        } else {
+          newParticipant.worker_id = user.id;
+        }
+        newParticipant.is_signin = 1;
+        newParticipant.course_count = courseCount;
+        newParticipant.exam_count = hasExam ? 1 : 0;
+
+        const savedParticipant = await queryRunner.manager.save(TrainingRecordParticipant, newParticipant);
+
+        // 是否存在考试
+        const exam = await queryRunner.manager
+          .createQueryBuilder(Exam,'exam')
+          .where('exam.training_record_id = :recordId', { recordId: id })
+          .getOne();
+
+        if (exam) {
+          // 创建考试记录
+          const examRecord = new ExamRecord();
+          examRecord.training_record_id = Number(id);
+          examRecord.exam_id = exam._id;
+          examRecord.participant_id = savedParticipant.id;
+          await queryRunner.manager.save(examRecord);
+        }
+
+        // 提交事务
+        await queryRunner.commitTransaction();
+        return successResponse(res, null, '签到成功');
+      } catch (error) {
+        await queryRunner.rollbackTransaction();
+        throw error;
+      } finally {
+        await queryRunner.release();
       }
-      const participant = await participantBuilder.getOne();
-
-      if (participant) {
-        return errorResponse(res, 400, '已签到', null);
-      }
-
-      // 查询培训记录课程数
-      const courseCount = await AppDataSource.getRepository(TrainingRecordCourseware)
-        .createQueryBuilder('courseware')
-        .where('courseware.training_record_id = :recordId', { recordId: id })
-        .getCount();
-
-      const newParticipant = new TrainingRecordParticipant();
-      newParticipant.training_record_id = Number(id);
-      if (userType === 1) {
-        newParticipant.user_id = user.id;
-      } else {
-        newParticipant.worker_id = user.id;
-      }
-      newParticipant.is_signin = 1;
-      newParticipant.course_count = courseCount;
-      await AppDataSource.getRepository(TrainingRecordParticipant).save(newParticipant);
-      return successResponse(res, null, '签到成功');
     } catch (error) {
       logger.error('签到失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -958,14 +1002,15 @@ export class UserController {
       if (isCompleted) {
         const allProgress = await AppDataSource.getRepository(TrainingRecordProgressDetail)
         .createQueryBuilder('progress')
-        .where('progress.training_record_progress_id = :progressId', { progressId: progressId })
+        .where('progress.training_record_progress_id = :progressId', { progressId })
         .select('progress.progress')
         .getRawMany();
 
+        // 更新总进度
         const totalProgress = allProgress.reduce((acc, cur) => acc + cur.progress_progress, 0);
         const progressRecord = await AppDataSource.getRepository(TrainingRecordProgress)
           .createQueryBuilder('progress')
-          .where('progress.id = :progressId', { progressId: progressId })
+          .where('progress.id = :progressId', { progressId })
           .getOne();
         if (progressRecord) {
           let chapterCount = progressRecord.chapter_count;
@@ -979,13 +1024,13 @@ export class UserController {
             .createQueryBuilder('progress')
             .where('progress.training_record_participant_id = :participantId', { participantId: progressRecord.training_record_participant_id })
             .getMany();
-            const totalCourseProgress = allCourseProgress.reduce((acc, cur) => acc + cur.progress, 0);
-            const courseProgress = Math.round(totalCourseProgress / allCourseProgress.length * 100) / 100;
+            const totalCourseProgress = allCourseProgress.reduce((acc, cur) => acc + Number(cur.progress), 0);
             const participant = await AppDataSource.getRepository(TrainingRecordParticipant)
               .createQueryBuilder('participant')
               .where('participant.id = :participantId', { participantId: progressRecord.training_record_participant_id })
               .getOne();
             if (participant) {
+              const courseProgress = Math.round(totalCourseProgress / ((participant.course_count || allCourseProgress.length) + (participant.exam_count || 0)) * 100) / 100;
               participant.progress = courseProgress;
               await AppDataSource.getRepository(TrainingRecordParticipant).save(participant);
             }
