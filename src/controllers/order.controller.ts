@@ -42,7 +42,7 @@ export class OrderController {
       // 生成订单信息
       const order = new Order();
       order.type = type || 1;
-      order.priceVersion = priceVersion || 0;
+      order.priceVersion = priceVersion || 1;
       order.name = name;
       order.platformId = platformId;
       order.customerId = 0;
