@@ -31,7 +31,7 @@ export class OrderController {
     const userId = (req as any).user.id;
     try {
       // 修改请求参数解析
-      const { name, type, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs, relatedId } = req.body;
+      const { name, type, priceVersion, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs, relatedId } = req.body;
 
 
       // 验证必要字段
@@ -42,6 +42,7 @@ export class OrderController {
       // 生成订单信息
       const order = new Order();
       order.type = type || 1;
+      order.priceVersion = priceVersion || 0;
       order.name = name;
       order.platformId = platformId;
       order.customerId = 0;
@@ -247,6 +248,7 @@ export class OrderController {
       const { page = 1, pageSize = 20, status, username, keyword, customerId, startDate, endDate, payStatus, platformIds } = req.query;
       let type = Number(req.query.type);
       if (!type) type = 1;
+      const priceVersion = Number(req.query.priceVersion);
       
       const queryBuilder = AppDataSource.getRepository(Order)
         .createQueryBuilder('order')
@@ -255,6 +257,7 @@ export class OrderController {
         .where('order.type = :type', { type });
 
       // 添加新的查询条件
+      if (priceVersion > 0) queryBuilder.andWhere('order.priceVersion = :priceVersion', { priceVersion });
       if (status && Array.isArray(status) && status.length > 0) queryBuilder.andWhere('order.status IN (:...status)', { status: status.map(Number) });
       if (payStatus && Array.isArray(payStatus) && payStatus.length > 0) queryBuilder.andWhere('order.payStatus IN (:...payStatus)', { payStatus: payStatus.map(Number) });
       if (startDate) queryBuilder.andWhere('order.createdAt >= :startDate', { startDate });

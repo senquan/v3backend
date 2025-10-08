@@ -24,6 +24,9 @@ export class Order {
   @Column({ type: 'smallint', default: OrderType.COMMON, comment: '订单类型' })  
   type!: OrderType;
 
+  @Column({ type: 'smallint', name: 'price_version', default: 0, comment: '计价版本' })  
+  priceVersion!: number;
+
   @Column({ name: 'platform_id' })
   platformId!: number;
 
