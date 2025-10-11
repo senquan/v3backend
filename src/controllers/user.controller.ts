@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { In } from "typeorm";
 import * as jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { AppDataSource } from '../config/database';
@@ -11,6 +12,10 @@ import { TrainingRecordProgressDetail } from '../models/entities/TrainingRecordP
 import { TrainingUser } from '../models/entities/TrainingUser.entity';
 import { TrainingRecord } from '../models/entities/TrainingRecord.entity';
 import { User } from '../models/entities/User.entity';
+import { Role } from '../models/entities/Role.entity';
+import { UserRole } from '../models/entities/UserRole.entity';
+import { Permission } from '../models/entities/Permission.entity';
+import { RolePermission } from '../models/entities/RolePermission.entity';
 import { ProjectDepartmentMember } from '../models/entities/ProjectDepartmentMember.entity';
 import { TrainingRecordCourseware } from '../models/entities/TrainingRecordCourseware.entity';
 import { TrainingRecordParticipant } from '../models/entities/TrainingRecordParticipant.entity';
@@ -77,10 +82,34 @@ export class UserController {
       // 检查用户状态
       if (user.status !== 1) return errorResponse(res, 403, '账户状态异常', null);
 
+      // 获取用户信息
+      const profileRepository = AppDataSource.getRepository(TrainingUser);
+      let profile = await profileRepository.findOne({
+        where: { global_id: user._id, type: 1 }
+      });
+      if (!profile) {
+        const newUser = profileRepository.create({
+          global_id: user._id,
+          name: user.name,
+          realname: user.realname,
+          type: user.type,
+          phone: user.phone,
+          avatar: null,
+          gender: "M",
+          wechat_openid: null,
+          wechat_unionid: null,
+          is_deleted: 0,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+        profile = await profileRepository.save(newUser);
+      }
+      
       // 生成 JWT 令牌
       const token = jwt.sign(
         {
-          id: user._id
+          id: user._id,
+          profile_id: profile.id
         },
         process.env.JWT_SECRET || 'EA(@eroiw302sodD03p21',
         { expiresIn: '24h' }
@@ -91,6 +120,7 @@ export class UserController {
         token,
         user: {
           id: user._id,
+          profile_id: profile.id,
           type: 1,
           realname: user.realname,
           name: user.name,
@@ -219,6 +249,95 @@ export class UserController {
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
+
+  // 获取子系统用户列表
+  async getLocalList(req: Request, res: Response): Promise<Response> {
+    try {
+      const { page = 1, pageSize = 20, keyword, type } = req.query;
+
+      // 计算分页
+      const pageNum = Number(page);
+      const pageSizeNum = Number(pageSize);
+      const skip = (pageNum - 1) * pageSizeNum;
+
+      // 构建查询，根据type关联不同表
+      let queryBuilder = AppDataSource.getRepository(TrainingUser)
+        .createQueryBuilder('trainingUser')
+        .select([
+            'trainingUser.id',
+            'trainingUser.global_id',
+            'trainingUser.name',
+            'trainingUser.realname',
+            'trainingUser.type',
+            'trainingUser.gender'
+        ])
+        // 左连接User表(type=1)
+        .leftJoin(User, 'user', 'trainingUser.global_id = user._id AND trainingUser.type = 1')
+        .addSelect([
+            'user.branch',
+            'user.email',
+            'user.phone',
+            'user.status',
+            'user.oa_id',
+            'user.join_date'
+        ])
+        // 左连接ConstructionWorker表(type=2)
+        .leftJoin(ConstructionWorker, 'worker', 'trainingUser.global_id = worker._id AND trainingUser.type = 2')
+        .addSelect([
+            'worker.branch',
+            'worker.phone',
+            'worker.status',
+            'worker.project'
+        ]);
+        
+      if (keyword) {
+          queryBuilder.andWhere('(trainingUser.name LIKE :keyword OR trainingUser.realname LIKE :keyword)', { keyword: `%${keyword}%` });
+      }
+      queryBuilder.orderBy('trainingUser.id', 'DESC');
+
+      // 获取总数和分页数据
+      const [users, total] = await queryBuilder
+        .skip(skip)
+        .take(pageSizeNum)
+        .getManyAndCount();
+      
+      // 格式化用户数据
+      const formattedUsers = users.map((profile: any) => {
+        // 根据用户类型获取关联数据
+        const relatedData = profile.type === 1 ? profile.user : profile.worker;
+        
+        return {
+          id: profile.global_id,
+          name: profile.name,
+          realname: profile.realname,
+          gender: profile.gender,
+          type: profile.type,
+          branch: relatedData?.branch || null,
+          email: profile.type === 1 ? relatedData?.email : null,
+          phone: relatedData?.phone || null,
+          status: relatedData?.status || null,
+          oa_id: profile.type === 1 ? relatedData?.oa_id : null,
+          join_date: profile.type === 1 ? relatedData?.join_date : null,
+          project: profile.type === 2 ? relatedData?.project : null
+        };
+      });
+
+      const roles = await AppDataSource.getRepository(Role).find(
+        { where: { isDeleted: 0 } }
+      );
+      
+      return successResponse(res, {
+        users: formattedUsers,
+        roles,
+        total,
+        page: pageNum,
+        pageSize: pageSizeNum
+      }, '获取用户列表成功');
+    } catch (error) {
+      logger.error('获取用户列表失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
   
   // 获取用户详情
   async getDetail(req: Request, res: Response): Promise<Response> {
@@ -278,6 +397,284 @@ export class UserController {
       logger.error('获取用户详情失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
+  }
+
+  // 获取用户信息
+  async getProfile(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = (req as any).user?._id;
+      const profileId = (req as any).user?.profile_id;
+      
+      if (!userId) {
+        return errorResponse(res, 401, '未授权', null);
+      }
+      
+      // 查询用户信息
+      const userRepository = AppDataSource.getRepository(TrainingUser);
+      const user = await userRepository.findOne({
+        where: { id: profileId },
+        relations: ['roles', 'roles.role']
+      });
+      
+      if (!user) {
+        return errorResponse(res, 404, '用户不存在', null);
+      }
+
+      const roleIds = user.roles?.map(role => role.roleId) || [];
+      const rolePermissions = roleIds.length > 0
+        ? await AppDataSource.getRepository(RolePermission)
+            .createQueryBuilder('rolePermission')
+            .innerJoinAndSelect('rolePermission.permission', 'permission')
+            .where('rolePermission.roleId IN (:...roleIds)', { roleIds })
+            .andWhere('permission.status = :status', { status: 1 })
+            .orderBy('permission.sort', 'ASC')
+            .getMany()
+        : [];
+      
+      // 返回用户信息
+      return res.json({
+        code: 0,
+        message: '获取用户信息成功',
+        data: {
+          id: userId,
+          username: user.name,
+          name: user.realname,
+          avatar: user.avatar,
+          roles: user.getRoleCodes(),
+          permissions: rolePermissions.map(rolePermission => rolePermission.permission.code),
+        }
+      });
+    } catch (error) {
+      logger.error('获取用户信息失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  async getUserRoles(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = req.params.id;
+      const userRepository = AppDataSource.getRepository(TrainingUser);
+      const user = await userRepository.createQueryBuilder("user")
+        .leftJoinAndSelect('user.roles', 'roles')
+        .where("user.id = :userId", { userId: Number(userId) })
+        .getOne();
+
+      if (!user) return errorResponse(res, 404, '用户不存在', null);
+
+      return res.json({
+        code: 0,
+        message: '获取用户角色列表成功',
+        data: user.roles
+      });
+    } catch (error) {
+      logger.error('获取用户角色列表失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  async updateUserRole(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = req.params.id;
+      const { roles } = req.body;
+
+      const userRepository = AppDataSource.getRepository(TrainingUser);
+      const user = await userRepository.createQueryBuilder("user")
+      .leftJoinAndSelect('user.roles','roles')
+      .where("user.id = :userId", { userId: Number(userId) })
+      .getOne();
+
+      if (!user) return errorResponse(res, 404, '用户不存在', null);
+
+      const oldRoles = user.roles?.map(role => role.roleId) || []
+      const newRoles = roles.filter((role: any) => typeof role === "number")
+   
+      // 只有当标签发生变化时才更新
+      if (JSON.stringify([...oldRoles].sort()) !== JSON.stringify([...newRoles].sort())) {
+
+        const roleRepository = AppDataSource.getRepository(Role);
+        const roleEntities = await roleRepository.find({
+          where: {
+            id: In(newRoles)
+          }
+        })
+
+        const deleteIds = oldRoles.filter(id => !newRoles.includes(id))
+        const addIds = newRoles.filter((id: number) => !oldRoles.includes(id))
+        
+        // 删除旧的关联关系
+        const userRoleRepository = AppDataSource.getRepository(UserRole);
+        if (deleteIds.length > 0) {
+          await userRoleRepository.delete({
+            userId: user.id,
+            roleId: In(deleteIds)
+          });
+        }
+        
+        // 创建新的关联关系
+        if (addIds.length > 0) {
+          const roleRelations = addIds.map((roleId: number) => ({
+            userId: user.id,
+            roleId
+          }));
+          await userRoleRepository.insert(roleRelations);
+        }
+      }
+      return successResponse(res, null, '用户角色更新成功');
+    } catch (error) {
+      logger.error('更新用户角色失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  async getUserPermissions(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = (req as any).user.profile_id;
+      const DEFAULT_ROLE_ID = 1;
+      
+      // 获取用户角色
+      const userRoles = await AppDataSource
+        .getRepository(UserRole)
+        .createQueryBuilder('userRole')
+        .leftJoinAndSelect('userRole.role', 'role')
+        .where('userRole.userId = :userId', { userId })
+        .getMany();
+
+      const roleIds = userRoles.map(ur => ur.roleId);
+      const roleCodes = userRoles.map(ur => ur.role?.code || '');
+  
+      // 检查是否包含 ADMIN 角色
+      const isAdmin = roleCodes.includes('ADMIN');
+      if (roleIds.length === 0 && !isAdmin) {
+        roleIds.push(DEFAULT_ROLE_ID);
+        roleCodes.push('COMMON');
+      }
+
+      let permissions: Permission[] = [];
+      
+      // 如果是管理员，获取所有权限
+      if (isAdmin) {
+        permissions = await AppDataSource.getRepository(Permission)
+          .createQueryBuilder('permission')
+          .where('permission.status = :status', { status: 1 })
+          .andWhere('permission.type = :type', { type: 1 })
+          .orderBy('permission.sort', 'ASC')
+          .getMany();
+      } else {
+        // 获取角色权限
+        const rolePermissions = await AppDataSource.getRepository(RolePermission)
+          .createQueryBuilder('rolePermission')
+          .leftJoinAndSelect('rolePermission.permission', 'permission')
+          .where('rolePermission.roleId IN (:...roleIds)', { roleIds })
+          .andWhere('permission.status = :status', { status: 1 })
+          .andWhere('permission.type = :type', { type: 1 })
+          .orderBy('permission.sort', 'ASC')
+          .getMany();
+        
+        // 去重，获取直接分配的权限ID
+        const permissionMap = new Map();
+        const permissionIds: number[] = [];
+        
+        rolePermissions.forEach(rp => {
+          if (rp.permission) {
+            permissionMap.set(rp.permission.id, rp.permission);
+            permissionIds.push(rp.permission.id);
+          }
+        });
+        
+        if (permissionIds.length > 0) {
+          // 获取所有权限（包括父节点）
+          const allPermissions = await AppDataSource.getRepository(Permission)
+            .createQueryBuilder('permission')
+            .where('permission.status = :status', { status: 1 })
+            .andWhere('permission.type = :type', { type: 1 })
+            .orderBy('permission.sort', 'ASC')
+            .getMany();
+          
+          // 找出所有权限的父节点
+          const parentMap = new Map<number, Permission>();
+          
+          // 先将所有权限放入映射表
+          allPermissions.forEach(p => {
+            parentMap.set(p.id, p);
+          });
+          
+          // 为每个权限找到其所有父节点
+          const completePermissionMap = new Map<number, Permission>();
+          
+          // 递归查找父节点
+          const findParents = (permissionId: number) => {
+            const permission = parentMap.get(permissionId);
+            if (!permission) return;
+            
+            // 如果该权限已经在完整权限映射中，则跳过
+            if (completePermissionMap.has(permission.id)) return;
+            
+            // 添加到完整权限映射
+            completePermissionMap.set(permission.id, permission);
+            
+            // 如果有父节点，递归查找
+            if (permission.parentId) {
+              findParents(permission.parentId);
+            }
+          };
+          
+          // 为每个直接分配的权限查找其父节点
+          permissionIds.forEach(id => {
+            findParents(id);
+            
+            // 将直接分配的权限也添加到完整权限映射
+            const directPermission = permissionMap.get(id);
+            if (directPermission) {
+              completePermissionMap.set(id, directPermission);
+            }
+          });
+          
+          // 转换为数组
+          permissions = Array.from(completePermissionMap.values());
+          permissions.sort((a, b) => a.sort - b.sort)
+        }
+      }
+      
+      // 构建权限树
+      const permissionTree = this.buildPermissionTree(permissions);
+      
+      return successResponse(res, {
+        permissions: permissionTree,
+      }, '获取用户权限成功');
+    } catch (error) {
+      console.error('获取用户权限失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  private buildPermissionTree(permissions: Permission[]): Permission[] {
+    // 创建一个映射表
+    const permissionMap = new Map<number, Permission>();
+    permissions.forEach(permission => {
+      permissionMap.set(permission.id, { ...permission, children: [] });
+    });
+    
+    const tree: Permission[] = [];
+    
+    // 构建树结构
+    permissions.forEach(permission => {
+      const node = permissionMap.get(permission.id);
+      if (node) {
+        if (permission.parentId === null || permission.parentId === 0) {
+          // 根节点
+          tree.push(node);
+        } else {
+          // 子节点
+          const parent = permissionMap.get(permission.parentId);
+          if (parent) {
+            parent.children = parent.children || [];
+            parent.children.push(node);
+          }
+        }
+      }
+    });
+    
+    return tree;
   }
 
   // 微信用户登录
@@ -1206,13 +1603,23 @@ export class UserController {
     unionid?: string;
     nickname?: string;
     avatar?: string;
+    phone?: string;
     province?: string;
     city?: string;
     country?: string;
   }): Promise<any> {
-    try {      
-      // 1, try to find user by openid
-      let user = await this.findUserByOpenid(wechatData.openid);
+    try {
+
+      // 1, 先在 TrainingUser 中找
+      let user;
+      if (wechatData.phone) {
+        user = await this.findTrainingUserByPhone(wechatData.phone);
+        if (user) {
+          return user;
+        }
+      }
+      // 2, try to find user by openid
+      user = await this.findUserByOpenid(wechatData.openid);
       if (user) {
         // Update user info if needed
         await this.updateUserInfo(user.id, {
@@ -1228,7 +1635,7 @@ export class UserController {
         return user;
       }
       
-      // If unionid exists, try to find by unionid
+      // 3, If unionid exists, try to find by unionid
       if (wechatData.unionid) {
         user = await this.findUserByUnionid(wechatData.unionid);
         if (user) {
@@ -1250,7 +1657,17 @@ export class UserController {
     }
   }
 
-    private async findUserByOpenid(openid: string): Promise<any> {
+  private async findTrainingUserByPhone(phone: string): Promise<any> {
+    try {
+      const userRepository = AppDataSource.getRepository(TrainingUser);
+      return await userRepository.findOne({ where: { phone } });
+    } catch (error) {
+      logger.error('Error finding user by phone:', error);
+      return null;
+    }
+  }
+
+  private async findUserByOpenid(openid: string): Promise<any> {
     try {
       const userRepository = AppDataSource.getRepository(TrainingUser);
       return await userRepository.findOne({ where: { wechat_openid: openid } });
@@ -1320,7 +1737,8 @@ export class UserController {
       // 构建微信用户信息
       const wechatUserInfo = {
         openid: openid,
-        unionid: unionid
+        unionid: unionid,
+        phone: phoneCode
       };
       
       // 2. 通过手机号授权码获取手机号
@@ -1339,13 +1757,16 @@ export class UserController {
       // 4. 创建或更新用户信息
       let user = await this.findUser({
         openid: wechatUserInfo.openid,
-        unionid: wechatUserInfo.unionid
+        unionid: wechatUserInfo.unionid,
+        phone: wechatUserInfo.phone
       });
       
       if (user) {
         // 更新现有用户的手机号
         await this.updateUserInfo(user.id, {
           phone: phoneInfo.phoneNumber,
+          wechat_openid: wechatUserInfo.openid,
+          wechat_unionid: wechatUserInfo.unionid,
           updated_at: new Date()
         });
       } else {

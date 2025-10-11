@@ -3,9 +3,6 @@ import * as dotenv from 'dotenv';
 
 import { Branch } from '../models/entities/Branch.entity';
 import { ConstructionWorker } from '../models/entities/ConstructionWorker.entity';
-import { Project } from '../models/entities/Project.entity';
-import { ProjectDepartmentMember } from '../models/entities/ProjectDepartmentMember.entity';
-import { User } from '../models/entities/User.entity';
 import { Category } from '../models/entities/Category.entity';
 import { Certificate } from '../models/entities/Certificate.entity';
 import { CertificateTemplate } from '../models/entities/CertificateTemplate.entity';
@@ -17,6 +14,11 @@ import { ExamQuestion } from '../models/entities/ExamQuestion.entity';
 import { ExamRecord } from '../models/entities/ExamRecord.entity';
 import { Material } from '../models/entities/Material.entity';
 import { Matrix } from '../models/entities/Matrix.entity';
+import { Permission } from '../models/entities/Permission.entity';
+import { Project } from '../models/entities/Project.entity';
+import { ProjectDepartmentMember } from '../models/entities/ProjectDepartmentMember.entity';
+import { Role } from '../models/entities/Role.entity';
+import { RolePermission } from '../models/entities/RolePermission.entity';
 import { Question } from '../models/entities/Question.entity';
 import { QuestionOption } from '../models/entities/QuestionOption.entity';
 import { StudyCourseware } from '../models/entities/StudyCourseware.entity';
@@ -43,6 +45,8 @@ import { TrainingRecordProgress } from '../models/entities/TrainingRecordProgres
 import { TrainingRecordProgressDetail } from '../models/entities/TrainingRecordProgressDetail.entity';
 import { TrainingRecordParticipant } from '../models/entities/TrainingRecordParticipant.entity';
 import { TrainingUser } from '../models/entities/TrainingUser.entity';
+import { User } from '../models/entities/User.entity';
+import { UserRole } from '../models/entities/UserRole.entity';
 
 // 加载环境变量
 dotenv.config();
@@ -58,11 +62,11 @@ export const AppDataSource = new DataSource({
   schema: process.env.DB_SCHEMA || 'public',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [Branch, ConstructionWorker, Project, ProjectDepartmentMember, User
-    , Category, Certificate, CertificateTemplate, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Question
+  entities: [Branch, ConstructionWorker, Project, ProjectDepartmentMember
+    , Category, Certificate, CertificateTemplate, Courseware, CoursewareMaterial, Exam, ExamAnswer, ExamQuestion, ExamRecord, Material, Matrix, Permission, Role, RolePermission, Question
     , QuestionOption, StudyCourseware, StudyExamRecord, StudyPlan, Survey, SurveyQuestion, SurveyQuestionOption, SurveySubmission, SurveyAnswer, Tag, Task, TaskAssignment, TaskItem, TaskProgress
     , Trainer, TrainerTag, TrainingPlan, TrainingPlanScope, TrainingRecord, TrainingRecordContent, TrainingRecordCourseware, TrainingRecordProgress
-    , TrainingRecordProgressDetail,TrainingRecordParticipant, TrainingUser],
+    , TrainingRecordProgressDetail,TrainingRecordParticipant, TrainingUser, User, UserRole],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });

@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { UserRole } from './UserRole.entity';
 
 @Entity('tr_user')
 export class TrainingUser {
@@ -52,4 +53,12 @@ export class TrainingUser {
 
   @UpdateDateColumn()
   updated_at!: Date;
+
+  // 关联关系
+  @OneToMany(() => UserRole, (userRole) => userRole.user)
+  roles!: UserRole[];
+
+  getRoleCodes(): string[] {
+    return this.roles ? this.roles.map(role => role.role.code) : [];
+  }
 }

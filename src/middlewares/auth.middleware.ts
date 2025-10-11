@@ -7,6 +7,7 @@ import { errorResponse } from '../utils/response';
 
 interface JwtPayload {
   id: number;
+  profile_id: number;
   roles?: string[];
   accessTags?: number[];
 }
@@ -51,6 +52,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     // 将用户信息添加到请求对象中
     (req as any).user = user;
     (req as any).user.id = user._id;
+    (req as any).user.profile_id = decoded.profile_id;
 
     // 将角色和标签信息添加到请求对象中
     if (decoded.roles) {
