@@ -210,7 +210,7 @@ export class UserController {
         .skip(skip)
         .take(pageSizeNum)
         .getManyAndCount();
-      
+
       // 格式化用户数据
       let formattedUsers = [];
       if (type === "outer") {
@@ -296,29 +296,28 @@ export class UserController {
       queryBuilder.orderBy('trainingUser.id', 'DESC');
 
       // 获取总数和分页数据
-      const [users, total] = await queryBuilder
+      const users = await queryBuilder
         .skip(skip)
         .take(pageSizeNum)
-        .getManyAndCount();
-      
+        .getRawMany();
+      const total = await queryBuilder.getCount();
+      console.log(users);
       // 格式化用户数据
       const formattedUsers = users.map((profile: any) => {
-        // 根据用户类型获取关联数据
-        const relatedData = profile.type === 1 ? profile.user : profile.worker;
-        
         return {
-          id: profile.global_id,
-          name: profile.name,
-          realname: profile.realname,
-          gender: profile.gender,
-          type: profile.type,
-          branch: relatedData?.branch || null,
-          email: profile.type === 1 ? relatedData?.email : null,
-          phone: relatedData?.phone || null,
-          status: relatedData?.status || null,
-          oa_id: profile.type === 1 ? relatedData?.oa_id : null,
-          join_date: profile.type === 1 ? relatedData?.join_date : null,
-          project: profile.type === 2 ? relatedData?.project : null
+          id: profile.trainingUser_global_id,
+          profile_id: profile.trainingUser_id,
+          name: profile.trainingUser_name,
+          realname: profile.trainingUser_realname,
+          gender: profile.trainingUser_gender,
+          type: profile.trainingUser_type,
+          branch: (profile.trainingUser_type === 1 ? profile.user_branch : profile.worker_branch) || null,
+          email: profile.trainingUser_type === 1 ? profile.user_email : null,
+          phone: (profile.trainingUser_type === 1 ? profile.user_phone : profile.worker_phone) || null,
+          status: (profile.trainingUser_type === 1 ? profile.user_status : profile.worker_status) || null,
+          oa_id: profile.trainingUser_type === 1 ? profile.user_oa_id : null,
+          join_date: profile.trainingUser_type === 1 ? profile.user_join_date : null,
+          project: (profile.trainingUser_type === 1 ? null : profile.worker_project) || null,
         };
       });
 
