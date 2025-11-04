@@ -69,12 +69,12 @@ export class ReturnOrderController {
           continue;
         }
 
-        // 计算退货金额
-        const returnAmount = (orderItem.unitPrice * returnQty);
+        // 计算退货金额 fixed 错误: 退货金额不能多于原订单支付金额 51.239999999999995 / 51.24
+        const returnAmount = (orderItem.unitPrice * returnQty).toFixed(2);
         if (returnAmount < item.refund) {
-          return errorResponse(res, 400, '退货金额不能多于原订单支付金额', null);
+          return errorResponse(res, 400, `退货金额不能多于原订单支付金额 ${returnAmount} / ${item.refund}`, null);
         }
-        
+      
         // 创建退货商品明细
         const returnItem = new ReturnOrderItem();
         returnItem.orderItemId = orderItem.id;

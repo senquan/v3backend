@@ -21,7 +21,7 @@ export class ProductController {
   // 获取商品列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, mid, keyword, color, serie, status, model, limit, sort, platform, images } = req.query;
+      const { page = 1, pageSize = 20, mid, keyword, color, serie, status, model, limit, sort, platform, images, tags } = req.query;
       
       const userRoles = (req as any).userRoles || [];
       let accessTags = (req as any).accessTags || [];
@@ -58,6 +58,10 @@ export class ProductController {
           ${accessTags.length > 0 ? `EXISTS (SELECT 1 FROM product_series_tags pst WHERE pst.series_id = product.serie_id AND pst.tag_id IN (:...accessTags))` : 'FALSE'}
         )`;
         queryBuilder.andWhere(whereClause, { accessTags });
+      }
+
+      if (Array.isArray(tags) && tags.length > 0) {
+        queryBuilder.andWhere("tags.id IN (:...tags)", { tags });
       }
 
       // 添加筛选条件
