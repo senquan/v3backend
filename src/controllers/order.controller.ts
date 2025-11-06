@@ -409,7 +409,7 @@ export class OrderController {
   async changeOrderVersion(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
-      const version = Number(req.body.version) === 3 ? 1 : 3;
+      const version = Number(req.body.version) === 3 ? 3 : 1;
 
       const orderRepository = AppDataSource.getRepository(Order);
       const order = await orderRepository.findOneBy({ id: Number(id) });
