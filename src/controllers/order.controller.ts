@@ -406,6 +406,25 @@ export class OrderController {
     }
   }
 
+  async changeOrderVersion(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const version = Number(req.body.version) === 3 ? 1 : 3;
+
+      const orderRepository = AppDataSource.getRepository(Order);
+      const order = await orderRepository.findOneBy({ id: Number(id) });
+
+      if (!order) return errorResponse(res, 404, '订单不存在', null);
+
+      if (order.priceVersion === version) return successResponse(res, version, '订单价格版本未改变');
+      await orderRepository.update(order.id, { priceVersion: version });
+      return successResponse(res, version, '更新订单价格版本成功');
+    } catch (error) {
+      logger.error('更新订单价格版本失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
   async delete(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;

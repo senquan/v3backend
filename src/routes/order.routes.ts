@@ -32,9 +32,11 @@ router.put('/:id/status', orderController.updateStatus.bind(orderController));
 // 更新订单类型
 router.put('/:id/type', orderController.changeOrderType.bind(orderController));
 
+// 更新订单价格版本
+router.put('/:id/version', orderController.changeOrderVersion.bind(orderController));
+
 // 更新订单
 router.put('/:id', orderController.update.bind(orderController));
-
 
 // 删除订单
 router.delete('/:id', orderController.delete);
