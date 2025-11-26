@@ -343,6 +343,7 @@ export class SettingsController {
       enable_register: '开启注册',
       site_analytics: '站点统计代码',
       bonus_series_ids: '赠品系列',
+      subsidy_series_keys: '国补系列',
     }
     if (Object.prototype.hasOwnProperty.call(settingNames, id)) {
       return settingNames[id as keyof typeof settingNames]
