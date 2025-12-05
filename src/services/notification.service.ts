@@ -3,6 +3,10 @@ import { Notification } from '../models/notification.model';
 import { Staff } from '../models/staff.model';
 import { Ticket } from '../models/ticket.model';
 import { logger } from '../utils/logger';
+import { RedisCacheService } from '../services/cache.service';
+
+// 获取缓存服务实例
+const cacheService = new RedisCacheService();
 
 export class NotificationService {
   /**
@@ -39,6 +43,7 @@ export class NotificationService {
 
       const savedNotification = await notificationRepository.save(notification);
       logger.info(`通知创建成功: ${savedNotification.id}`);
+      await cacheService.clearCacheByPath('/api/v1/notifications');
       
       return savedNotification;
     } catch (error) {
