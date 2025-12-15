@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { ProductController } from '../controllers/product.controller';
 import { resourceAccessMiddleware } from '../middlewares/resource-access.middleware';
+import { cacheClearMiddleware } from '../middlewares/cache-clear.middleware';
 
 const router = Router();
 const productController = new ProductController();
@@ -37,22 +38,22 @@ router.get('/:id', async (req, res, next) => {
   }, productController.getDetail);
 
 // 创建商品
-router.post('/', productController.create.bind(productController));
+router.post('/', cacheClearMiddleware('/api/v1/product/list'), productController.create.bind(productController));
 
 // 批量更新商品
-router.put('/batch', productController.batchUpdatePrices);
+router.put('/batch', cacheClearMiddleware('/api/v1/product/list'), productController.batchUpdatePrices);
 
 // 更新商品
-router.put('/:id', productController.update);
+router.put('/:id', cacheClearMiddleware('/api/v1/product/list'), productController.update);
 
 // 删除商品
-router.delete('/:id', productController.delete);
+router.delete('/:id', cacheClearMiddleware('/api/v1/product/list'), productController.delete);
 
 // 批量删除商品
-router.post('/batch/delete', productController.batchDeleteProducts);
+router.post('/batch/delete', cacheClearMiddleware('/api/v1/product/list'), productController.batchDeleteProducts);
 
 // 批量导入商品
-router.post('/import', productController.importProducts);
+router.post('/import', cacheClearMiddleware('/api/v1/product/list'), productController.importProducts);
 
 // 创建系列
 router.post('/series/', productController.createSeries);

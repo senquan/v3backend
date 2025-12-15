@@ -53,7 +53,7 @@ export class RedisCacheService implements CacheService {
   async clearCacheByPath(path: string): Promise<void> {
     // 在Redis中使用模式匹配查找所有相关缓存
     const pattern = `api:GET:${path}*`;
-
+    console.log('Cache clear pattern:', pattern);
     return new Promise((resolve, reject) => {
       this.client.keys(pattern, (err, keys) => {
         if (err) return reject(err);

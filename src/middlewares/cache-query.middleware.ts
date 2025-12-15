@@ -40,7 +40,7 @@ export class CacheQueryMiddleware {
       
       if (cachedData) {
         // 如果有缓存数据，直接返回
-        console.log('Cache hit:', cacheKey);
+        // console.log('Cache hit:', cacheKey);
         return res.json(cachedData);
       }
       

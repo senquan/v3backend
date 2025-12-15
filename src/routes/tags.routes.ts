@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { TagsController } from '../controllers/tags.controller';
+import { cacheClearMiddleware } from '../middlewares/cache-clear.middleware';
 
 const router = Router();
 const tagsController = new TagsController();
@@ -15,7 +16,7 @@ router.get('/list', tagsController.getList);
 router.get('/platform/:id', tagsController.getPlatformTags);
 
 // 批量更新标签
-router.put('/batch', tagsController.batchUpdateTags);
+router.put('/batch', cacheClearMiddleware('/api/v1/product/list'), tagsController.batchUpdateTags);
 
 // 获取标签详情
 router.get('/:id', tagsController.getDetail);
@@ -24,9 +25,9 @@ router.get('/:id', tagsController.getDetail);
 router.post('/', tagsController.create.bind(tagsController));
 
 // 更新标签
-router.put('/:id', tagsController.update.bind(tagsController));
+router.put('/:id', cacheClearMiddleware('/api/v1/product/list'), tagsController.update.bind(tagsController));
 
 // 删除标签
-router.delete('/:id', tagsController.delete);
+router.delete('/:id', cacheClearMiddleware('/api/v1/product/list'), tagsController.delete);
 
 export default router;
