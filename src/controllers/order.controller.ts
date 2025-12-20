@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Order } from '../models/order.model';
 import { OrderItem } from '../models/order-item.model';
+import { ReturnOrder } from '../models/return-order.model';
+import { PlatformTags } from '../models/platform-tags.model';
 import { OrderStatusLogService } from '../services/order-status-log.service';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
@@ -336,7 +338,18 @@ export class OrderController {
         return errorResponse(res, 404, '订单不存在', null);
       }
 
-      return successResponse(res, order, '获取订单详情成功');
+      const returns = await AppDataSource.getRepository(ReturnOrder)
+        .createQueryBuilder('returnOrder')
+        .leftJoinAndSelect('returnOrder.items', 'items')
+        .where('returnOrder.orderId = :orderId', { orderId: order.id })
+        .getMany();
+
+      const orderDetailResponse = {
+        ...order,
+        returns,
+      };
+
+      return successResponse(res, orderDetailResponse, '获取订单详情成功');
     } catch (error) {
       logger.error('获取订单详情失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -425,6 +438,54 @@ export class OrderController {
     }
   }
 
+async changeOrderPlatform(req: Request, res: Response): Promise<Response> {
+  try {
+    const { id } = req.params;
+    const { platformId } = req.body;
+
+    const orderRepository = AppDataSource.getRepository(Order);
+    const order = await orderRepository.findOneBy({ id: Number(id) });
+
+    if (!order) return errorResponse(res, 404, '订单不存在', null);
+
+    if (order.platformId === platformId) return successResponse(res, platformId, '订单平台未改变');
+
+    // 列出订单明细及对应的标签
+    const orderItems = await AppDataSource.getRepository(OrderItem)
+      .createQueryBuilder('orderItem')
+      .innerJoinAndSelect('orderItem.product', 'product')
+      .leftJoinAndSelect('product.tags', 'tags')
+      .where('orderItem.orderId = :orderId', { orderId: order.id })
+      .getMany();
+
+    // 目标平台标签列表
+    const platformTags = await AppDataSource.getRepository(PlatformTags)
+      .createQueryBuilder('platformTags')
+      .select('platformTags.tagId', 'tagId')
+      .where('platformTags.platform_id = :platformId', { platformId: platformId })
+      .getRawMany();
+
+    const platformTagIds = platformTags.map(tag => tag.tagId);
+
+    const filteredItems = orderItems.filter(item =>
+      item.product.tags &&
+      item.product.tags.length > 0 &&
+      !item.product.tags.some(tag => platformTagIds.includes(tag.id))
+    );
+
+    if (filteredItems.length > 0)
+      return errorResponse(res, 400, '订单内包含不支持目标平台的产品，不可转换。', null);
+    else {
+      await orderRepository.update(order.id, { platformId });
+      return successResponse(res, platformId, '更新订单平台成功');
+    }
+      
+  } catch (error) {
+    logger.error('更新订单平台失败:', error);
+    return errorResponse(res, 500, '服务器内部错误', null);
+  }
+}
+  
   async delete(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;

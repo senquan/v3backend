@@ -149,7 +149,7 @@ export class ReturnOrderController {
   // 获取退货订单列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, status, customerId, orderId, startDate, endDate, username } = req.query;
+      const { page = 1, pageSize = 20, status, customerId, orderId, startDate, endDate, username, keyword } = req.query;
 
       const userRoles = (req as any).userRoles || [];
       const userPlatforms = (req as any).accessPlatforms || [];
@@ -174,12 +174,16 @@ export class ReturnOrderController {
       if (startDate) queryBuilder.andWhere('returnOrder.createdAt >= :startDate', { startDate });
       if (endDate) queryBuilder.andWhere('returnOrder.createdAt <= :endDate', { endDate: endDate + " 23:59:59" });
       
-      if (orderId) {
+      if (orderId && Number(orderId) > 0) {
         queryBuilder.andWhere('returnOrder.orderId = :orderId', { orderId });
       }
 
       if (username) {
         queryBuilder.andWhere('(user.username LIKE :username OR staff.name LIKE :username)', { username: `%${username}%` });
+      }
+
+      if (keyword) {
+        queryBuilder.andWhere('(returnOrder.name LIKE :keyword OR returnOrder.reason LIKE :keyword)', { keyword: `%${keyword}%` });
       }
 
       // 分页查询

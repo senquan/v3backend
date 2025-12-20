@@ -35,6 +35,9 @@ router.put('/:id/type', orderController.changeOrderType.bind(orderController));
 // 更新订单价格版本
 router.put('/:id/version', orderController.changeOrderVersion.bind(orderController));
 
+// 更新订单平台
+router.put('/:id/platform', orderController.changeOrderPlatform.bind(orderController));
+
 // 更新订单
 router.put('/:id', orderController.update.bind(orderController));
 
