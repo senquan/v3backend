@@ -123,8 +123,8 @@ export class UserController {
           avatar: user.avatar,
           last_login_ip: user.last_login_ip,
           last_login_time: user.last_login_time,
-          roles: user.getRoleCodes(),
-          platforms: user.getRolePlatforms()
+          roles: user.getRoleCodes() || [],
+          platforms: user.getRolePlatforms() || []
         }
       });
     } catch (error) {
