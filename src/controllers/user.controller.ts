@@ -10,6 +10,10 @@ import { Permission } from '../models/permission.model';
 import * as jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
+import { RedisCacheService } from '../services/cache.service';
+
+// 获取缓存服务实例
+const cacheService = new RedisCacheService();
 
 const authController = require('../controllers/auth.controller');
 
@@ -69,6 +73,9 @@ export class UserController {
         last_login_time: new Date(),
         last_login_ip: req.ip || ''
       });
+
+      // 清空用户相关缓存
+      await cacheService.clearCacheByPath(`*:u:${user.id}`);
       
       // 返回用户信息和令牌
       return res.json({

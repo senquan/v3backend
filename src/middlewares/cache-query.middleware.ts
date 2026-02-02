@@ -76,7 +76,7 @@ export class CacheQueryMiddleware {
       const payload = jwt.decode(token) as { id: string };
       user = payload?.id || 'nobody';
     }
-    return `api:${method}:${path}:${this.md5Hash(JSON.stringify(query))}:${user}`;
+    return `api:${method}:${path}:${this.md5Hash(JSON.stringify(query))}:u:${user}:`;
   }
 
   private md5Hash(data: string): string {
