@@ -7,8 +7,10 @@ import { AppDataSource } from './config/database';
 import { errorMiddleware } from './middlewares/error.middleware';
 import { logger } from './utils/logger';
 import path from 'path';
+import http from 'http';
 import { RedisCacheService } from './services/cache.service';
 import { CacheQueryMiddleware } from './middlewares/cache-query.middleware';
+import { WebSocketService } from './utils/websocket';
 
 // 加载环境变量
 dotenv.config();
@@ -47,9 +49,17 @@ app.use('/api', routes);
 // 错误处理中间件
 app.use(errorMiddleware);
 
+// 创建HTTP服务器
+const server = http.createServer(app);
+
+// 初始化WebSocket服务
+const webSocketService = WebSocketService.getInstance();
+webSocketService.initialize(server);
+
 // 启动服务器
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
+  logger.info(`WebSocket server running on ws://localhost:${PORT}/ws`);
 });
 
 export default app;

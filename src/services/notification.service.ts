@@ -3,10 +3,9 @@ import { Notification } from '../models/notification.model';
 import { Staff } from '../models/staff.model';
 import { Ticket } from '../models/ticket.model';
 import { logger } from '../utils/logger';
-import { RedisCacheService } from '../services/cache.service';
+import { NotificationService as wsNotificationService } from '../services/ws.notification.service';
 
-// 获取缓存服务实例
-const cacheService = new RedisCacheService();
+const wsnService: wsNotificationService = wsNotificationService.getInstance();
 
 export class NotificationService {
   /**
@@ -42,8 +41,9 @@ export class NotificationService {
       });
 
       const savedNotification = await notificationRepository.save(notification);
-      logger.info(`通知创建成功: ${savedNotification.id}`);
-      await cacheService.clearCacheByPath('/api/v1/notifications');
+      wsnService.sendToUser(String(notificationData.userId), {
+        type: "notification_batch_create",
+      });;
       
       return savedNotification;
     } catch (error) {
@@ -88,7 +88,10 @@ export class NotificationService {
 
       const savedNotifications = await notificationRepository.save(notificationEntities);
       logger.info(`批量创建通知成功: ${savedNotifications.length} 条`);
-      
+      wsnService.sendToAll({
+        type: "notification_batch_create",
+      });;
+
       return savedNotifications;
     } catch (error) {
       logger.error('批量创建通知失败:', error);

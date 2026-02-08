@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import { body, query, param } from 'express-validator';
 import { NotificationController } from '../controllers/notification.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
-import { cacheClearMiddleware } from '../middlewares/cache-clear.middleware';
 
 const router = Router();
 const notificationController = new NotificationController();
@@ -35,7 +34,6 @@ router.get(
 router.post(
   '/',
   authMiddleware,
-  cacheClearMiddleware('/api/v1/notifications'),
   [
     body('title').notEmpty().withMessage('通知标题不能为空'),
     body('description').optional().isString().withMessage('描述必须是字符串'),
@@ -54,7 +52,6 @@ router.post(
 router.post(
   '/batch',
   authMiddleware,
-  cacheClearMiddleware('/api/v1/notifications'),
   [
     body('notifications').isArray({ min: 1 }).withMessage('通知列表不能为空'),
     body('notifications.*.title').notEmpty().withMessage('通知标题不能为空'),
@@ -72,7 +69,6 @@ router.post(
 router.put(
   '/:id',
   authMiddleware,
-  cacheClearMiddleware('/api/v1/notifications'),
   [
     param('id').isInt({ min: 1 }).withMessage('通知ID必须是正整数'),
     body('title').optional().notEmpty().withMessage('通知标题不能为空'),
@@ -91,7 +87,6 @@ router.put(
 router.patch(
   '/batch/read',
   authMiddleware,
-  cacheClearMiddleware('/api/v1/notifications'),
   [
     body('ids').isArray({ min: 1 }).withMessage('通知ID列表不能为空'),
     body('ids.*').isInt({ min: 1 }).withMessage('通知ID必须是正整数')
@@ -103,7 +98,6 @@ router.patch(
 router.patch(
   '/all/read',
   authMiddleware,
-  cacheClearMiddleware('/api/v1/notifications'),
   [
     body('type').optional().isIn(['notification', 'message', 'todo']).withMessage('类型必须是notification、message或todo')
   ],
@@ -114,7 +108,6 @@ router.patch(
 router.patch(
   '/:id/read',
   authMiddleware,
-  cacheClearMiddleware('/api/v1/notifications'),
   [
     param('id').isInt({ min: 1 }).withMessage('通知ID必须是正整数')
   ],
@@ -125,7 +118,6 @@ router.patch(
 router.delete(
   '/:id',
   authMiddleware,
-  cacheClearMiddleware('/api/v1/notifications'),
   [
     param('id').isInt({ min: 1 }).withMessage('通知ID必须是正整数')
   ],
@@ -136,7 +128,6 @@ router.delete(
 router.delete(
   '/batch',
   authMiddleware,
-  cacheClearMiddleware('/api/v1/notifications'),
   [
     body('ids').isArray({ min: 1 }).withMessage('通知ID列表不能为空'),
     body('ids.*').isInt({ min: 1 }).withMessage('通知ID必须是正整数')

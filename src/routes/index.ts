@@ -20,6 +20,7 @@ import ticketRoutes  from './ticket.routes';
 import settingsRoutes  from './settings.routes';
 import notificationRoutes  from './notification.routes';
 import galleryRoutes  from './gallery.routes';
+import wsRoutes from './ws.routes';
 
 const router = Router();
 
@@ -45,6 +46,7 @@ router.use('/v1/ticket', ticketRoutes);
 router.use('/v1/settings', settingsRoutes);
 router.use('/v1/notifications', notificationRoutes);
 router.use('/v1/gallery', galleryRoutes);
+router.use('/v1/ws', wsRoutes)
 
 // 处理404情况 - 当没有匹配到路由时
 router.use('*', (req: Request, res: Response) => {

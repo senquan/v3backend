@@ -5,8 +5,12 @@ import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { Like, In } from 'typeorm';
 import { NotificationService } from '../services/notification.service';
+import { NotificationService as wsNotificationService } from '../services/ws.notification.service';
 
 export class NotificationController {
+
+  private wsnService: wsNotificationService = wsNotificationService.getInstance();
+  
   // 获取通知列表
   async getNotifications(req: Request, res: Response): Promise<Response> {
     try {
@@ -178,6 +182,9 @@ export class NotificationController {
       });
 
       await notificationRepository.save(notification);
+      this.wsnService.sendToUser(userId, {
+        type: "notification_create",
+      });
 
       return successResponse(res, {
         id: notification.id,
@@ -289,6 +296,14 @@ export class NotificationController {
       }
 
       await notificationRepository.save(notification);
+      const wsNotification = {
+        type: "notification_update",
+      }
+      if (notification.userId) {
+        this.wsnService.sendToUser(String(notification.userId), wsNotification);
+      } else {
+        this.wsnService.sendToAll(wsNotification);
+      }
 
       return successResponse(res, {
         id: notification.id,
@@ -374,6 +389,9 @@ export class NotificationController {
       // 软删除
       notification.isActive = 0;
       await notificationRepository.save(notification);
+      this.wsnService.sendToUser(String(notification.userId), {
+        type: "notification_soft_delete",
+      });
 
       return successResponse(res, null, '删除通知成功');
     } catch (error) {
@@ -386,6 +404,7 @@ export class NotificationController {
   async deleteBatchNotifications(req: Request, res: Response): Promise<Response> {
     try {
       const { ids } = req.body;
+      const userId = (req as any).user?.id;
 
       if (!Array.isArray(ids) || ids.length === 0) {
         return errorResponse(res, 400, '通知ID列表不能为空', null);
@@ -396,6 +415,9 @@ export class NotificationController {
         { id: In(ids), isActive: 1 },
         { isActive: 0, updatedAt: new Date() }
       );
+      this.wsnService.sendToUser(userId, {
+        type: "notification_batch_delete",
+      });
 
       return successResponse(res, null, '批量删除通知成功');
     } catch (error) {

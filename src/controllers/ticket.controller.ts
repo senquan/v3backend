@@ -68,6 +68,169 @@ export class TicketController {
     }
   }
 
+  // 更新工单
+  async update(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const { title, content, ticketType, priority, productId, orderId, storeName, trackId, remark } = req.body;
+      const userId = (req as any).user?.id;
+      const userRoles = (req as any).userRoles || [];
+      
+      const ticketRepository = AppDataSource.getRepository(Ticket);
+      const ticket = await ticketRepository.findOne({ 
+        where: { id: Number(id), isDeleted: 0 } 
+      });
+      
+      if (!ticket) {
+        return errorResponse(res, 404, '工单不存在', null);
+      }
+      
+      // 检查权限：只有管理员、客服或工单创建者可以更新工单
+      if (!userRoles.includes('ADMIN') && !userRoles.includes('SUPPORT') && ticket.creatorId !== userId) {
+        return errorResponse(res, 403, '无权更新此工单', null);
+      }
+      
+      // 已关闭或已取消的工单不能更新
+      if (ticket.status === 4 || ticket.status === 5) {
+        return errorResponse(res, 400, '工单已关闭或取消，不能更新', null);
+      }
+      
+      // 记录更新前的字段值
+      const oldValues: any = {};
+      const newValues: any = {};
+      
+      // 更新标题
+      if (title !== undefined) {
+        if (!title.trim()) {
+          return errorResponse(res, 400, '标题不能为空', null);
+        }
+        oldValues.title = ticket.title;
+        newValues.title = title;
+        ticket.title = title;
+      }
+      
+      // 更新内容
+      if (content !== undefined) {
+        if (!content.trim()) {
+          return errorResponse(res, 400, '内容不能为空', null);
+        }
+        oldValues.content = ticket.content;
+        newValues.content = content;
+        ticket.content = content;
+      }
+      
+      // 更新工单类型
+      if (ticketType !== undefined) {
+        const validTypes = [1, 2, 3, 4]; // 1-咨询，2-投诉，3-售后，4-建议
+        if (!validTypes.includes(Number(ticketType))) {
+          return errorResponse(res, 400, '无效的工单类型', null);
+        }
+        oldValues.ticketType = ticket.ticketType;
+        newValues.ticketType = Number(ticketType);
+        ticket.ticketType = Number(ticketType);
+      }
+      
+      // 更新优先级
+      if (priority !== undefined) {
+        const validPriorities = [1, 2, 3, 4, 5]; // 1-日常，2-一般，3-紧急，4-加急，5-特急
+        if (!validPriorities.includes(Number(priority))) {
+          return errorResponse(res, 400, '无效的优先级', null);
+        }
+        oldValues.priority = ticket.priority;
+        newValues.priority = Number(priority);
+        ticket.priority = Number(priority);
+      }
+      
+      // 更新产品ID
+      if (productId !== undefined) {
+        oldValues.productId = ticket.productId;
+        newValues.productId = productId || null;
+        ticket.productId = productId || null;
+      }
+      
+      // 更新订单ID
+      if (orderId !== undefined) {
+        oldValues.orderId = ticket.orderId;
+        newValues.orderId = orderId || null;
+        ticket.orderId = orderId || null;
+      }
+      
+      // 根据工单类型更新related字段
+      if (storeName !== undefined && (ticket.ticketType === 1 || ticket.ticketType === 2)) {
+        oldValues.related = ticket.related;
+        newValues.related = storeName;
+        ticket.related = storeName;
+      }
+      
+      if (trackId !== undefined && ticket.ticketType === 4) {
+        oldValues.related = ticket.related;
+        newValues.related = trackId;
+        ticket.related = trackId;
+      }
+      
+      // 更新备注
+      if (remark !== undefined) {
+        oldValues.remark = ticket.remark;
+        newValues.remark = remark || null;
+        ticket.remark = remark || null;
+      }
+      
+      // 保存更新后的工单
+      await ticketRepository.save(ticket);
+      
+      // 创建系统评论记录变更
+      if (Object.keys(oldValues).length > 0) {
+        const changeDetails = [];
+        for (const [field, newValue] of Object.entries(newValues)) {
+          const oldValue = oldValues[field];
+          if (oldValue !== newValue) {
+            // 将数值类型的代码转换为可读文本
+            let oldValueStr = String(oldValue);
+            let newValueStr = String(newValue);
+            
+            if (field === 'ticketType') {
+              const typeMap: Record<number, string> = {1: '咨询', 2: '投诉', 3: '售后', 4: '建议'};
+              oldValueStr = typeMap[oldValue] || oldValueStr;
+              newValueStr = typeMap[newValue as number] || newValueStr;
+            } else if (field === 'priority') {
+              const priorityMap: Record<number, string> = {1: '日常', 2: '一般', 3: '紧急', 4: '加急', 5: '特急'};
+              oldValueStr = priorityMap[oldValue] || oldValueStr;
+              newValueStr = priorityMap[newValue as number] || newValueStr;
+            } else if (field === 'status') {
+              const statusMap: Record<number, string> = {1: '待处理', 2: '处理中', 3: '待确认', 4: '已关闭', 5: '已取消'};
+              oldValueStr = statusMap[oldValue] || oldValueStr;
+              newValueStr = statusMap[newValue as number] || newValueStr;
+            }
+            
+            changeDetails.push(`${field}: ${oldValueStr} → ${newValueStr}`);
+          }
+        }
+        
+        if (changeDetails.length > 0) {
+          const comment = new TicketComment();
+          comment.ticketId = Number(id);
+          comment.userId = userId;
+          comment.content = `工单信息已更新: ${changeDetails.join(', ')}`;
+          await AppDataSource.getRepository(TicketComment).save(comment);
+        }
+      }
+      
+      // 获取完整更新后的工单信息
+      const updatedTicket = await ticketRepository
+        .createQueryBuilder('ticket')
+        .leftJoinAndSelect('ticket.creator', 'creator')
+        .leftJoinAndSelect('creator.staff', 'creatorStaff')
+        .leftJoinAndSelect('ticket.assignee', 'assignee')
+        .where('ticket.id = :id', { id: Number(id) })
+        .getOne();
+      
+      return successResponse(res, updatedTicket, '工单更新成功');
+    } catch (error) {
+      logger.error('更新工单失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
   // 获取工单列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {

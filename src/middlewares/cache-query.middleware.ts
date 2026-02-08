@@ -16,7 +16,6 @@ export class CacheQueryMiddleware {
 
   constructor(private readonly cacheService: RedisCacheService) {
     this.pathCache.set('/api/v1/product/list', { userOnly: false, ttl: 60 * 60 });
-    this.pathCache.set('/api/v1/notifications/unread/count', { userOnly: true });
   }
 
   // 创建工厂函数，以便在需要时注入服务

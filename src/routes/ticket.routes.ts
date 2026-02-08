@@ -15,6 +15,7 @@ router.get('/', ticketController.getList);
 router.delete('/:id', ticketController.delete);
 router.get('/assignee', ticketController.getAssigneeList);
 router.get('/:id', ticketController.getDetail);
+router.put('/:id', ticketController.update);
 router.put('/:id/assign', ticketController.assign);
 router.put('/:id/process', ticketController.process);
 router.put('/:id/confirm', ticketController.confirm);
