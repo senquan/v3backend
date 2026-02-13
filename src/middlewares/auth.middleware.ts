@@ -1,15 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { AppDataSource } from '../config/database';
-import { User } from '../models/user.model';
+import { User } from '../models/user.entity';
 import { logger } from '../utils/logger';
 import { errorResponse } from '../utils/response';
 
 interface JwtPayload {
   id: number;
   roles?: string[];
-  accessTags?: number[];
-  accessPlatforms?: number[];
 }
 
 /**
@@ -38,7 +36,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { id: decoded.id },
-      relations: ['roles', 'roles.platforms']
+      relations: ['roles']
     });
     
     if (!user) return errorResponse(res, 401, '用户不存在');
@@ -55,15 +53,6 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
       // 如果 JWT 中没有角色和平台信息，则从用户对象中获取
       (req as any).userRoles = user.getRoleCodes();
     }
-    if (decoded.accessPlatforms) {
-      (req as any).accessPlatforms = decoded.accessPlatforms;
-    } else {
-      // 如果 JWT 中没有角色和平台信息，则从用户对象中获取
-      (req as any).accessPlatforms = user.getRolePlatforms();
-    }
-    // 将可访问标签添加到请求对象中
-    (req as any).accessTags = decoded.accessTags || [];
-    // 继续处理请求
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {

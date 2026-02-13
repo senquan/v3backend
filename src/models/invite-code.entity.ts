@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { User } from './user.model';
+import { User } from './user.entity';
 
 @Entity('invite_codes')
 export class InviteCode {
@@ -26,16 +26,34 @@ export class InviteCode {
   @JoinColumn({ name: 'used_by' })
   usedByUser: User | null = null;
 
-  @Column({ name: 'used_at', type: 'datetime', nullable: true })
+  @Column({ 
+    type: 'timestamp',
+    nullable: true,
+    default: () => 'CURRENT_TIMESTAMP',
+    comment: '使用时间' 
+  })
   usedAt: Date | null = null;
 
-  @Column({ name: 'expires_at', type: 'datetime' })
+  @Column({ 
+    type: 'timestamp',
+    nullable: true,
+    default: () => 'CURRENT_TIMESTAMP',
+    comment: '过期时间' 
+  })
   expiresAt!: Date;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+    comment: '创建时间' 
+  })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+    comment: '更新时间' 
+  })
   updatedAt: Date | null = null;
 
   /**

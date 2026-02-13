@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import { In } from "typeorm";
 import { AppDataSource } from '../config/database';
-import { User } from '../models/user.model';
-import { Role } from '../models/role.model';
-import { UserRole } from '../models/user-roles.model';
-import { InviteCode } from '../models/invite-code.model';
-import { RolePermission } from '../models/role-permission.model';
-import { Permission } from '../models/permission.model';
+import { User } from '../models/user.entity';
+import { Role } from '../models/role.entity';
+import { UserRole } from '../models/user-roles.entity';
+import { InviteCode } from '../models/invite-code.entity';
+import { RolePermission } from '../models/role-permission.entity';
+import { Permission } from '../models/permission.entity';
 import * as jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
@@ -30,7 +30,7 @@ export class UserController {
       const user = await userRepository.findOne({ 
         select: ['id', 'username', 'password', 'status', 'avatar', 'name', 'email', 'phone'],
         where: { username },
-        relations: ['roles', 'roles.platforms']
+        relations: ['roles']
       });
       // 用户不存在
       if (!user) return errorResponse(res, 401, '用户名或密码错误', null);
@@ -42,27 +42,12 @@ export class UserController {
 
       // 生成JWT令牌
       const userRoles = user.getRoleCodes();
-      const userPlatforms = user.getRolePlatforms();
-
-      // 获取用户可访问的标签
-      const accessibleTags = await AppDataSource.createQueryBuilder()
-        .select('t.id')
-        .from('tags', 't')
-        .innerJoin('role_tags', 'rt', 't.id = rt.tag_id')
-        .innerJoin('user_roles', 'ur', 'rt.role_id = ur.role_id')
-        .where('ur.user_id = :userId', { userId: user.id })
-        .andWhere('t.is_deleted = 0')
-        .getRawMany();
-
-      const tagIds = accessibleTags.map(tag => tag.t_id).filter(id => id !== null && id !== undefined);
 
       // 生成 JWT 令牌
       const token = jwt.sign(
         {
           id: user.id,
           roles: userRoles,
-          accessTags: tagIds,
-          accessPlatforms: userPlatforms 
         },
         process.env.JWT_SECRET || 'ei(@3kdl20KS21020alsa12',
         { expiresIn: '24h' }
@@ -70,12 +55,12 @@ export class UserController {
 
       // 更新最后登录时间和IP
       await userRepository.update(user.id, {
-        last_login_time: new Date(),
-        last_login_ip: req.ip || ''
+        lastLoginAt: new Date(),
+        lastLoginIp: req.ip || ''
       });
 
       // 清空用户相关缓存
-      await cacheService.clearCacheByPath(`*:u:${user.id}`);
+      // await cacheService.clearCacheByPath(`*:u:${user.id}`);
       
       // 返回用户信息和令牌
       return res.json({
@@ -89,8 +74,7 @@ export class UserController {
             name: user.name,
             email: user.email,
             avatar: user.avatar,
-            roles: userRoles,
-            platforms: userPlatforms
+            roles: userRoles
           }
         }
       });
@@ -112,7 +96,7 @@ export class UserController {
       const userRepository = AppDataSource.getRepository(User);
       const user = await userRepository.findOne({
         where: { id: userId },
-        relations: ['roles', 'roles.platforms']
+        relations: ['roles']
       });
       
       if (!user) return errorResponse(res, 404, '用户不存在', null);
@@ -128,10 +112,9 @@ export class UserController {
           email: user.email,
           phone: user.phone,
           avatar: user.avatar,
-          last_login_ip: user.last_login_ip,
-          last_login_time: user.last_login_time,
+          lastLoginIp: user.lastLoginIp,
+          lastLoginAt: user.lastLoginAt,
           roles: user.getRoleCodes() || [],
-          platforms: user.getRolePlatforms() || []
         }
       });
     } catch (error) {
@@ -161,7 +144,7 @@ export class UserController {
         email: email || user.email,
         phone: phone || user.phone,
         avatar: avatar || user.avatar,
-        updated_at: new Date()
+        updatedAt: new Date()
       });
 
       return successResponse(res, null, '用户信息更新成功');
@@ -197,7 +180,7 @@ export class UserController {
       
       await userRepository.update(user.id, {
         password: user.password,
-        updated_at: new Date()
+        updatedAt: new Date()
       });
 
       return successResponse(res, null, '密码更新成功');
@@ -235,10 +218,10 @@ export class UserController {
       newUser.email = '';
       newUser.avatar = '';
       newUser.status = 1;
-      newUser.created_at = new Date();
-      newUser.updated_at = new Date();
-      newUser.last_login_time = new Date();
-      newUser.last_login_ip = req.ip || '';
+      newUser.createdAt = new Date();
+      newUser.updatedAt = new Date();
+      newUser.lastLoginAt = new Date();
+      newUser.lastLoginIp = req.ip || '';
       
       // 保存用户
       const savedUser = await userRepository.save(newUser);
@@ -412,6 +395,7 @@ export class UserController {
   async getUserPermissions(req: Request, res: Response): Promise<Response> {
     try {
       const userId = (req as any).user.id;
+      const DEFAULT_ROLE_ID = 1;
       
       // 获取用户角色
       const userRoles = await AppDataSource
@@ -428,7 +412,8 @@ export class UserController {
       const isAdmin = roleCodes.includes('ADMIN');
       
       if (roleIds.length === 0 && !isAdmin) {
-        return successResponse(res, { permissions: [] }, '用户没有分配角色');
+        roleIds.push(DEFAULT_ROLE_ID);
+        roleCodes.push('COMMON');
       }
       
       let permissions: Permission[] = [];
@@ -438,6 +423,7 @@ export class UserController {
         permissions = await AppDataSource.getRepository(Permission)
           .createQueryBuilder('permission')
           .where('permission.status = :status', { status: 1 })
+          .andWhere('permission.type = :type', { type: 1 })
           .orderBy('permission.sort', 'ASC')
           .getMany();
       } else {
@@ -447,6 +433,7 @@ export class UserController {
           .leftJoinAndSelect('rolePermission.permission', 'permission')
           .where('rolePermission.roleId IN (:...roleIds)', { roleIds })
           .andWhere('permission.status = :status', { status: 1 })
+          .andWhere('permission.type = :type', { type: 1 })
           .orderBy('permission.sort', 'ASC')
           .getMany();
         
@@ -466,6 +453,7 @@ export class UserController {
           const allPermissions = await AppDataSource.getRepository(Permission)
             .createQueryBuilder('permission')
             .where('permission.status = :status', { status: 1 })
+            .andWhere('permission.type = :type', { type: 1 })
             .orderBy('permission.sort', 'ASC')
             .getMany();
           
@@ -510,6 +498,7 @@ export class UserController {
           
           // 转换为数组
           permissions = Array.from(completePermissionMap.values());
+          permissions.sort((a, b) => a.sort - b.sort)
         }
       }
       

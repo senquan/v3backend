@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
-import { RolePermission } from './role-permission.model';
+import { RolePermission } from './role-permission.entity';
 
 @Entity('permissions')
 export class Permission {
@@ -15,7 +15,7 @@ export class Permission {
   @Column({ length: 100, unique: true })
   code!: string;
 
-  @Column({ type: 'tinyint' })
+  @Column({ type: 'smallint' })
   type!: number;
 
   @Column({ name: 'parent_id', nullable: true })
@@ -36,10 +36,10 @@ export class Permission {
   @Column({ default: 0 })
   sort!: number;
 
-  @Column({ type: 'tinyint', default: 0 })
+  @Column({ type: 'smallint', default: 0 })
   hidden!: number;
 
-  @Column({ type: 'tinyint', default: 1 })
+  @Column({ type: 'smallint', default: 1 })
   status!: number;
 
   @CreateDateColumn({ name: 'created_at' })

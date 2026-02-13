@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In } from 'typeorm';
-import { UserRole } from '../models/user-roles.model';
-import { RolePermission } from '../models/role-permission.model';
-import { Permission } from '../models/permission.model';
+import { UserRole } from '../models/user-roles.entity';
+import { RolePermission } from '../models/role-permission.entity';
+import { Permission } from '../models/permission.entity';
 import { AppDataSource } from '../config/database';
 
 @Injectable()

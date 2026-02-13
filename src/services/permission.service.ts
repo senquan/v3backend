@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull } from 'typeorm';
-import { Permission } from '../models/permission.model';
+import { Permission } from '../models/permission.entity';
 import { AppDataSource } from '../config/database';
 
 @Injectable()
