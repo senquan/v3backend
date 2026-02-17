@@ -39,7 +39,7 @@ export class CompanyInfo {
 
   // 关系映射
   @ManyToOne(() => CompanyInfo, company => company.children)
-  parentCompany: CompanyInfo | null = null;;
+  parentCompany: CompanyInfo | null = null;
 
   @OneToMany(() => CompanyInfo, company => company.parentCompany)
   children!: CompanyInfo[];
