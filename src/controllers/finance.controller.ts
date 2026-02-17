@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { CompanyInfo } from '../models/company-info.entity';
+import { Dict } from '../models/dict.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
@@ -148,6 +149,7 @@ export class FinanceController {
 
 export class ImportDepositController {
   private fixedDepositRepository = AppDataSource.getRepository(FixedDeposit);
+  private dictRepository = AppDataSource.getRepository(Dict);
 
   async importDeposit(req: any, res: Response) {
     try {
@@ -164,8 +166,26 @@ export class ImportDepositController {
       const importedRecords: FixedDeposit[] = [];
       const errors: string[] = [];
 
+      
+      // 获取存款类型字典
+      const depositTypeData = await this.dictRepository.find({ where: { group: 1 }, select: ['value', 'name'] });
+      const depositTypeMap = depositTypeData.reduce((acc, cur) => {
+        acc[cur.name] = Number(cur.value);
+        return acc;
+      }, {} as Record<string, number>);
+
       for (let i = 0; i < deposits.length; i++) {
         const item = deposits[i];
+
+        if (!item.depositCode) {
+          errors.push(`第${i + 1}行：存款编号不能为空`);
+          continue;
+        }
+
+        if (!item.depositType || !depositTypeMap[item.depositType]) {
+          errors.push(`第${i + 1}行：存款类型 ${item.depositType} 不存在`);
+          continue;
+        }
 
         if (!item.depositCode) {
           errors.push(`第${i + 1}行：存款编号不能为空`);
@@ -248,30 +268,34 @@ export class ImportDepositController {
 
   async getImportDepositRecords(req: any, res: Response) {
     try {
-      const { batchNo, companyName, status, page = 1, size = 10 } = req.query;
+      const { keyword, status, startDate, endDate, page = 1, size = 10 } = req.query;
       const pageNum = parseInt(page as string);
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
 
       let queryBuilder = this.fixedDepositRepository.createQueryBuilder('deposit');
 
-      if (batchNo) {
-        queryBuilder = queryBuilder.andWhere('deposit.batchNo = :batchNo', { batchNo });
+      if (keyword) {
+        queryBuilder = queryBuilder.andWhere('(deposit.companyName LIKE :keyword OR deposit.batchNo LIKE :keyword)', { keyword: `%${keyword}%` });
       }
-      if (companyName) {
-        queryBuilder = queryBuilder.andWhere('deposit.companyName LIKE :companyName', { companyName: `%${companyName}%` });
-      }
-      if (status) {
+      if (status && status > 0) {
         queryBuilder = queryBuilder.andWhere('deposit.status = :status', { status: parseInt(status as string) });
       }
+      if (startDate) {
+        queryBuilder = queryBuilder.andWhere('deposit.startDate >= :startDate', { startDate: new Date(`${startDate} 00:00:00`) });
+      }
+      if (endDate) {
+        queryBuilder = queryBuilder.andWhere('deposit.endDate <= :endDate', { endDate: new Date(`${endDate} 23:59:59`) });
+      }
 
-      const [items, total] = await queryBuilder
+      const [records, total] = await queryBuilder
+        .innerJoinAndSelect('deposit.creator', 'creator')
         .orderBy('deposit.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)
         .getManyAndCount();
 
-      return successResponse(res, { items, total }, '查询成功');
+      return successResponse(res, { records, total }, '查询成功');
     } catch (error) {
       return errorResponse(res, 500, `查询失败: ${error}`);
     }

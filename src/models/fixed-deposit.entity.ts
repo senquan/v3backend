@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('fixed_deposit')
@@ -62,5 +62,6 @@ export class FixedDeposit {
 
   // 关系映射
   @ManyToOne(() => User)
-  createdByEntity!: User;
+  @JoinColumn({ name: 'createdBy' })
+  creator!: User;
 }
