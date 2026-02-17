@@ -395,7 +395,7 @@ export class UserController {
   async getUserPermissions(req: Request, res: Response): Promise<Response> {
     try {
       const userId = (req as any).user.id;
-      const DEFAULT_ROLE_ID = 1;
+      const DEFAULT_ROLE_ID = 2;
       
       // 获取用户角色
       const userRoles = await AppDataSource

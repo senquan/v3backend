@@ -8,6 +8,9 @@ import { Role } from '../models/role.entity';
 import { RolePermission } from '../models/role-permission.entity';
 import { User } from '../models/user.entity';
 import { UserRole } from '../models/user-roles.entity';
+import { InternalDeposit } from '../models/internal-deposit.entity';
+import { AdvanceExpense } from '../models/advance-expense.entity';
+import { ProfitPayment } from '../models/profit-payment.entity';
 
 // 加载环境变量
 dotenv.config();
@@ -23,7 +26,7 @@ export const AppDataSource = new DataSource({
   schema: process.env.DB_SCHEMA || 'fms',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [CompanyInfo, InviteCode, Permission, Role, RolePermission, User, UserRole],
+  entities: [CompanyInfo, InviteCode, Permission, Role, RolePermission, User, UserRole, InternalDeposit, AdvanceExpense, ProfitPayment],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });
