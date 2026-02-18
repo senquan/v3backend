@@ -140,6 +140,7 @@ const subMenuStructure = [
         code: 'finance:payment-clearing',
         type: 2,
         path: '/finance/payment-clearing',
+        component: 'pages/finance/payment-clearing.vue',
         icon: 'Collection',
         sort: 3,
         hidden: 0,

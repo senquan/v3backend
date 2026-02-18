@@ -14,6 +14,9 @@ import { UserRole } from '../models/user-roles.entity';
 import { InternalDeposit } from '../models/internal-deposit.entity';
 import { ProfitPayment } from '../models/profit-payment.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
+import { BankReceive } from '../models/bank-receive.entity';
+import { BillReceive } from '../models/bill-receive.entity';
+import { PaymentReceive } from '../models/payment-receive.entity';
 
 // 加载环境变量
 dotenv.config();
@@ -30,7 +33,7 @@ export const AppDataSource = new DataSource({
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
   entities: [CompanyInfo, Dict, InviteCode, Permission, Role, RolePermission, User, UserRole, InternalDeposit, AdvanceExpense,
-    ProfitPayment, FixedDeposit, Settings],
+    ProfitPayment, FixedDeposit, Settings, BankReceive, BillReceive, PaymentReceive],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });
