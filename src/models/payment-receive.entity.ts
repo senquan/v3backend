@@ -75,8 +75,8 @@ export class PaymentReceive {
   @UpdateDateColumn({ type: 'timestamp', comment: '最后修改时间' })
   updatedAt!: Date;
 
-  @Column({ type: 'varchar', length: 50, comment: '导入批次号' })
-  batchNo!: string;
+  @Column({ type: 'varchar', length: 50, nullable: true, comment: '导入批次号' })
+  batchNo: string | null = null;
 
   // 关系映射
   @ManyToOne(() => User)

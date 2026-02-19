@@ -290,6 +290,7 @@ export class ImportDepositController {
 
       const [records, total] = await queryBuilder
         .innerJoinAndSelect('deposit.creator', 'creator')
+        .select(['deposit', 'creator.name'])
         .orderBy('deposit.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)

@@ -4,6 +4,7 @@ import * as dotenv from 'dotenv';
 import { AdvanceExpense } from '../models/advance-expense.entity';
 import { CompanyInfo } from '../models/company-info.entity';
 import { Dict } from '../models/dict.entity';
+import { FundTransfer } from '../models/fund-transfer.entity';
 import { InviteCode } from '../models/invite-code.entity';
 import { Permission } from '../models/permission.entity';
 import { Role } from '../models/role.entity';
@@ -14,8 +15,6 @@ import { UserRole } from '../models/user-roles.entity';
 import { InternalDeposit } from '../models/internal-deposit.entity';
 import { ProfitPayment } from '../models/profit-payment.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
-import { BankReceive } from '../models/bank-receive.entity';
-import { BillReceive } from '../models/bill-receive.entity';
 import { PaymentReceive } from '../models/payment-receive.entity';
 
 // 加载环境变量
@@ -32,8 +31,8 @@ export const AppDataSource = new DataSource({
   schema: process.env.DB_SCHEMA || 'fms',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [CompanyInfo, Dict, InviteCode, Permission, Role, RolePermission, User, UserRole, InternalDeposit, AdvanceExpense,
-    ProfitPayment, FixedDeposit, Settings, BankReceive, BillReceive, PaymentReceive],
+  entities: [CompanyInfo, Dict, FundTransfer, InviteCode, Permission, Role, RolePermission, User, UserRole, InternalDeposit, AdvanceExpense,
+    ProfitPayment, FixedDeposit, Settings, PaymentReceive],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });

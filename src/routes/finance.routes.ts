@@ -54,6 +54,6 @@ router.put('/fund-transfer/:id', (req, res: Response) => fundTransferController.
 
 router.delete('/fund-transfer', (req, res: Response) => fundTransferController.deleteTransfer(req, res));
 
-router.post('/fund-transfer/import', (req, res: Response) => fundTransferController.batchImport(req, res));
+router.post('/import-transfer', (req, res: Response) => fundTransferController.batchImport(req, res));
 
 export default router;
