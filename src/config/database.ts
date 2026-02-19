@@ -2,6 +2,8 @@ import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
 
 import { AdvanceExpense } from '../models/advance-expense.entity';
+import { AdvanceExpenseDetail } from '../models/advance-expense-detail.entity';
+import { AdvanceExpenseType } from '../models/advance-expense-type.entity';
 import { CompanyInfo } from '../models/company-info.entity';
 import { Dict } from '../models/dict.entity';
 import { FundTransfer } from '../models/fund-transfer.entity';
@@ -32,7 +34,7 @@ export const AppDataSource = new DataSource({
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
   entities: [CompanyInfo, Dict, FundTransfer, InviteCode, Permission, Role, RolePermission, User, UserRole, InternalDeposit, AdvanceExpense,
-    ProfitPayment, FixedDeposit, Settings, PaymentReceive],
+    AdvanceExpenseDetail, AdvanceExpenseType, ProfitPayment, FixedDeposit, Settings, PaymentReceive],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });

@@ -1,6 +1,14 @@
 import { Router } from 'express';
+import { DictService } from '../services/dict.service';
+import { Dict } from '../models/dict.entity';
+import { AppDataSource } from '../config/database';
+import { RedisCacheService } from '../services/cache.service';
 
 const router = Router();
+
+const dictRepository = AppDataSource.getRepository(Dict);
+const cacheService = new RedisCacheService();
+const dictService = new DictService(dictRepository, cacheService);
 
 router.get('/backups', (req, res) => {
   const { backupName, backupType, backupMode, status, startDate, endDate, page = 1, size = 10 } = req.query;
@@ -177,6 +185,177 @@ router.get('/backups/:id/download', (req, res) => {
       downloadUrl: `/uploads/backups/backup_${id}.sql`
     }
   });
+});
+
+router.get('/dicts', async (req, res) => {
+  try {
+    const { page = 1, size = 10, group, name, value } = req.query;
+    const result = await dictService.findAll({
+      page: parseInt(page as string),
+      size: parseInt(size as string),
+      group,
+      name,
+      value
+    });
+    res.json({
+      code: 0,
+      message: '查询成功',
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '查询失败',
+      data: null
+    });
+  }
+});
+
+router.get('/dicts/groups', async (req, res) => {
+  try {
+    const groups = await dictService.getAllGroups();
+    res.json({
+      code: 0,
+      message: '查询成功',
+      data: groups
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '查询失败',
+      data: null
+    });
+  }
+});
+
+router.get('/dicts/group/:group', async (req, res) => {
+  try {
+    const group = parseInt(req.params.group);
+    const items = await dictService.findByGroup(group);
+    res.json({
+      code: 0,
+      message: '查询成功',
+      data: items
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '查询失败',
+      data: null
+    });
+  }
+});
+
+router.get('/dicts/group/:group/value/:value', async (req, res) => {
+  try {
+    const group = parseInt(req.params.group);
+    const value = req.params.value;
+    const name = await dictService.getNameByValueFromCache(group, value);
+    res.json({
+      code: 0,
+      message: '查询成功',
+      data: name
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '查询失败',
+      data: null
+    });
+  }
+});
+
+router.get('/dicts/map/:group', async (req, res) => {
+  try {
+    const group = parseInt(req.params.group);
+    const map = await dictService.getDictMap(group);
+    const result: Record<string, string> = {};
+    map.forEach((value, key) => {
+      result[key] = value;
+    });
+    res.json({
+      code: 0,
+      message: '查询成功',
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '查询失败',
+      data: null
+    });
+  }
+});
+
+router.get('/dicts/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const dict = await dictService.findOne(id);
+    res.json({
+      code: 0,
+      message: '查询成功',
+      data: dict
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '查询失败',
+      data: null
+    });
+  }
+});
+
+router.post('/dicts', async (req, res) => {
+  try {
+    const dict = await dictService.create(req.body);
+    res.json({
+      code: 0,
+      message: '创建成功',
+      data: dict
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '创建失败',
+      data: null
+    });
+  }
+});
+
+router.put('/dicts/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const dict = await dictService.update(id, req.body);
+    res.json({
+      code: 0,
+      message: '更新成功',
+      data: dict
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '更新失败',
+      data: null
+    });
+  }
+});
+
+router.delete('/dicts/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await dictService.remove(id);
+    res.json({
+      code: 0,
+      message: '删除成功',
+      data: null
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '删除失败',
+      data: null
+    });
+  }
 });
 
 export default router;

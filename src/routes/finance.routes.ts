@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { FinanceController, ImportDepositController } from '../controllers/finance.controller';
 import { PaymentClearingController } from '../controllers/payment-clearing.controller';
 import { FundTransferController } from '../controllers/fund-transfer.controller';
+import { AdvanceExpenseController } from '../controllers/advance-expense.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -10,6 +11,7 @@ const financeController = new FinanceController();
 const importDepositController = new ImportDepositController();
 const paymentClearingController = new PaymentClearingController();
 const fundTransferController = new FundTransferController();
+const advanceExpenseController = new AdvanceExpenseController();
 
 // 应用认证中间件
 router.use(authMiddleware);
@@ -55,5 +57,24 @@ router.put('/fund-transfer/:id', (req, res: Response) => fundTransferController.
 router.delete('/fund-transfer', (req, res: Response) => fundTransferController.deleteTransfer(req, res));
 
 router.post('/import-transfer', (req, res: Response) => fundTransferController.batchImport(req, res));
+
+router.post('/transfer/confirm', (req, res: Response) => fundTransferController.confirmTransfer(req, res));
+
+// 代垫费用管理
+router.post('/advance-expense', (req, res: Response) => advanceExpenseController.createExpense(req, res));
+
+router.get('/advance-expenses', (req, res: Response) => advanceExpenseController.getExpenseList(req, res));
+
+router.put('/advance-expense/:id', (req, res: Response) => advanceExpenseController.updateExpense(req, res));
+
+router.delete('/advance-expense', (req, res: Response) => advanceExpenseController.deleteExpense(req, res));
+
+router.post('/advance-expense/confirm', (req, res: Response) => advanceExpenseController.confirmExpense(req, res));
+
+router.post('/import-advance-expense', (req, res: Response) => advanceExpenseController.batchImport(req, res));
+
+router.get('/advance-expense/summary', (req, res: Response) => advanceExpenseController.getSummary(req, res));
+
+router.get('/expense-types', (req, res: Response) => advanceExpenseController.getExpenseTypeList(req, res));
 
 export default router;

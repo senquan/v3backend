@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { FundTransfer } from '../models/fund-transfer.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
+import { In } from 'typeorm';
 
 export class FundTransferController {
   private fundTransferRepository = AppDataSource.getRepository(FundTransfer);
@@ -235,6 +236,28 @@ export class FundTransferController {
       return errorResponse(res, 500, `导入失败: ${error.message}`);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async confirmTransfer(req: any, res: Response) {
+    try {
+      const type = parseInt(req.body.type) || 1;
+      const { ids } = req.body;
+
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return errorResponse(res, 400, '请选择要确认的记录');
+      }
+
+      const numIds = ids.map((id: string | number) => parseInt(id as string));
+
+      const result = await this.fundTransferRepository.update(
+        { id: In(numIds), transferStatus: 1, transferType: type },
+        { transferStatus: 2 }
+      );
+
+      return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
+    } catch (error) {
+      return errorResponse(res, 500, `确认失败: ${error}`);
     }
   }
 
