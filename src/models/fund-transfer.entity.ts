@@ -57,5 +57,5 @@ export class FundTransfer {
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'updatedBy' })
-  updator!: User;
+  updater!: User;
 }

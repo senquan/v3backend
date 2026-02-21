@@ -121,10 +121,10 @@ export class AdvanceExpenseController {
 
       const [records, total] = await queryBuilder
         .innerJoinAndSelect('expense.creator', 'creator')
-        .innerJoinAndSelect('expense.updator', 'updator')
+        .innerJoinAndSelect('expense.updater', 'updater')
         .leftJoinAndSelect('expense.details', 'details')
         .leftJoinAndSelect('details.expenseType', 'expenseType')
-        .select(['expense', 'creator.name', 'updator.name', 'details', 'expenseType'])
+        .select(['expense', 'creator.name', 'updater.name', 'details', 'expenseType'])
         .orderBy('expense.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)

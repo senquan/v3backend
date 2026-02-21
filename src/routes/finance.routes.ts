@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { FinanceController, ImportDepositController } from '../controllers/finance.controller';
+import { FinanceController, ImportDepositController, ProfitPaymentController } from '../controllers/finance.controller';
 import { PaymentClearingController } from '../controllers/payment-clearing.controller';
 import { FundTransferController } from '../controllers/fund-transfer.controller';
 import { AdvanceExpenseController } from '../controllers/advance-expense.controller';
@@ -12,6 +12,7 @@ const importDepositController = new ImportDepositController();
 const paymentClearingController = new PaymentClearingController();
 const fundTransferController = new FundTransferController();
 const advanceExpenseController = new AdvanceExpenseController();
+const profitPaymentController = new ProfitPaymentController();
 
 // 应用认证中间件
 router.use(authMiddleware);
@@ -76,5 +77,25 @@ router.post('/import-advance-expense', (req, res: Response) => advanceExpenseCon
 router.get('/advance-expense/summary', (req, res: Response) => advanceExpenseController.getSummary(req, res));
 
 router.get('/expense-types', (req, res: Response) => advanceExpenseController.getExpenseTypeList(req, res));
+
+// 利润上缴管理
+router.get('/profit-payments', (req, res: Response) => profitPaymentController.getList(req, res));
+
+router.get('/profit-payments/summary', (req, res: Response) => profitPaymentController.getSummary(req, res));
+
+router.get('/profit-payments/batch/:batchNo', (req, res: Response) => profitPaymentController.getByBatchNo(req, res));
+
+router.get('/profit-payments/:id', (req, res: Response) => profitPaymentController.getById(req, res));
+
+router.post('/profit-payments', (req, res: Response) => profitPaymentController.create(req, res));
+
+router.put('/profit-payments/:id', (req, res: Response) => profitPaymentController.update(req, res));
+
+router.delete('/profit-payments', (req, res: Response) => profitPaymentController.delete(req, res));
+
+router.post('/profit-payments/confirm', (req, res: Response) => profitPaymentController.confirm(req, res));
+
+router.post('/import-profit', (req, res: Response) => profitPaymentController.importProfit(req, res));
+
 
 export default router;

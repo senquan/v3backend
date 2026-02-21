@@ -52,7 +52,7 @@ export class AdvanceExpense {
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'updatedBy' })
-  updator!: User;
+  updater!: User;
 
   @OneToMany(() => AdvanceExpenseDetail, detail => detail.advanceExpense)
   details!: AdvanceExpenseDetail[];

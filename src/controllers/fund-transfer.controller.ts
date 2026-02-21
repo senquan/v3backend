@@ -135,8 +135,8 @@ export class FundTransferController {
 
       const [items, total] = await queryBuilder
         .innerJoinAndSelect('transfer.creator', 'creator')
-        .innerJoinAndSelect('transfer.updator', 'updator')
-        .select(['transfer', 'creator.name', 'updator.name'])
+        .innerJoinAndSelect('transfer.updater', 'updater')
+        .select(['transfer', 'creator.name', 'updater.name'])
         .orderBy('transfer.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)

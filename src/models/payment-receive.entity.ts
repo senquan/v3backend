@@ -85,5 +85,5 @@ export class PaymentReceive {
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'updatedBy' })
-  updator!: User;
+  updater!: User;
 }

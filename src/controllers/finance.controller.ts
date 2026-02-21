@@ -2,8 +2,11 @@ import { Response } from 'express';
 import { CompanyInfo } from '../models/company-info.entity';
 import { Dict } from '../models/dict.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
+import { ProfitPayment } from '../models/profit-payment.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
+import { RedisCacheService } from '../services/cache.service';
+import { ProfitPaymentService } from '../services/profit-payment.service';
 
 export class FinanceController {
   private companyRepository = AppDataSource.getRepository(CompanyInfo);
@@ -353,6 +356,226 @@ export class ImportDepositController {
       return successResponse(res, null, '删除成功');
     } catch (error) {
       return errorResponse(res, 500, `删除失败: ${error}`);
+    }
+  }
+}
+
+export class ProfitPaymentController {
+  private profitPaymentRepository = AppDataSource.getRepository(ProfitPayment);
+  private companyRepository = AppDataSource.getRepository(CompanyInfo);
+  private cacheService = new RedisCacheService();
+  private profitPaymentService = new ProfitPaymentService(
+    this.profitPaymentRepository,
+    this.companyRepository,
+    this.cacheService
+  );
+
+  async getList(req: any, res: Response) {
+    try {
+      const result = await this.profitPaymentService.findAll(req.query);
+      return successResponse(res, result, '查询成功');
+    } catch (error: any) {
+      return errorResponse(res, 500, `查询失败: ${error.message}`);
+    }
+  }
+
+  async getById(req: any, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return errorResponse(res, 400, '无效的记录ID');
+      }
+
+      const record = await this.profitPaymentService.findOne(id);
+      if (!record) {
+        return errorResponse(res, 404, '记录不存在');
+      }
+
+      return successResponse(res, record, '查询成功');
+    } catch (error: any) {
+      return errorResponse(res, 500, `查询失败: ${error.message}`);
+    }
+  }
+
+  async create(req: any, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
+
+      const { companyId, companyName, dueProfit1, dueProfit2, actualAmount, lastPaymentDate, businessYear } = req.body;
+
+      if (!companyName && !companyId) {
+        return errorResponse(res, 400, '单位名称不能为空');
+      }
+      if (!businessYear) {
+        return errorResponse(res, 400, '业务年份不能为空');
+      }
+
+      let companyIdValue = companyId;
+      if (!companyIdValue && companyName) {
+        const company = await this.companyRepository.findOne({ where: { companyName } });
+        if (!company) {
+          return errorResponse(res, 400, '单位不存在');
+        }
+        companyIdValue = company.id;
+      }
+
+      const record = await this.profitPaymentService.create({
+        companyId: companyIdValue,
+        dueProfit1: dueProfit1 ? parseFloat(dueProfit1) : 0,
+        dueProfit2: dueProfit2 ? parseFloat(dueProfit2) : 0,
+        actualAmount: actualAmount ? parseFloat(actualAmount) : 0,
+        lastPaymentDate: lastPaymentDate ? new Date(lastPaymentDate) : null,
+        businessYear: parseInt(businessYear)
+      }, userId);
+
+      return successResponse(res, record, '创建成功');
+    } catch (error: any) {
+      return errorResponse(res, 400, error.message || '创建失败');
+    }
+  }
+
+  async update(req: any, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return errorResponse(res, 400, '无效的记录ID');
+      }
+
+      const { dueProfit1, dueProfit2, actualAmount, lastPaymentDate, status } = req.body;
+
+      const record = await this.profitPaymentService.update(id, {
+        dueProfit1: dueProfit1 ? parseFloat(dueProfit1) : undefined,
+        dueProfit2: dueProfit2 ? parseFloat(dueProfit2) : undefined,
+        actualAmount: actualAmount ? parseFloat(actualAmount) : undefined,
+        lastPaymentDate: lastPaymentDate ? new Date(lastPaymentDate) : undefined,
+        status: status ? parseInt(status) : undefined
+      }, userId);
+
+      return successResponse(res, record, '更新成功');
+    } catch (error: any) {
+      return errorResponse(res, 400, error.message || '更新失败');
+    }
+  }
+
+  async delete(req: any, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
+
+      const { id } = req.body;
+      if (!id) {
+        return errorResponse(res, 400, '记录ID不能为空');
+      }
+
+      await this.profitPaymentService.remove(parseInt(id), userId);
+      return successResponse(res, null, '删除成功');
+    } catch (error: any) {
+      return errorResponse(res, 400, error.message || '删除失败');
+    }
+  }
+
+  async confirm(req: any, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
+
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return errorResponse(res, 400, '请选择要确认的记录');
+      }
+
+      const numIds = ids.map((id: string | number) => parseInt(id as string));
+      const result = await this.profitPaymentService.batchConfirm(numIds, userId);
+
+      return successResponse(res, result, `确认成功，共确认 ${result.affected} 条记录`);
+    } catch (error: any) {
+      return errorResponse(res, 400, error.message || '确认失败');
+    }
+  }
+
+  async importProfit(req: any, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
+
+      const { profits, batchNo, businessYear } = req.body;
+
+      if (!profits || !Array.isArray(profits) || profits.length === 0) {
+        return errorResponse(res, 400, '导入数据不能为空');
+      }
+
+      const currentBatchNo = batchNo || `PP${Date.now()}`;
+      const year = businessYear || new Date().getFullYear();
+
+      const dataList = profits.map((item: any) => ({
+        companyId: item.companyId,
+        companyName: item.companyName,
+        dueProfit1: item.dueProfit1,
+        dueProfit2: item.dueProfit2,
+        actualAmount: item.actualAmount,
+        lastPaymentDate: item.lastPaymentDate,
+        businessYear: item.businessYear || year
+      }));
+
+      const result = await this.profitPaymentService.batchImport(dataList, currentBatchNo, userId);
+
+      if (!result.success && result.successCount === 0) {
+        return successResponse(res, {
+          success: false,
+          total: result.total,
+          successCount: 0,
+          errorCount: result.errorCount,
+          errors: result.errors
+        }, '导入失败', 0);
+      }
+
+      return successResponse(res, {
+        success: true,
+        total: result.total,
+        successCount: result.successCount,
+        errorCount: result.errorCount,
+        batchNo: result.batchNo,
+        errors: result.errors
+      }, result.errors ? '部分数据导入成功' : '导入成功');
+    } catch (error: any) {
+      return errorResponse(res, 500, `导入失败: ${error.message}`);
+    }
+  }
+
+  async getSummary(req: any, res: Response) {
+    try {
+      const result = await this.profitPaymentService.getSummary(req.query);
+      return successResponse(res, result, '查询成功');
+    } catch (error: any) {
+      return errorResponse(res, 500, `查询失败: ${error.message}`);
+    }
+  }
+
+  async getByBatchNo(req: any, res: Response) {
+    try {
+      const { batchNo } = req.params;
+      if (!batchNo) {
+        return errorResponse(res, 400, '批次号不能为空');
+      }
+
+      const records = await this.profitPaymentService.findByBatchNo(batchNo);
+      return successResponse(res, records, '查询成功');
+    } catch (error: any) {
+      return errorResponse(res, 500, `查询失败: ${error.message}`);
     }
   }
 }

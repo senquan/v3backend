@@ -4,6 +4,7 @@ import userRoutes from './user.routes';
 import wsRoutes from './ws.routes';
 import financeRoutes from './finance.routes';
 import systemRoutes from './system.routes';
+import companyRoutes from './company.routes';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.use('/v1/users', userRoutes);
 router.use('/v1/ws', wsRoutes);
 router.use('/v1/finance', financeRoutes);
 router.use('/v1/system', systemRoutes);
+router.use('/v1/company', companyRoutes);
 
 // 处理404情况 - 当没有匹配到路由时
 router.use('*', (req: Request, res: Response) => {

@@ -145,8 +145,8 @@ export class PaymentClearingController {
 
       const [records, total] = await queryBuilder
         .innerJoinAndSelect('receive.creator', 'creator')
-        .innerJoinAndSelect('receive.updator', 'updator')
-        .select(['receive', 'creator.name', 'updator.name'])
+        .innerJoinAndSelect('receive.updater', 'updater')
+        .select(['receive', 'creator.name', 'updater.name'])
         .orderBy('receive.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)
