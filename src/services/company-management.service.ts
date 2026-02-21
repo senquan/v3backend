@@ -16,32 +16,34 @@ export class CompanyService {
   }
 
   async findAll(query: any) {
-    const { page = 1, size = 10, companyCode, companyName, status, parentCompanyId } = query;
+    const { page = 1, size = 10, keyword, status, parentCompanyId } = query;
     const pageNum = parseInt(page as string);
     const pageSize = parseInt(size as string);
     const skip = (pageNum - 1) * pageSize;
 
-    const where: any = {};
-    if (companyCode) {
-      where.companyCode = Like(`%${companyCode}%`);
-    }
-    if (companyName) {
-      where.companyName = Like(`%${companyName}%`);
+    const queryBuilder = this.companyRepository.createQueryBuilder('company')
+      .leftJoinAndSelect('company.parentCompany', 'parentCompany')
+      .leftJoin('company.creator', 'creator')
+      .addSelect('creator.name')
+      .leftJoin('company.updater', 'updater')
+      .addSelect('updater.name')
+      .where('company.isDeleted = 0')
+
+    if (keyword) {
+      queryBuilder.andWhere('(company.companyCode LIKE :keyword OR company.companyName LIKE :keyword)', { keyword: `%${keyword}%` });
     }
     if (status !== undefined && status !== '') {
-      where.status = parseInt(status as string);
+      queryBuilder.andWhere('company.status = :status', { status: parseInt(status as string) });
     }
     if (parentCompanyId !== undefined && parentCompanyId !== '') {
-      where.parentCompanyId = parseInt(parentCompanyId as string);
+      queryBuilder.andWhere('company.parentCompanyId = :parentCompanyId', { parentCompanyId: parseInt(parentCompanyId as string) });
     }
 
-    const [records, total] = await this.companyRepository.findAndCount({
-      where,
-      skip,
-      take: pageSize,
-      relations: ['parentCompany'],
-      order: { createdAt: 'DESC' }
-    });
+    queryBuilder.orderBy('company.createdAt', 'DESC')
+      .skip(skip)
+      .take(pageSize);
+
+    const [records, total] = await queryBuilder.getManyAndCount();
 
     return {
       records,
@@ -59,7 +61,7 @@ export class CompanyService {
     }
 
     const result = await this.companyRepository.findOne({ 
-      where: { id },
+      where: { id, isDeleted: 0 },
       relations: ['parentCompany', 'children']
     });
     if (result) {
@@ -91,6 +93,7 @@ export class CompanyService {
     }
 
     const allCompanies = await this.companyRepository.find({
+      where: { isDeleted: 0 },
       relations: ['parentCompany']
     });
     
@@ -104,7 +107,9 @@ export class CompanyService {
 
     companies.forEach(company => {
       companyMap.set(company.id, {
-        ...company,
+        value: company.id,
+        label: company.companyName,
+        code: company.companyCode,
         children: []
       });
     });
@@ -124,7 +129,7 @@ export class CompanyService {
     return roots;
   }
 
-  async create(data: Partial<CompanyInfo>, userId?: string, userName?: string) {
+  async create(data: Partial<CompanyInfo>, userId: number) {
     const existing = await this.findByCode(data.companyCode || '');
     if (existing) {
       throw new Error('单位编号已存在');
@@ -142,8 +147,8 @@ export class CompanyService {
       ...data,
       companyLevel,
       status: data.status || 1,
-      createdBy: userName || 'system',
-      updatedBy: userName || 'system'
+      createdBy: userId,
+      updatedBy: userId
     });
 
     const result = await this.companyRepository.save(company);
@@ -151,7 +156,7 @@ export class CompanyService {
     return result;
   }
 
-  async update(id: number, data: Partial<CompanyInfo>, userName?: string) {
+  async update(id: number, data: Partial<CompanyInfo>, userId: number) {
     const company = await this.findOne(id);
     if (!company) {
       throw new Error('单位不存在');
@@ -182,7 +187,7 @@ export class CompanyService {
 
     await this.companyRepository.update(id, {
       ...data,
-      updatedBy: userName || 'system'
+      updatedBy: userId
     });
 
     await this.clearCache();
@@ -214,10 +219,10 @@ export class CompanyService {
     return await this.companyRepository.delete(id);
   }
 
-  async updateStatus(id: number, status: number, userName?: string) {
+  async updateStatus(id: number, status: number, userId: number) {
     await this.companyRepository.update(id, {
       status,
-      updatedBy: userName || 'system'
+      updatedBy: userId
     });
     await this.clearCache();
     return await this.findOne(id);

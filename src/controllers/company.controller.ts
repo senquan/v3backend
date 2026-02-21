@@ -14,11 +14,7 @@ export class CompanyController {
   async getAll(req: Request, res: Response): Promise<Response> {
     try {
       const result = await companyService.findAll(req.query);
-      return res.json({
-        code: 0,
-        message: '查询成功',
-        data: result
-      });
+      return successResponse(res, result, '查询成功');
     } catch (error) {
       logger.error('获取单位列表失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -28,11 +24,7 @@ export class CompanyController {
   async getTree(req: Request, res: Response): Promise<Response> {
     try {
       const tree = await companyService.getTree();
-      return res.json({
-        code: 0,
-        message: '查询成功',
-        data: tree
-      });
+      return successResponse(res, { records: tree }, '查询成功');
     } catch (error) {
       logger.error('获取单位树失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -81,9 +73,16 @@ export class CompanyController {
   async create(req: Request, res: Response): Promise<Response> {
     try {
       const userId = (req as any).user?.id;
-      const userName = (req as any).user?.name || 'system';
       
-      const { companyCode, companyName, parentCompanyId, status } = req.body;
+      const {
+        companyName,
+        companyCode,
+        accountCode,
+        accountName,
+        parentCompanyId,
+        companyLevel,
+        status
+      } = req.body;
 
       if (!companyCode || !companyName) {
         return errorResponse(res, 400, '单位编号和单位名称不能为空', null);
@@ -92,9 +91,12 @@ export class CompanyController {
       const company = await companyService.create({
         companyCode,
         companyName,
+        accountCode,
+        accountName,        
         parentCompanyId: parentCompanyId || null,
+        companyLevel: companyLevel || 1,
         status: status || 1
-      }, userId, userName);
+      }, userId);
 
       return res.json({
         code: 0,
@@ -114,20 +116,28 @@ export class CompanyController {
         return errorResponse(res, 400, '无效的单位ID', null);
       }
 
-      const userName = (req as any).user?.name || 'system';
-      const { companyName, parentCompanyId, status } = req.body;
+      const userId = (req as any).user?.id;
+      const {
+        companyName,
+        companyCode,
+        accountCode,
+        accountName,
+        parentCompanyId,
+        companyLevel,
+        status
+      } = req.body;
 
       const company = await companyService.update(id, {
         companyName,
+        companyCode,
+        accountCode,
+        accountName,        
         parentCompanyId,
+        companyLevel: companyLevel || 1,
         status
-      }, userName);
+      }, userId);
 
-      return res.json({
-        code: 0,
-        message: '更新成功',
-        data: company
-      });
+      return successResponse(res, company, '更新成功');
     } catch (error: any) {
       logger.error('更新单位失败:', error);
       return errorResponse(res, 400, error.message || '更新失败', null);
@@ -141,13 +151,11 @@ export class CompanyController {
         return errorResponse(res, 400, '无效的单位ID', null);
       }
 
-      await companyService.remove(id);
+      const userId = (req as any).user?.id;
 
-      return res.json({
-        code: 0,
-        message: '删除成功',
-        data: null
-      });
+      await companyService.update(id, { isDeleted: 1 }, userId);
+
+      return successResponse(res, null, '删除成功');
     } catch (error: any) {
       logger.error('删除单位失败:', error);
       return errorResponse(res, 400, error.message || '删除失败', null);
@@ -166,8 +174,8 @@ export class CompanyController {
         return errorResponse(res, 400, '状态值无效', null);
       }
 
-      const userName = (req as any).user?.name || 'system';
-      const company = await companyService.updateStatus(id, status, userName);
+      const userId = (req as any).user?.id;
+      const company = await companyService.updateStatus(id, status, userId);
 
       return res.json({
         code: 0,

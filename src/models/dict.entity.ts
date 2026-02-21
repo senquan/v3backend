@@ -20,6 +20,9 @@ export class Dict {
   @Column({ type: 'varchar', length: 50, nullable: true, comment: '图标' })
   icon: string | '' = '';
 
+  @Column({ type: 'smallint', default: 0, comment: '排序' })
+  sort!: number;
+
   @UpdateDateColumn({ name: "updated_at" })
   updatedAt!: Date;
 }

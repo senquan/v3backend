@@ -14,6 +14,7 @@ import { RolePermission } from '../models/role-permission.entity';
 import { Settings } from '../models/settings.entity';
 import { User } from '../models/user.entity';
 import { UserRole } from '../models/user-roles.entity';
+import { InterestRate } from '../models/interest-rate.entity';
 import { InternalDeposit } from '../models/internal-deposit.entity';
 import { ProfitPayment } from '../models/profit-payment.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
@@ -33,7 +34,7 @@ export const AppDataSource = new DataSource({
   schema: process.env.DB_SCHEMA || 'fms',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [CompanyInfo, Dict, FundTransfer, InviteCode, Permission, Role, RolePermission, User, UserRole, InternalDeposit, AdvanceExpense,
+  entities: [CompanyInfo, Dict, FundTransfer, InviteCode, Permission, Role, RolePermission, User, UserRole, InterestRate, InternalDeposit, AdvanceExpense,
     AdvanceExpenseDetail, AdvanceExpenseType, ProfitPayment, FixedDeposit, Settings, PaymentReceive],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
