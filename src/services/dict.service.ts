@@ -36,7 +36,7 @@ export class DictService {
       where.value = Like(`%${value}%`);
     }
 
-    const [items, total] = await this.dictRepository.findAndCount({
+    const [records, total] = await this.dictRepository.findAndCount({
       where,
       skip,
       take: pageSize,
@@ -44,7 +44,7 @@ export class DictService {
     });
 
     return {
-      items,
+      records,
       total,
       page: pageNum,
       size: pageSize

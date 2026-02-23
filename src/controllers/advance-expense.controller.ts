@@ -99,6 +99,7 @@ export class AdvanceExpenseController {
     try {
       const {
         keyword,
+        type,
         status,
         page = 1,
         size = 10
@@ -117,6 +118,9 @@ export class AdvanceExpenseController {
         queryBuilder = queryBuilder.andWhere('expense.status = :status', { status: parseInt(status as string) });
       } else {
         queryBuilder = queryBuilder.andWhere('expense.status != 3');
+      }
+      if (type && type > 0) {
+        queryBuilder = queryBuilder.andWhere('expense.expenseType = :type', { type: parseInt(type as string) });
       }
 
       const [records, total] = await queryBuilder
