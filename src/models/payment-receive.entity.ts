@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { CompanyInfo } from './company-info.entity';
 import { User } from './user.entity';
 
 @Entity('payment_receive')
@@ -15,8 +16,8 @@ export class PaymentReceive {
   @Column({ type: 'varchar', length: 50, nullable: true, comment: 'SAP代码' })
   sapCode!: string | null;
 
-  @Column({ type: 'varchar', length: 100, comment: '单位名称' })
-  companyName!: string;
+  @Column({ type: 'bigint', comment: '单位ID' })
+  companyId!: number;
 
   @Column({ type: 'varchar', length: 100, nullable: true, comment: '客户名称' })
   customerName!: string | null;
@@ -79,6 +80,10 @@ export class PaymentReceive {
   batchNo: string | null = null;
 
   // 关系映射
+  @ManyToOne(() => CompanyInfo)
+  @JoinColumn({ name: 'companyId' })
+  company: CompanyInfo | null = null;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'createdBy' })
   creator!: User;

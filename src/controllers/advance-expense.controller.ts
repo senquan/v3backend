@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AdvanceExpense } from '../models/advance-expense.entity';
 import { AdvanceExpenseType } from '../models/advance-expense-type.entity';
 import { AdvanceExpenseDetail } from '../models/advance-expense-detail.entity';
+import { CompanyInfo } from '../models/company-info.entity';
 import { Dict } from '../models/dict.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
@@ -19,15 +20,14 @@ export class AdvanceExpenseController {
       const {
         advanceCode,
         companyId,
-        companyName,
         expenseType,
         amount,
         remark,
         businessYear
       } = req.body;
 
-      if (!companyName) {
-        return errorResponse(res, 400, '单位名称不能为空');
+      if (!companyId) {
+        return errorResponse(res, 400, '单位编号不能为空');
       }
       if (!amount || parseFloat(amount) <= 0) {
         return errorResponse(res, 400, '金额必须大于0');
@@ -44,7 +44,6 @@ export class AdvanceExpenseController {
       const expense = new AdvanceExpense();
       expense.advanceCode = advanceCode || this.generateAdvanceCode();
       expense.companyId = companyId ? parseInt(companyId) : 0;
-      expense.companyName = companyName;
       expense.expenseType = parseInt(expenseType);
       expense.amount = parseFloat(amount);
       expense.remark = remark || null;
@@ -70,7 +69,6 @@ export class AdvanceExpenseController {
       }
 
       const {
-        companyName,
         expenseType,
         amount,
         remark,
@@ -78,7 +76,6 @@ export class AdvanceExpenseController {
         status
       } = req.body;
 
-      if (companyName !== undefined) record.companyName = companyName;
       if (expenseType !== undefined) record.expenseType = parseInt(expenseType);
       if (amount !== undefined) record.amount = parseFloat(amount);
       if (remark !== undefined) record.remark = remark || null;
@@ -99,6 +96,7 @@ export class AdvanceExpenseController {
     try {
       const {
         keyword,
+        companyId,
         type,
         status,
         page = 1,
@@ -122,13 +120,17 @@ export class AdvanceExpenseController {
       if (type && type > 0) {
         queryBuilder = queryBuilder.andWhere('expense.expenseType = :type', { type: parseInt(type as string) });
       }
+      if (companyId && companyId > 0) {
+        queryBuilder = queryBuilder.andWhere('expense.companyId = :companyId', { companyId: parseInt(companyId as string) });
+      }
 
       const [records, total] = await queryBuilder
+        .innerJoinAndSelect('expense.company', 'company')
         .innerJoinAndSelect('expense.creator', 'creator')
         .innerJoinAndSelect('expense.updater', 'updater')
         .leftJoinAndSelect('expense.details', 'details')
         .leftJoinAndSelect('details.expenseType', 'expenseType')
-        .select(['expense', 'creator.name', 'updater.name', 'details', 'expenseType'])
+        .select(['expense', 'company', 'creator.name', 'updater.name', 'details', 'expenseType'])
         .orderBy('expense.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)
@@ -197,7 +199,9 @@ export class AdvanceExpenseController {
 
     try {
       const { expenses, batchNo, businessYear } = req.body;
-      const userId = (req as any).user?.id || 'admin';
+
+      const userId = (req as any).user?.id;
+      if (!userId) return errorResponse(res, 401, '未授权', null);
 
       if (!expenses || !Array.isArray(expenses) || expenses.length === 0) {
         await queryRunner.rollbackTransaction();
@@ -222,11 +226,23 @@ export class AdvanceExpenseController {
         detailTypeNameToId.set(type.name, type.id);
       });
 
+      const companies = await queryRunner.manager.find(CompanyInfo, {
+        where: { status: 1 }
+      });
+      const companyNameToId: Map<string, number> = new Map();
+      companies.forEach(company => {
+        companyNameToId.set(company.companyName, company.id);
+      });
+
       for (let i = 0; i < expenses.length; i++) {
         const item = expenses[i];
         if (!item.companyName) {
           await queryRunner.rollbackTransaction();
           return errorResponse(res, 400, `第${i + 1}行：单位名称不能为空`);
+        }
+        if (!companyNameToId.has(item.companyName)) {
+          await queryRunner.rollbackTransaction();
+          return errorResponse(res, 400, `第${i + 1}行：单位名称 "${item.companyName}" 不存在于系统中`);
         }
         if (!item.expenseType) {
           await queryRunner.rollbackTransaction();
@@ -248,8 +264,7 @@ export class AdvanceExpenseController {
         const expense = new AdvanceExpense();
         expense.batchNo = currentBatchNo;
         expense.advanceCode = item.advanceCode || this.generateAdvanceCode();
-        expense.companyId = item.companyId ? parseInt(item.companyId) : 0;
-        expense.companyName = item.companyName;
+        expense.companyId = companyNameToId.get(item.companyName) || 0;
         expense.expenseType = expenseTypeId;
         expense.amount = parseFloat(item.amount);
         expense.remark = item.remark || null;

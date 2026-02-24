@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { CompanyInfo } from '../models/company-info.entity';
 import { PaymentReceive } from '../models/payment-receive.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
@@ -6,6 +7,8 @@ import { In } from 'typeorm';
 
 export class PaymentClearingController {
   private paymentReceiveRepository = AppDataSource.getRepository(PaymentReceive);
+  private companyInfoRepository = AppDataSource.getRepository(CompanyInfo);
+  
 
   async importPaymentReceive(req: any, res: Response) {
     try {
@@ -21,24 +24,29 @@ export class PaymentClearingController {
       const importedRecords: PaymentReceive[] = [];
       const errors: string[] = [];
 
+      const companies = await this.companyInfoRepository.find({
+        where: { status: 1 }
+      });
+      const companyNameToId: Map<string, number> = new Map();
+      companies.forEach(company => {
+        companyNameToId.set(company.companyName, company.id);
+      });
+
       for (let i = 0; i < receives.length; i++) {
         const item = receives[i];
 
         if (!item.companyName) {
-          errors.push(`第${i + 1}行：单位名称不能为空`);
-          continue;
+          return errorResponse(res, 400, `第${i + 1}行：单位名称不能为空`);
         }
-
-        if (!item.receiveDate) {
-          errors.push(`第${i + 1}行：到款日期不能为空`);
-          continue;
+        if (!companyNameToId.has(item.companyName)) {
+          return errorResponse(res, 400, `第${i + 1}行：单位名称 "${item.companyName}" 不存在于系统中`);
         }
 
         const payment = new PaymentReceive();
         payment.receiveType = type;
         payment.receiveDate = new Date(item.receiveDate);
         payment.sapCode = item.sapCode || null;
-        payment.companyName = item.companyName;
+        payment.companyId = companyNameToId.get(item.companyName) || 0;
         payment.customerName = item.customerName || null;
         payment.projectName = item.projectName || null;
         payment.receiveBank = item.receiveBank || null;
@@ -121,7 +129,7 @@ export class PaymentClearingController {
 
   async getReceiveList(req: any, res: Response) {
     try {
-      const { receiveType, companyName, status, batchNo, page = 1, size = 10 } = req.query;
+      const { receiveType, companyName, status, batchNo, received, page = 1, size = 10 } = req.query;
       const pageNum = parseInt(page as string);
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
@@ -142,11 +150,15 @@ export class PaymentClearingController {
       if (batchNo) {
         queryBuilder = queryBuilder.andWhere('receive.batchNo = :batchNo', { batchNo });
       }
+      if (received !== undefined) {
+        queryBuilder = queryBuilder.andWhere('receive.received = :received', { received: parseInt(received as string) });
+      }
 
       const [records, total] = await queryBuilder
+        .innerJoinAndSelect('receive.company', 'company')
         .innerJoinAndSelect('receive.creator', 'creator')
         .innerJoinAndSelect('receive.updater', 'updater')
-        .select(['receive', 'creator.name', 'updater.name'])
+        .select(['receive', 'company', 'creator.name', 'updater.name'])
         .orderBy('receive.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)

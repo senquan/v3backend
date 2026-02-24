@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { CompanyInfo } from './company-info.entity';
 import { User } from './user.entity';
 
 @Entity('fixed_deposit')
@@ -15,8 +16,8 @@ export class FixedDeposit {
   @Column({ type: 'date', comment: '起息日期' })
   startDate!: Date;
 
-  @Column({ type: 'varchar', length: 100, comment: '单位名称' })
-  companyName!: string;
+  @Column({ type: 'bigint', comment: '单位ID' })
+  companyId!: number;
 
   @Column({ type: 'decimal', precision: 18, scale: 2, comment: '金额' })
   amount!: number;
@@ -61,6 +62,10 @@ export class FixedDeposit {
   lastInterestDate!: Date | null;
 
   // 关系映射
+  @ManyToOne(() => CompanyInfo)
+  @JoinColumn({ name: 'companyId' })
+  company: CompanyInfo | null = null;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'createdBy' })
   creator!: User;

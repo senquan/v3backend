@@ -29,7 +29,7 @@ router.get('/loan-deposit-summary/:id', (req, res: Response) => financeControlle
 
 router.post('/import-deposit', (req, res: Response) => importDepositController.importDeposit(req, res));
 
-router.get('/fixed-deposits', (req, res: Response) => importDepositController.getImportDepositRecords(req, res));
+router.get('/fixed-deposits', (req, res: Response) => importDepositController.getFixedDepositRecords(req, res));
 
 router.put('/import-deposit/:id/confirm', (req, res: Response) => importDepositController.confirmRecord(req, res));
 

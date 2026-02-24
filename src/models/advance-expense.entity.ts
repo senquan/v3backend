@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
-import { User } from './user.entity';
 import { AdvanceExpenseDetail } from './advance-expense-detail.entity';
+import { CompanyInfo } from './company-info.entity';
+import { User } from './user.entity';
 
 @Entity('advance_expense')
 export class AdvanceExpense {
@@ -12,9 +13,6 @@ export class AdvanceExpense {
 
   @Column({ type: 'bigint', comment: '单位ID' })
   companyId!: number;
-
-  @Column({ type: 'varchar', length: 100, comment: '单位名称' })
-  companyName!: string;
 
   @Column({ type: 'smallint', comment: '费用类型：1-利息，2-其他' })
   expenseType!: number;
@@ -45,6 +43,11 @@ export class AdvanceExpense {
 
   @UpdateDateColumn({ type: 'timestamp', comment: '最后修改时间' })
   updatedAt!: Date;
+
+  // 关系映射
+  @ManyToOne(() => CompanyInfo)
+  @JoinColumn({ name: 'companyId' })
+  company: CompanyInfo | null = null;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'createdBy' })

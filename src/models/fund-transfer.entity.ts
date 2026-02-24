@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { CompanyInfo } from './company-info.entity';
 import { User } from './user.entity';
 
 @Entity('fund_transfer')
@@ -9,8 +10,8 @@ export class FundTransfer {
   @Column({ type: 'varchar', length: 50, comment: '转账编号' })
   transferCode!: string;
 
-  @Column({ type: 'varchar', length: 100, comment: '单位名称' })
-  companyName!: string;
+  @Column({ type: 'bigint', comment: '单位ID' })
+  companyId!: number;
 
   @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, comment: '转账金额' })
   transferAmount!: number;
@@ -51,6 +52,11 @@ export class FundTransfer {
   @Column({ type: 'varchar', length: 50, nullable: true, comment: '导入批次号' })
   batchNo!: string | null;
 
+  // 关系映射
+  @ManyToOne(() => CompanyInfo)
+  @JoinColumn({ name: 'companyId' })
+  company: CompanyInfo | null = null;
+  
   @ManyToOne(() => User)
   @JoinColumn({ name: 'createdBy' })
   creator!: User;

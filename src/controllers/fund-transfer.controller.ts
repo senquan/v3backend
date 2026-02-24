@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { CompanyInfo } from '../models/company-info.entity';
 import { FundTransfer } from '../models/fund-transfer.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
@@ -11,7 +12,7 @@ export class FundTransferController {
     try {
       const {
         transferCode,
-        companyName,
+        companyId,
         transferAmount,
         transferType,
         transferDate,
@@ -22,8 +23,8 @@ export class FundTransferController {
         remark
       } = req.body;
 
-      if (!companyName) {
-        return errorResponse(res, 400, '单位名称不能为空');
+      if (!companyId) {
+        return errorResponse(res, 400, '单位编号不能为空');
       }
       if (!transferAmount || parseFloat(transferAmount) <= 0) {
         return errorResponse(res, 400, '转账金额必须大于0');
@@ -39,7 +40,7 @@ export class FundTransferController {
 
       const transfer = new FundTransfer();
       transfer.transferCode = transferCode || this.generateTransferCode();
-      transfer.companyName = companyName;
+      transfer.companyId = companyId;
       transfer.transferAmount = parseFloat(transferAmount);
       transfer.transferType = parseInt(transferType);
       transfer.transferDate = new Date(transferDate);
@@ -68,7 +69,6 @@ export class FundTransferController {
       }
 
       const {
-        companyName,
         transferAmount,
         transferType,
         transferDate,
@@ -79,7 +79,6 @@ export class FundTransferController {
         remark
       } = req.body;
 
-      if (companyName !== undefined) record.companyName = companyName;
       if (transferAmount !== undefined) record.transferAmount = parseFloat(transferAmount);
       if (transferType !== undefined) record.transferType = parseInt(transferType);
       if (transferDate !== undefined) record.transferDate = new Date(transferDate);
@@ -102,11 +101,13 @@ export class FundTransferController {
   async getTransferList(req: any, res: Response) {
     try {
       const { 
-        companyName, 
+        keyword,
+        companyId,
         type, 
         transferStatus, 
         startDate, 
         endDate,
+        isLoan,
         page = 1, 
         size = 10 
       } = req.query;
@@ -117,9 +118,6 @@ export class FundTransferController {
 
       let queryBuilder = this.fundTransferRepository.createQueryBuilder('transfer');
 
-      if (companyName) {
-        queryBuilder = queryBuilder.andWhere('transfer.companyName LIKE :companyName', { companyName: `%${companyName}%` });
-      }
       if (type && type > 0) {
         queryBuilder = queryBuilder.andWhere('transfer.transferType = :transferType', { transferType: parseInt(type as string) });
       }
@@ -132,11 +130,21 @@ export class FundTransferController {
       if (endDate) {
         queryBuilder = queryBuilder.andWhere('transfer.transferDate <= :endDate', { endDate: new Date(endDate as string) });
       }
+      if (keyword) {
+        queryBuilder = queryBuilder.andWhere('company.companyName LIKE :keyword', { keyword: `%${keyword}%` });
+      }
+      if (companyId) {
+        queryBuilder = queryBuilder.andWhere('transfer.companyId = :companyId', { companyId: parseInt(companyId as string) });
+      }
+      if (isLoan) {
+        queryBuilder = queryBuilder.andWhere('transfer.isLoan = :isLoan', { isLoan: parseInt(isLoan as string) });
+      }
 
       const [items, total] = await queryBuilder
+        .innerJoinAndSelect('transfer.company', 'company')
         .innerJoinAndSelect('transfer.creator', 'creator')
         .innerJoinAndSelect('transfer.updater', 'updater')
-        .select(['transfer', 'creator.name', 'updater.name'])
+        .select(['transfer', 'company', 'creator.name', 'updater.name'])
         .orderBy('transfer.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)
@@ -190,12 +198,24 @@ export class FundTransferController {
       const type = parseInt(transferType) || 1;
       const currentBatchNo = batchNo || (type === 1 ? `UP${Date.now()}` : `DOWN${Date.now()}`);
 
+      const companies = await queryRunner.manager.find(CompanyInfo, {
+        where: { status: 1 }
+      });
+      const companyNameToId: Map<string, number> = new Map();
+      companies.forEach(company => {
+        companyNameToId.set(company.companyName, company.id);
+      });
+
       for (let i = 0; i < transfers.length; i++) {
         const item = transfers[i];
 
         if (!item.companyName) {
           await queryRunner.rollbackTransaction();
           return errorResponse(res, 400, `第${i + 1}行：单位名称不能为空`);
+        }
+        if (!companyNameToId.has(item.companyName)) {
+          await queryRunner.rollbackTransaction();
+          return errorResponse(res, 400, `第${i + 1}行：单位名称 "${item.companyName}" 不存在于系统中`);
         }
         if (!item.transferAmount || parseFloat(item.transferAmount) <= 0) {
           await queryRunner.rollbackTransaction();
@@ -209,7 +229,7 @@ export class FundTransferController {
         const transfer = new FundTransfer();
         transfer.batchNo = currentBatchNo;
         transfer.transferCode = item.transferCode || this.generateTransferCode();
-        transfer.companyName = item.companyName;
+        transfer.companyId = companyNameToId.get(item.companyName) || 0;
         transfer.transferAmount = parseFloat(item.transferAmount);
         transfer.transferType = type;
         transfer.transferDate = new Date(item.transferDate);

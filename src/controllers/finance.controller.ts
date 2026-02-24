@@ -153,6 +153,7 @@ export class FinanceController {
 export class ImportDepositController {
   private fixedDepositRepository = AppDataSource.getRepository(FixedDeposit);
   private dictRepository = AppDataSource.getRepository(Dict);
+  private companyRepository = AppDataSource.getRepository(CompanyInfo);
 
   async importDeposit(req: any, res: Response) {
     try {
@@ -177,6 +178,21 @@ export class ImportDepositController {
         return acc;
       }, {} as Record<string, number>);
 
+      // 获取存款类型字典
+      const depositPeriodData = await this.dictRepository.find({ where: { group: 3 }, select: ['value', 'name'] });
+      const depositPeriodMap = depositPeriodData.reduce((acc, cur) => {
+        acc[cur.name] = Number(cur.value);
+        return acc;
+      }, {} as Record<string, number>);
+
+      const companies = await this.companyRepository.find({
+        where: { status: 1 }
+      });
+      const companyNameToId: Map<string, number> = new Map();
+      companies.forEach(company => {
+        companyNameToId.set(company.companyName, company.id);
+      });
+
       for (let i = 0; i < deposits.length; i++) {
         const item = deposits[i];
 
@@ -199,7 +215,10 @@ export class ImportDepositController {
           errors.push(`第${i + 1}行：单位名称不能为空`);
           continue;
         }
-
+        if (!companyNameToId.has(item.companyName)) {
+          errors.push(`第${i + 1}行：单位名称 "${item.companyName}" 不存在于系统中`);
+          continue;
+        }
         if (!item.depositAmount || parseFloat(item.depositAmount) <= 0) {
           errors.push(`第${i + 1}行：金额必须大于0`);
           continue;
@@ -215,15 +234,18 @@ export class ImportDepositController {
           continue;
         }
 
-        const depositPeriod = parseInt(item.depositPeriod) || 3;
+        if (!item.depositPeriod || !depositPeriodMap[item.depositPeriod]) {
+          errors.push(`第${i + 1}行：存期类型 ${item.depositPeriod} 不存在`);
+          continue;
+        }
 
         const fixedDeposit = new FixedDeposit();
         fixedDeposit.depositCode = item.depositCode;
-        fixedDeposit.depositType = parseInt(item.depositType) || 1;
+        fixedDeposit.depositType = depositTypeMap[item.depositType];
         fixedDeposit.startDate = new Date(item.startDate);
-        fixedDeposit.companyName = item.companyName;
+        fixedDeposit.companyId = companyNameToId.get(item.companyName) || 0;
         fixedDeposit.amount = parseFloat(item.depositAmount);
-        fixedDeposit.depositPeriod = depositPeriod;
+        fixedDeposit.depositPeriod = depositPeriodMap[item.depositPeriod];
         fixedDeposit.endDate = new Date(item.endDate);
         fixedDeposit.remark = item.remark || null;
         fixedDeposit.earlyRelease = 0;
@@ -269,9 +291,9 @@ export class ImportDepositController {
     }
   }
 
-  async getImportDepositRecords(req: any, res: Response) {
+  async getFixedDepositRecords(req: any, res: Response) {
     try {
-      const { keyword, status, startDate, endDate, page = 1, size = 10 } = req.query;
+      const { keyword, status, companyId, isReleased, startDate, endDate, page = 1, size = 10 } = req.query;
       const pageNum = parseInt(page as string);
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
@@ -290,10 +312,17 @@ export class ImportDepositController {
       if (endDate) {
         queryBuilder = queryBuilder.andWhere('deposit.endDate <= :endDate', { endDate: new Date(`${endDate} 23:59:59`) });
       }
+      if (companyId) {
+        queryBuilder = queryBuilder.andWhere('deposit.companyId = :companyId', { companyId: parseInt(companyId as string) });
+      }
+      if (isReleased) {
+        queryBuilder = queryBuilder.andWhere('deposit.earlyRelease = :isReleased', { isReleased: parseInt(isReleased as string) });
+      }
 
       const [records, total] = await queryBuilder
+        .leftJoinAndSelect('deposit.company', 'company')
         .innerJoinAndSelect('deposit.creator', 'creator')
-        .select(['deposit', 'creator.name'])
+        .select(['deposit', 'company', 'creator.name'])
         .orderBy('deposit.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)
