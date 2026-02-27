@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { In } from 'typeorm';
 import { CompanyInfo } from '../models/company-info.entity';
 import { Dict } from '../models/dict.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
@@ -293,13 +294,16 @@ export class ImportDepositController {
 
   async getFixedDepositRecords(req: any, res: Response) {
     try {
-      const { keyword, status, companyId, isReleased, startDate, endDate, page = 1, size = 10 } = req.query;
+      const { keyword, type, status, companyId, isReleased, startDate, endDate, page = 1, size = 10 } = req.query;
       const pageNum = parseInt(page as string);
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
 
       let queryBuilder = this.fixedDepositRepository.createQueryBuilder('deposit');
-
+      
+      if (type && type > 0) {
+        queryBuilder = queryBuilder.andWhere('deposit.depositType = :type', { type: parseInt(type as string) });
+      }
       if (keyword) {
         queryBuilder = queryBuilder.andWhere('(deposit.companyName LIKE :keyword OR deposit.batchNo LIKE :keyword)', { keyword: `%${keyword}%` });
       }
@@ -354,18 +358,23 @@ export class ImportDepositController {
 
   async batchConfirm(req: any, res: Response) {
     try {
-      const { batchNo } = req.body;
-
-      if (!batchNo) {
-        return errorResponse(res, 400, '批次号不能为空');
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
       }
 
-      const result = await this.fixedDepositRepository.update(
-        { batchNo, status: 1 },
-        { status: 2 }
-      );
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return errorResponse(res, 400, '请选择要确认的记录');
+      }
 
-      return successResponse(res, { affected: result.affected }, `批量确认成功，共确认 ${result.affected} 条记录`);
+      const numIds = ids.map((id: string | number) => parseInt(id as string));
+      const result = await this.fixedDepositRepository.update(
+            { id: In(ids), status: 1 },
+            { status: 2, updatedBy: userId }
+          );
+
+      return successResponse(res, result, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error) {
       return errorResponse(res, 500, `确认失败: ${error}`);
     }

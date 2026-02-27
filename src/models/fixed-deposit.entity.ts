@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, UpdateDateColumn } from 'typeorm';
 import { CompanyInfo } from './company-info.entity';
 import { User } from './user.entity';
 
@@ -54,6 +54,12 @@ export class FixedDeposit {
 
   @CreateDateColumn({ type: 'timestamp', comment: '创建时间' })
   createdAt!: Date;
+  
+  @Column({ type: 'bigint', default: 3, comment: '最后修改人' })
+  updatedBy!: number;
+
+  @UpdateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', comment: '最后修改时间' })
+  updatedAt!: Date;
 
   @Column({ type: 'varchar', length: 50, comment: '导入批次号' })
   batchNo!: string;
@@ -69,4 +75,8 @@ export class FixedDeposit {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'createdBy' })
   creator!: User;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'updatedBy' })
+  updater!: User;
 }

@@ -33,7 +33,7 @@ router.get('/fixed-deposits', (req, res: Response) => importDepositController.ge
 
 router.put('/import-deposit/:id/confirm', (req, res: Response) => importDepositController.confirmRecord(req, res));
 
-router.put('/import-deposit/batch/confirm', (req, res: Response) => importDepositController.batchConfirm(req, res));
+router.post('/import-deposit/confirm', (req, res: Response) => importDepositController.batchConfirm(req, res));
 
 router.delete('/import-deposit/:id', (req, res: Response) => importDepositController.deleteRecord(req, res));
 
