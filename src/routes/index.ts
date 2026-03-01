@@ -6,6 +6,7 @@ import financeRoutes from './finance.routes';
 import systemRoutes from './system.routes';
 import basicRoutes from './basic.routes';
 import reportRoutes from './report.routes';
+import roleRoutes from './role.routes';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.use('/v1/finance', financeRoutes);
 router.use('/v1/system', systemRoutes);
 router.use('/v1/basic', basicRoutes);
 router.use('/v1/report', reportRoutes);
+router.use('/v1/roles', roleRoutes);
 
 // 处理404情况 - 当没有匹配到路由时
 router.use('*', (req: Request, res: Response) => {
