@@ -51,4 +51,10 @@ export class Settings {
 
   @Column({ name: 'is_deleted', type: 'smallint', default: 0 })
   isDeleted!: number;
+  
+  @Column({ type: 'bigint', comment: '创建人' })
+  createdBy!: number;
+  
+  @Column({ type: 'bigint', comment: '最后修改人' })
+  updatedBy!: number;
 }
