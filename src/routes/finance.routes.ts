@@ -31,6 +31,8 @@ router.post('/import-deposit', (req, res: Response) => importDepositController.i
 
 router.get('/fixed-deposits', (req, res: Response) => importDepositController.getFixedDepositRecords(req, res));
 
+router.put('/fixed-deposits/:id/release', (req, res: Response) => importDepositController.releaseFixedDeposit(req, res));
+
 router.put('/import-deposit/:id/confirm', (req, res: Response) => importDepositController.confirmRecord(req, res));
 
 router.post('/import-deposit/confirm', (req, res: Response) => importDepositController.batchConfirm(req, res));

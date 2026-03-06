@@ -2,13 +2,10 @@ import { Response } from 'express';
 import { CompanyInfo } from '../models/company-info.entity';
 import { PaymentReceive } from '../models/payment-receive.entity';
 import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
-import { DepositLoanSummaryService } from '../services/deposit-loan-summary.service';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
-import { In, DataSource } from 'typeorm';
+import { In, QueryRunner } from 'typeorm';
 
-const depositLoanSummaryRepository = AppDataSource.getRepository(DepositLoanSummary);
-const depositLoanSummaryService = new DepositLoanSummaryService(depositLoanSummaryRepository);
 const dataSource = AppDataSource;
 
 export class PaymentClearingController {
@@ -142,7 +139,8 @@ export class PaymentClearingController {
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
 
-      let queryBuilder = this.paymentReceiveRepository.createQueryBuilder('receive');
+      let queryBuilder = this.paymentReceiveRepository.createQueryBuilder('receive')
+        .andWhere('receive.status != 4');
 
       if (receiveType && receiveType > 0) {
         queryBuilder = queryBuilder.andWhere('receive.receiveType = :receiveType', { receiveType: parseInt(receiveType as string) });
@@ -179,9 +177,16 @@ export class PaymentClearingController {
   }
 
   async updateReceive(req: any, res: Response) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
       const id = parseInt(req.params.id);
-      const record = await this.paymentReceiveRepository.findOne({ where: { id } });
+      const record = await queryRunner.manager.findOne(PaymentReceive, {
+        relations: ['company'],
+        where: { id } 
+      });
 
       if (!record) {
         return errorResponse(res, 404, '记录不存在');
@@ -222,10 +227,16 @@ export class PaymentClearingController {
         record.status = parseInt(status);
       }
 
-      const updated = await this.paymentReceiveRepository.save(record);
+      const updated = await queryRunner.manager.save(PaymentReceive, record);
+      await this._updateDepositIncomingSummary(record.companyId, queryRunner);
+
+      await queryRunner.commitTransaction();
       return successResponse(res, updated, '更新成功');
-    } catch (error) {
-      return errorResponse(res, 500, `更新失败: ${error}`);
+    } catch (error: any) {
+      await queryRunner.rollbackTransaction();
+      return errorResponse(res, 500, `更新失败: ${error.message || error}`);
+    } finally {
+      await queryRunner.release();
     }
   }
 
@@ -266,38 +277,10 @@ export class PaymentClearingController {
       if (companyIds.length > 0) {
         // 3. 为每个公司重新计算到款汇总
         for (const item of companyIds) {
-          const companyId = parseInt(item.companyId);
-            
-          // 计算到款总额
-          const amount = await queryRunner.manager.createQueryBuilder(PaymentReceive, 'payment')
-            .select('SUM(payment.accountAmount)', 'receiveAmount')
-            .where('payment.companyId = :companyId', { companyId })
-            .andWhere('payment.received = 1')
-            .andWhere('payment.status = 2')
-            .getRawOne();
-            
-          const receiveAmount = amount.receiveAmount || 0;
-          // 查找或创建汇总记录
-          const summary = await queryRunner.manager.findOne(DepositLoanSummary, {
-            relations: ['company'],
-            where: { companyId }
-          });
-            
-          if (!summary) {
-            const record = new DepositLoanSummary();
-            record.companyId = companyId;
-            record.depositIncoming = receiveAmount;
-            record.lastStatDate = new Date();
-            await queryRunner.manager.save(DepositLoanSummary, record);
-          } else {
-            summary.depositIncoming = receiveAmount;
-            summary.lastStatDate = new Date();
-            await queryRunner.manager.save(DepositLoanSummary, summary);
-          }
+          await this._updateDepositIncomingSummary(parseInt(item.companyId), queryRunner);
         }
       }
         
-      // 提交事务
       await queryRunner.commitTransaction();
         
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
@@ -313,15 +296,46 @@ export class PaymentClearingController {
     }
   }
 
+  private async _updateDepositIncomingSummary(companyId: number, queryRunner: QueryRunner) {
+    // 计算到款总额
+    const amount = await queryRunner.manager.createQueryBuilder(PaymentReceive, 'payment')
+      .select('SUM(payment.accountAmount)', 'receiveAmount')
+      .where('payment.companyId = :companyId', { companyId })
+      .andWhere('payment.received = 1')
+      .andWhere('payment.status = 2')
+      .getRawOne();
+      
+    const receiveAmount = amount.receiveAmount || 0;
+    // 查找或创建汇总记录
+    let summary = await queryRunner.manager.findOne(DepositLoanSummary, {
+      relations: ['company'],
+      where: { companyId }
+    });
+      
+    if (!summary) {
+      summary = new DepositLoanSummary();
+      summary.companyId = companyId;
+    }
+    summary.depositIncoming = receiveAmount;
+    summary.lastStatDate = new Date();
+    await queryRunner.manager.save(DepositLoanSummary, summary);
+  }
+
   async deleteReceive(req: any, res: Response) {
     try {
       const { id } = req.body;
       
       const idNum = parseInt(id);
-      const record = await this.paymentReceiveRepository.findOne({ where: { id: idNum } });
+      const record = await this.paymentReceiveRepository.findOne({
+        relations: ['company'],
+        where: { id: idNum }
+      });
 
       if (!record) {
         return errorResponse(res, 404, '记录不存在');
+      }
+      if (record.status !== 1) {
+        return errorResponse(res, 400, '只能删除未确认的记录');
       }
 
       record.status = 4;
