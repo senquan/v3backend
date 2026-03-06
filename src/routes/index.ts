@@ -8,6 +8,7 @@ import basicRoutes from './basic.routes';
 import reportRoutes from './report.routes';
 import roleRoutes from './role.routes';
 import operationLogRoutes from './operation-log.routes';
+import uploadRoutes  from './upload.routes';
 
 const router = Router();
 
@@ -21,6 +22,7 @@ router.use('/v1/basic', basicRoutes);
 router.use('/v1/report', reportRoutes);
 router.use('/v1/roles', roleRoutes);
 router.use('/v1/logs', operationLogRoutes);
+router.use('/v1/upload', uploadRoutes);
 
 // 处理404情况 - 当没有匹配到路由时
 router.use('*', (req: Request, res: Response) => {

@@ -11,6 +11,9 @@ export class User {
   @Column({ type: 'varchar', length: 50, unique: true, comment: '用户名' })
   username!: string;
 
+  @Column({ type: 'varchar', length: 50, unique: true, comment: '内部编号' })
+  innerCode!: string;
+
   @Column({ type: 'varchar', length: 255, comment: '密码' })
   password!: string;
 

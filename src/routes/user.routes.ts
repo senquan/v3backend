@@ -10,6 +10,9 @@ const userController = new UserController();
 router.get('/me', authMiddleware, (req: Request, res: Response) => userController.getProfile(req, res));
 
 // 更新用户信息
+router.put('/:id', authMiddleware, (req: Request, res: Response) => userController.updateUser(req, res));
+
+// 更新用户个人信息
 router.put('/profile', authMiddleware, (req: Request, res: Response) => userController.updateProfile(req, res));
 
 // 更新用户密码
@@ -26,6 +29,9 @@ router.post(
   ],
   (req: Request, res: Response) => userController.register(req, res)
 );
+
+// 获取本地用户列表
+router.get('/local', authMiddleware, userController.getLocalList);
 
 // 更新用户角色
 router.put('/:id/role', authMiddleware, (req: Request, res: Response) => userController.updateRole(req, res));

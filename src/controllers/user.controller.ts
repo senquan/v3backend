@@ -83,13 +83,70 @@ export class UserController {
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
+
+  // 获取本地用户列表
+  async getLocalList(req: Request, res: Response): Promise<Response> {
+    try {
+      const { page = 1, pageSize = 20, keyword, type, status } = req.query;
+
+      // 计算分页
+      const pageNum = Number(page);
+      const pageSizeNum = Number(pageSize);
+      const skip = (pageNum - 1) * pageSizeNum;
+
+      let queryBuilder = AppDataSource.getRepository(User)
+        .createQueryBuilder('user')
+        .leftJoin('user.company', 'company')
+        .select([
+            'user.id',
+            'user.innerCode',
+            'user.name',
+            'user.username',
+            'user.email',
+            'user.phone',
+            'user.notes',
+            'user.createdAt',
+            'user.lastLoginAt',
+            'user.status',
+            'company'
+        ]);
+        
+      if (keyword) {
+          queryBuilder.andWhere('(user.name LIKE :keyword OR user.phone LIKE :keyword OR user.email LIKE :keyword)', { keyword: `%${keyword}%` });
+      }
+      if (status) {
+          queryBuilder.andWhere('user.status = :status', { status: Number(status) });
+      }
+      queryBuilder.orderBy('user.id', 'DESC');
+
+      // 获取总数和分页数据
+      const [records, total] = await queryBuilder
+        .skip(skip)
+        .take(pageSizeNum)
+        .getManyAndCount();
+
+      const roles = await AppDataSource.getRepository(Role).find(
+        { where: { isDeleted: 0 } }
+      );
+      
+      return successResponse(res, {
+        records,
+        roles,
+        total,
+        page: pageNum,
+        pageSize: pageSizeNum
+      }, '获取用户列表成功');
+    } catch (error) {
+      logger.error('获取用户列表失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
   
   // 获取用户信息
   async getProfile(req: Request, res: Response): Promise<Response> {
     try {
       // 从请求中获取用户ID（通过auth中间件设置）
       const userId = (req as any).user?.id;
-      
       if (!userId) return errorResponse(res, 401, '未授权', null);
       
       // 查询用户信息
@@ -144,6 +201,34 @@ export class UserController {
         email: email || user.email,
         phone: phone || user.phone,
         avatar: avatar || user.avatar,
+        updatedAt: new Date()
+      });
+
+      return successResponse(res, null, '用户信息更新成功');
+    } catch (error) {
+      logger.error('更新用户信息失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 更新用户信息
+  async updateUser(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id, name, companyId, status, notes } = req.body;
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id }
+      });
+
+      if (!user) return errorResponse(res, 404, '用户不存在', null);
+
+      // 更新用户信息
+      await userRepository.update(user.id, {
+        name: name || user.name,
+        companyId: companyId || user.companyId,
+        status: status || 0,
+        notes: notes || user.notes,
         updatedAt: new Date()
       });
 
@@ -217,7 +302,7 @@ export class UserController {
       newUser.name = '';
       newUser.email = '';
       newUser.avatar = '';
-      newUser.status = 1;
+      newUser.status = 0;
       newUser.createdAt = new Date();
       newUser.updatedAt = new Date();
       newUser.lastLoginAt = new Date();
@@ -293,21 +378,20 @@ export class UserController {
 
   async updateRole(req: Request, res: Response): Promise<Response> {
     try {
-      const staffId = req.params.id;
+      const userId = req.params.id;
       const { roles } = req.body;
 
       const userRepository = AppDataSource.getRepository(User);
       const user = await userRepository.createQueryBuilder("user")
-      .leftJoinAndSelect('user.staff', 'staff')
       .leftJoinAndSelect('user.roles','roles')
-      .where("staff.id = :staffId", { staffId: staffId })
+      .where("user.id = :userId", { userId: userId })
       .getOne();
 
       if (!user) return errorResponse(res, 404, '用户不存在', null);
 
       const oldRoles = user.roles?.map(role => role.id) || []
       const newRoles = roles.filter((role: any) => typeof role === "number")
-   
+      
       // 只有当标签发生变化时才更新
       if (JSON.stringify([...oldRoles].sort()) !== JSON.stringify([...newRoles].sort())) {
 
@@ -327,12 +411,14 @@ export class UserController {
         })
         
         // 创建新的关联关系
-        const roleRelations = newRoles.map((roleId: number) => ({
-          userId: user.id,
-          roleId
-        }))
-        
-        await userRoleRepository.insert(roleRelations)
+        if (newRoles.length > 0) {
+          const roleRelations = newRoles.map((roleId: number) => ({
+            userId: user.id,
+            roleId
+          }))
+          
+          await userRoleRepository.insert(roleRelations)
+        }
       }
 
       await userRepository.save(user);
