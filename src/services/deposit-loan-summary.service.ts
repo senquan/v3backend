@@ -1,9 +1,12 @@
 import { Repository } from 'typeorm';
 import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
+import { PaymentReceive } from '../models/payment-receive.entity';
+import { AppDataSource } from '../config/database';
 
 export class DepositLoanSummaryService {
   constructor(
     private depositLoanSummaryRepository: Repository<DepositLoanSummary>,
+    private paymentReceiveRepository: Repository<PaymentReceive> = AppDataSource.getRepository(PaymentReceive)
   ) {}
 
   async findAll(query: any) {

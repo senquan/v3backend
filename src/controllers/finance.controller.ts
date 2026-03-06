@@ -3,6 +3,7 @@ import { In } from 'typeorm';
 import { CompanyInfo } from '../models/company-info.entity';
 import { Dict } from '../models/dict.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
+import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { ProfitPayment } from '../models/profit-payment.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
@@ -339,44 +340,158 @@ export class ImportDepositController {
   }
 
   async confirmRecord(req: any, res: Response) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
       const id = parseInt(req.params.id);
-      const record = await this.fixedDepositRepository.findOne({ where: { id } });
+      const userId = (req as any).user?.id || 'admin';
+      const record = await queryRunner.manager.findOne(FixedDeposit, { where: { id } });
 
       if (!record) {
         return errorResponse(res, 404, '记录不存在');
       }
 
-      record.status = 2;
-      const updated = await this.fixedDepositRepository.save(record);
+      if (record.status !== 1) {
+        return errorResponse(res, 400, '记录已确认或状态不正确');
+      }
 
+      record.status = 2;
+      record.updatedBy = userId;
+      const updated = await queryRunner.manager.save(FixedDeposit, record);
+
+      const companyId = record.companyId;
+
+      // 计算活期转入定期总额 (depositToFixed)
+      const toFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
+        .select('SUM(deposit.amount)', 'total')
+        .where('deposit.companyId = :companyId', { companyId })
+        .andWhere('deposit.status = 2')
+        .getRawOne();
+      const depositToFixed = parseFloat(toFixedResult.total) || 0;
+
+      // 计算定期转入活期总额 (depositFromFixed)
+      const fromFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
+        .select('SUM(deposit.releaseAmount)', 'total')
+        .where('deposit.companyId = :companyId', { companyId })
+        .andWhere('deposit.status = 2')
+        .andWhere('deposit.earlyRelease = 1')
+        .getRawOne();
+      const depositFromFixed = parseFloat(fromFixedResult.total) || 0;
+
+      // 查找或创建汇总记录
+      let summary = await queryRunner.manager.findOne(DepositLoanSummary, {
+        where: { companyId }
+      });
+
+      if (!summary) {
+        summary = new DepositLoanSummary();
+        summary.companyId = companyId;
+      }
+
+      summary.depositToFixed = depositToFixed;
+      summary.depositFromFixed = depositFromFixed;
+      summary.lastStatDate = new Date();
+      await queryRunner.manager.save(DepositLoanSummary, summary);
+
+      await queryRunner.commitTransaction();
       return successResponse(res, updated, '确认成功');
-    } catch (error) {
-      return errorResponse(res, 500, `确认失败: ${error}`);
+    } catch (error: any) {
+      await queryRunner.rollbackTransaction();
+      console.error('确认定期存款记录失败:', error);
+      return errorResponse(res, 500, `确认失败: ${error.message || error}`);
+    } finally {
+      await queryRunner.release();
     }
   }
 
   async batchConfirm(req: any, res: Response) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
       const userId = (req as any).user?.id;
       if (!userId) {
-        return errorResponse(res, 401, '未授权');
+        return errorResponse(res, 403, '未授权');
       }
-
       const { ids } = req.body;
+
       if (!ids || !Array.isArray(ids) || ids.length === 0) {
         return errorResponse(res, 400, '请选择要确认的记录');
       }
 
       const numIds = ids.map((id: string | number) => parseInt(id as string));
-      const result = await this.fixedDepositRepository.update(
-            { id: In(ids), status: 1 },
-            { status: 2, updatedBy: userId }
-          );
 
-      return successResponse(res, result, `确认成功，共确认 ${result.affected} 条记录`);
-    } catch (error) {
-      return errorResponse(res, 500, `确认失败: ${error}`);
+      // 1. 更新状态为已确认（status: 2）
+      const result = await queryRunner.manager.update(
+        FixedDeposit,
+        { id: In(numIds), status: 1 },
+        { status: 2, updatedBy: userId }
+      );
+
+      if (result.affected === 0) {
+        throw new Error('没有记录被更新，可能记录已被确认或不存在');
+      }
+
+      // 2. 获取涉及的公司 ID
+      const companyIds = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
+        .select('deposit.companyId', 'companyId')
+        .where('deposit.id IN (:...ids)', { ids: numIds })
+        .distinct(true)
+        .getRawMany();
+
+      if (companyIds.length > 0) {
+        // 3. 为每个公司重新计算汇总
+        for (const item of companyIds) {
+          const companyId = parseInt(item.companyId);
+
+          // 计算活期转入定期总额 (depositToFixed)
+          const toFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
+            .select('SUM(deposit.amount)', 'total')
+            .where('deposit.companyId = :companyId', { companyId })
+            .andWhere('deposit.status = 2')
+            .andWhere('deposit.depositType = 2')
+            .getRawOne();
+          const depositToFixed = parseFloat(toFixedResult.total) || 0;
+
+          // 计算定期转入活期总额 (depositFromFixed)
+          const fromFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
+            .select('SUM(deposit.releaseAmount)', 'totalRelease')
+            .where('deposit.companyId = :companyId', { companyId })
+            .andWhere('deposit.status = 2')
+            .andWhere('deposit.earlyRelease = 1')
+            .getRawOne();
+          const depositFromFixed = parseFloat(fromFixedResult.totalRelease) || 0;
+
+          // 查找或创建汇总记录
+          let summary = await queryRunner.manager.findOne(DepositLoanSummary, {
+            relations: ['company'],
+            where: { companyId }
+          });
+
+          if (!summary) {
+            summary = new DepositLoanSummary();
+            summary.companyId = companyId;
+          }
+
+          summary.depositToFixed = depositToFixed;
+          summary.depositFromFixed = depositFromFixed;
+          summary.lastStatDate = new Date();
+          await queryRunner.manager.save(DepositLoanSummary, summary);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
+      return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
+    } catch (error: any) {
+      await queryRunner.rollbackTransaction();
+      console.error('确认定期存款记录失败:', error);
+      return errorResponse(res, 500, `确认失败: ${error.message || error}`);
+    } finally {
+      await queryRunner.release();
     }
   }
 

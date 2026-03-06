@@ -24,10 +24,10 @@ export class DepositLoanSummary {
   @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, comment: '活期存款-定期转入' })
   depositFromFixed!: number;
 
-  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, comment: '活期存款-上划下拨' })
+  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, comment: '活期存款-下拨' })
   depositTransferDown!: number;
 
-  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, comment: '活期存款-上划转入定期' })
+  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, comment: '活期存款-转入定期' })
   depositToFixed!: number;
 
   @Column({ type: 'jsonb', nullable: true, comment: '定期存款(JSON格式: {term: value})' })

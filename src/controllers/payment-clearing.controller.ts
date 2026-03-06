@@ -1,13 +1,20 @@
 import { Response } from 'express';
 import { CompanyInfo } from '../models/company-info.entity';
 import { PaymentReceive } from '../models/payment-receive.entity';
+import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
+import { DepositLoanSummaryService } from '../services/deposit-loan-summary.service';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
-import { In } from 'typeorm';
+import { In, DataSource } from 'typeorm';
+
+const depositLoanSummaryRepository = AppDataSource.getRepository(DepositLoanSummary);
+const depositLoanSummaryService = new DepositLoanSummaryService(depositLoanSummaryRepository);
+const dataSource = AppDataSource;
 
 export class PaymentClearingController {
   private paymentReceiveRepository = AppDataSource.getRepository(PaymentReceive);
   private companyInfoRepository = AppDataSource.getRepository(CompanyInfo);
+  private dataSource = dataSource;
   
 
   async importPaymentReceive(req: any, res: Response) {
@@ -63,6 +70,7 @@ export class PaymentClearingController {
             continue;
           }
           payment.accountAmount = parseFloat(item.accountAmount);
+          payment.received = 1;
         } else {
           if (!item.billNo) {
             errors.push(`第${i + 1}行：票据号码不能为空`);
@@ -222,23 +230,86 @@ export class PaymentClearingController {
   }
 
   async confirmReceive(req: any, res: Response) {
+    const queryRunner = this.dataSource.createQueryRunner();
+      
     try {
       const { ids } = req.body;
-
+  
       if (!ids || !Array.isArray(ids) || ids.length === 0) {
         return errorResponse(res, 400, '请选择要确认的记录');
       }
-
+  
       const numIds = ids.map((id: string | number) => parseInt(id as string));
-      
-      const result = await this.paymentReceiveRepository.update(
+        
+      // 开启事务
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+        
+      // 1. 更新状态为已确认（status: 2）
+      const result = await queryRunner.manager.update(
+        PaymentReceive,
         { id: In(numIds), status: 1 },
         { status: 2 }
       );
-
+        
+      if (result.affected === 0) {
+        throw new Error('没有记录被更新，可能记录已被确认或不存在');
+      }
+        
+      // 2. 获取涉及的公司 ID
+      const companyIds = await queryRunner.manager.createQueryBuilder(PaymentReceive, 'receive')
+        .select('receive.companyId', 'companyId')
+        .where('receive.id IN (:...ids)', { ids: numIds })
+        .distinct(true)
+        .getRawMany();
+      
+      if (companyIds.length > 0) {
+        // 3. 为每个公司重新计算到款汇总
+        for (const item of companyIds) {
+          const companyId = parseInt(item.companyId);
+            
+          // 计算到款总额
+          const amount = await queryRunner.manager.createQueryBuilder(PaymentReceive, 'payment')
+            .select('SUM(payment.accountAmount)', 'receiveAmount')
+            .where('payment.companyId = :companyId', { companyId })
+            .andWhere('payment.received = 1')
+            .andWhere('payment.status = 2')
+            .getRawOne();
+            
+          const receiveAmount = amount.receiveAmount || 0;
+          // 查找或创建汇总记录
+          const summary = await queryRunner.manager.findOne(DepositLoanSummary, {
+            relations: ['company'],
+            where: { companyId }
+          });
+            
+          if (!summary) {
+            const record = new DepositLoanSummary();
+            record.companyId = companyId;
+            record.depositIncoming = receiveAmount;
+            record.lastStatDate = new Date();
+            await queryRunner.manager.save(DepositLoanSummary, record);
+          } else {
+            summary.depositIncoming = receiveAmount;
+            summary.lastStatDate = new Date();
+            await queryRunner.manager.save(DepositLoanSummary, summary);
+          }
+        }
+      }
+        
+      // 提交事务
+      await queryRunner.commitTransaction();
+        
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
-    } catch (error) {
-      return errorResponse(res, 500, `确认失败: ${error}`);
+    } catch (error: any) {
+      // 回滚事务
+      await queryRunner.rollbackTransaction();
+        
+      console.error('确认收款失败:', error);
+      return errorResponse(res, 500, `确认失败：${error.message || error}`);
+    } finally {
+      // 释放连接
+      await queryRunner.release();
     }
   }
 

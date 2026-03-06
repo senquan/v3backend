@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { CompanyInfo } from '../models/company-info.entity';
 import { FundTransfer } from '../models/fund-transfer.entity';
+import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
 import { In } from 'typeorm';
@@ -260,6 +261,10 @@ export class FundTransferController {
   }
 
   async confirmTransfer(req: any, res: Response) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
       const type = parseInt(req.body.type) || 1;
       const { ids } = req.body;
@@ -270,14 +275,65 @@ export class FundTransferController {
 
       const numIds = ids.map((id: string | number) => parseInt(id as string));
 
-      const result = await this.fundTransferRepository.update(
+      const result = await queryRunner.manager.update(
+        FundTransfer,
         { id: In(numIds), transferStatus: 1, transferType: type },
         { transferStatus: 2 }
       );
 
+      if (result.affected === 0) {
+        throw new Error('没有记录被更新，可能记录已被确认或不存在');
+      }
+
+      const companyIds = await queryRunner.manager.createQueryBuilder(FundTransfer, 'transfer')
+        .select('transfer.companyId', 'companyId')
+        .where('transfer.id IN (:...ids)', { ids: numIds })
+        .distinct(true)
+        .getRawMany();
+
+      if (companyIds.length > 0) {
+        for (const item of companyIds) {
+          const companyId = parseInt(item.companyId);
+
+          let summary = await queryRunner.manager.findOne(DepositLoanSummary, {
+            relations: ['company'],
+            where: { companyId }
+          });
+
+          if (!summary) {
+            summary = new DepositLoanSummary();
+            summary.companyId = companyId;
+          }
+
+          if (type === 1) {
+            const upAmountResult = await queryRunner.manager.createQueryBuilder(FundTransfer, 'transfer')
+              .select('SUM(transfer.transferAmount)', 'total')
+              .where('transfer.companyId = :companyId', { companyId })
+              .andWhere('transfer.transferType = 1')
+              .andWhere('transfer.transferStatus = 2')
+              .getRawOne();
+            summary.depositTransferUp = upAmountResult.total || 0;
+          } else if (type === 2) {
+            const downAmountResult = await queryRunner.manager.createQueryBuilder(FundTransfer, 'transfer')
+              .select('SUM(transfer.transferAmount)', 'total')
+              .where('transfer.companyId = :companyId', { companyId })
+              .andWhere('transfer.transferType = 2')
+              .andWhere('transfer.transferStatus = 2')
+              .getRawOne();
+            summary.depositTransferDown = downAmountResult.total || 0;
+          }
+          summary.lastStatDate = new Date();
+          await queryRunner.manager.save(DepositLoanSummary, summary);
+        }
+      }
+      await queryRunner.commitTransaction();
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
-    } catch (error) {
-      return errorResponse(res, 500, `确认失败: ${error}`);
+    } catch (error: any) {
+      await queryRunner.rollbackTransaction();
+      console.error('确认资金调拨失败:', error);
+      return errorResponse(res, 500, `确认失败: ${error.message || error}`);
+    } finally {
+      await queryRunner.release();
     }
   }
 
