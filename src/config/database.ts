@@ -25,6 +25,7 @@ import { ProfitPayment } from '../models/profit-payment.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
 import { PaymentReceive } from '../models/payment-receive.entity';
 import { OperationLog } from '../models/operation-log.entity';
+import { FixedDepositLog } from '../models/fixed-deposit-log.entity';
 
 // 加载环境变量
 dotenv.config();
@@ -42,7 +43,7 @@ export const AppDataSource = new DataSource({
   logging: process.env.NODE_ENV !== 'production',
   entities: [ClearingSummary, CompanyInfo, DailyCurrentInterestDetail, DailyFixedInterestDetail, FixedToCurrentInterestDetail, DepositLoanSummary, Dict,
     FundTransfer, InviteCode, Permission, Role, RolePermission, User, UserRole,
-    InterestRate, InternalDeposit, AdvanceExpense, AdvanceExpenseDetail, AdvanceExpenseType, ProfitPayment, FixedDeposit, Settings, PaymentReceive, OperationLog],
+    InterestRate, InternalDeposit, AdvanceExpense, AdvanceExpenseDetail, AdvanceExpenseType, ProfitPayment, FixedDeposit, Settings, PaymentReceive, OperationLog, FixedDepositLog],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });

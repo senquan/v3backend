@@ -7,6 +7,7 @@ import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { ProfitPayment } from '../models/profit-payment.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
+import { FixedDepositLog } from '../models/fixed-deposit-log.entity';
 import { RedisCacheService } from '../services/cache.service';
 import { ProfitPaymentService } from '../services/profit-payment.service';
 
@@ -327,7 +328,7 @@ export class ImportDepositController {
       const [records, total] = await queryBuilder
         .leftJoinAndSelect('deposit.company', 'company')
         .innerJoinAndSelect('deposit.creator', 'creator')
-        .innerJoinAndSelect('deposit.updater', 'updater')
+        .leftJoinAndSelect('deposit.updater', 'updater')
         .select(['deposit', 'company', 'creator.name', 'updater.name'])
         .orderBy('deposit.createdAt', 'DESC')
         .skip(skip)
@@ -387,6 +388,17 @@ export class ImportDepositController {
       record.updatedBy = userId;
       const updated = await queryRunner.manager.save(record);
 
+      // 创建资金释放记录
+      const fundLog = new FixedDepositLog();
+      fundLog.depositId = record.id;
+      fundLog.logType = 1;
+      fundLog.logTime = record.releaseDate;
+      fundLog.amount = Number(releaseAmount);
+      fundLog.remark = `定期资金释放，释放日期：${record.releaseDate.toLocaleDateString()}`;
+      fundLog.createdBy = userId;
+      fundLog.createdAt = new Date();
+      await queryRunner.manager.save(fundLog);
+
       // 更新定期转入活期总额
       await this._updateDepositFixedSummary(record.companyId, queryRunner);
 
@@ -401,13 +413,21 @@ export class ImportDepositController {
   }
 
   private async _updateDepositFixedSummary(companyId: number, queryRunner: QueryRunner) {
-    // 计算活期转入定期总额 (depositToFixed)
+    // 计算活期转入定期总额 (depositToFixed) 及现有定期
     const toFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
-      .select('SUM(deposit.amount)', 'total')
       .where('deposit.companyId = :companyId', { companyId })
       .andWhere('deposit.status = 2')
-      .getRawOne();
-    const depositToFixed = parseFloat(toFixedResult.total) || 0;
+      .getMany();
+      
+    let depositToFixed = 0;
+    const depositFixedObj: Record<string, number> = {};
+    for (const item of toFixedResult) {
+      const periodKey = item.depositPeriod.toString();
+      depositFixedObj[periodKey] = Number(item.remainingAmount) + (depositFixedObj[periodKey] || 0);
+      if (item.depositType === 2) {
+        depositToFixed += Number(item.remainingAmount);
+      }
+    }
 
     // 计算定期转入活期总额 (depositFromFixed)
     const fromFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
@@ -431,6 +451,7 @@ export class ImportDepositController {
 
     summary.depositToFixed = depositToFixed;
     summary.depositFromFixed = depositFromFixed;
+    summary.depositFixed = depositFixedObj;
     summary.lastStatDate = new Date();
     await queryRunner.manager.save(DepositLoanSummary, summary);
   }
@@ -473,6 +494,7 @@ export class ImportDepositController {
     }
   }
 
+  // 定期存款记录批量确认
   async batchConfirm(req: any, res: Response) {
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
@@ -513,40 +535,8 @@ export class ImportDepositController {
         // 3. 为每个公司重新计算汇总
         for (const item of companyIds) {
           const companyId = parseInt(item.companyId);
-
-          // 计算活期转入定期总额 (depositToFixed)
-          const toFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
-            .select('SUM(deposit.amount)', 'total')
-            .where('deposit.companyId = :companyId', { companyId })
-            .andWhere('deposit.status = 2')
-            .andWhere('deposit.depositType = 2')
-            .getRawOne();
-          const depositToFixed = parseFloat(toFixedResult.total) || 0;
-
-          // 计算定期转入活期总额 (depositFromFixed)
-          const fromFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
-            .select('SUM(deposit.releaseAmount)', 'totalRelease')
-            .where('deposit.companyId = :companyId', { companyId })
-            .andWhere('deposit.status = 2')
-            .andWhere('deposit.earlyRelease = 1')
-            .getRawOne();
-          const depositFromFixed = parseFloat(fromFixedResult.totalRelease) || 0;
-
-          // 查找或创建汇总记录
-          let summary = await queryRunner.manager.findOne(DepositLoanSummary, {
-            relations: ['company'],
-            where: { companyId }
-          });
-
-          if (!summary) {
-            summary = new DepositLoanSummary();
-            summary.companyId = companyId;
-          }
-
-          summary.depositToFixed = depositToFixed;
-          summary.depositFromFixed = depositFromFixed;
-          summary.lastStatDate = new Date();
-          await queryRunner.manager.save(DepositLoanSummary, summary);
+          // 更新定期转入活期总额
+          await this._updateDepositFixedSummary(companyId, queryRunner);
         }
       }
 

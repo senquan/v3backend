@@ -55,7 +55,7 @@ export class FixedDeposit {
   @CreateDateColumn({ type: 'timestamp', comment: '创建时间' })
   createdAt!: Date;
   
-  @Column({ type: 'bigint', default: 3, comment: '最后修改人' })
+  @Column({ type: 'bigint', comment: '最后修改人' })
   updatedBy!: number;
 
   @UpdateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', comment: '最后修改时间' })
