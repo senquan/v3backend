@@ -80,6 +80,8 @@ router.get('/advance-expense/summary', (req, res: Response) => advanceExpenseCon
 
 router.get('/expense-types', (req, res: Response) => advanceExpenseController.getExpenseTypeList(req, res));
 
+router.get('/expense-detail-types', (req, res: Response) => advanceExpenseController.getExpenseDetailTypeList(req, res));
+
 // 利润上缴管理
 router.get('/profit-payments', (req, res: Response) => profitPaymentController.getList(req, res));
 

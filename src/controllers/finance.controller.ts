@@ -259,7 +259,7 @@ export class ImportDepositController {
         fixedDeposit.status = 1;
         fixedDeposit.createdBy = userId;
         fixedDeposit.batchNo = currentBatchNo;
-        fixedDeposit.lastInterestDate = new Date(item.startDate);
+        fixedDeposit.lastInterestDate = this._getRecentInterestDate(fixedDeposit);
 
         try {
           const saved = await this.fixedDepositRepository.save(fixedDeposit);
@@ -567,6 +567,33 @@ export class ImportDepositController {
     } catch (error) {
       return errorResponse(res, 500, `删除失败: ${error}`);
     }
+  }
+
+  _getRecentInterestDate(fixedDeposit: FixedDeposit) {
+  
+    const period = Number(fixedDeposit.depositPeriod)
+    const startDate = new Date(fixedDeposit.startDate)
+    const endDate = new Date(fixedDeposit.endDate)
+
+    // 3个月或已到期：直接设为到期日
+    if (period === 2 || endDate <= new Date()) {
+      return fixedDeposit.endDate
+    }
+
+    // 6个月、12个月：起息日 + 90天
+    if (period > 2) {
+      const nextDate = new Date(startDate)
+      nextDate.setDate(nextDate.getDate() + 90)
+      
+      // 若加90天后，距离到期日在15天内，则设置为到期日
+      const diffDays = Math.floor((endDate.getTime() - nextDate.getTime()) / (1000 * 60 * 60 * 24))
+      if (diffDays <= 15) {
+        return fixedDeposit.endDate
+      }
+      
+      return nextDate
+    }
+    return null
   }
 }
 

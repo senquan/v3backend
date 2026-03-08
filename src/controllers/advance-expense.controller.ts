@@ -12,34 +12,47 @@ import { DictService } from '../services/dict.service';
 
 export class AdvanceExpenseController {
   private advanceExpenseRepository = AppDataSource.getRepository(AdvanceExpense);
+  private advanceExpenseTypeRepository = AppDataSource.getRepository(AdvanceExpenseType);
   private dictRepository = AppDataSource.getRepository(Dict);
   private dictService = new DictService(this.dictRepository, new RedisCacheService());
 
   async createExpense(req: any, res: Response) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     try {
       const {
         advanceCode,
+        businessYear,
         companyId,
         expenseType,
         amount,
         remark,
-        businessYear
+        expenseDetail
       } = req.body;
 
       if (!companyId) {
+        await queryRunner.rollbackTransaction();
         return errorResponse(res, 400, '单位编号不能为空');
       }
       if (!amount || parseFloat(amount) <= 0) {
+        await queryRunner.rollbackTransaction();
         return errorResponse(res, 400, '金额必须大于0');
       }
       if (!expenseType) {
+        await queryRunner.rollbackTransaction();
         return errorResponse(res, 400, '费用类型不能为空');
       }
       if (!businessYear) {
+        await queryRunner.rollbackTransaction();
         return errorResponse(res, 400, '业务年份不能为空');
       }
 
-      const userId = (req as any).user?.id || 'admin';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        await queryRunner.rollbackTransaction();
+        return errorResponse(res, 400, '未授权');
+      }
 
       const expense = new AdvanceExpense();
       expense.advanceCode = advanceCode || this.generateAdvanceCode();
@@ -52,11 +65,53 @@ export class AdvanceExpenseController {
       expense.createdBy = userId;
       expense.updatedBy = userId;
 
-      const saved = await this.advanceExpenseRepository.save(expense);
+      const saved = await queryRunner.manager.save(expense);
+
+      if (expenseDetail && expenseDetail.length > 0) {
+
+        const expenseDetailType = await queryRunner.manager.find(AdvanceExpenseType, {
+          where: { status: 2 }
+        });
+        const detailTypeNameToId: Map<string, number> = new Map();
+        expenseDetailType.forEach(type => {
+          detailTypeNameToId.set(type.name, type.id);
+        });
+        let sum = 0;
+        for (const item of expenseDetail) {
+          let expenseDetailTypeId = detailTypeNameToId.get(item.name);
+            if (!expenseDetailTypeId) {
+              const newType = await queryRunner.manager.save(AdvanceExpenseType, {
+                name: item.name,
+                status: 2,
+                remark: `${expense.advanceCode} 创建`,
+                createdBy: userId,
+                createdAt: new Date()
+              })
+              expenseDetailTypeId = newType.id;
+              detailTypeNameToId.set(item.name, expenseDetailTypeId);
+            }
+            const detail = new AdvanceExpenseDetail();
+            detail.expenseId = saved.id;
+            detail.expenseTypeId = expenseDetailTypeId;
+            detail.amount = parseFloat(item.amount || '0');
+            sum += detail.amount;
+            await queryRunner.manager.save(AdvanceExpenseDetail, detail);
+        }
+        if (sum !== Number(expense.amount)) {
+          await queryRunner.rollbackTransaction();
+          return errorResponse(res, 400, `费用明细金额之和与总金额不一致${sum} / ${expense.amount}`);
+        }
+      }
+
+      await queryRunner.commitTransaction();
       return successResponse(res, saved, '创建成功');
-    } catch (error) {
+    } catch (error: any) {
+      await queryRunner.rollbackTransaction();
       return errorResponse(res, 500, `创建失败: ${error}`);
+    } finally {
+      await queryRunner.release();
     }
+     
   }
 
   async updateExpense(req: any, res: Response) {
@@ -151,6 +206,17 @@ export class AdvanceExpenseController {
     }
   }
 
+  async getExpenseDetailTypeList(req: any, res: Response) {
+    try {
+      const records = await this.advanceExpenseTypeRepository.find({
+        where: { status: 2 }
+      });
+      return successResponse(res, { records, total: records.length }, '查询成功');
+    } catch (error) {
+      return errorResponse(res, 500, `查询失败: ${error}`);
+    }
+  }
+
   async deleteExpense(req: any, res: Response) {
     try {
       const { id } = req.body;
@@ -214,7 +280,7 @@ export class AdvanceExpenseController {
       const dictTypes = await this.dictService.findByGroup(2);
       const typeNameToId: Map<string, number> = new Map();
       dictTypes.forEach(dict => {
-        typeNameToId.set(dict.name, dict.id);
+        typeNameToId.set(dict.name, Number(dict.value));
       });
 
       // 代垫费用细目类型
