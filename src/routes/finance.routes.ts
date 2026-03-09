@@ -91,11 +91,15 @@ router.get('/profit-payments/batch/:batchNo', (req, res: Response) => profitPaym
 
 router.get('/profit-payments/:id', (req, res: Response) => profitPaymentController.getById(req, res));
 
-router.post('/profit-payments', (req, res: Response) => profitPaymentController.create(req, res));
+router.get('/profit-payment/logs', (req, res: Response) => profitPaymentController.getProfitPaymentLogs(req, res));
 
-router.put('/profit-payments/:id', (req, res: Response) => profitPaymentController.update(req, res));
+router.post('/profit-payment', (req, res: Response) => profitPaymentController.create(req, res));
 
-router.delete('/profit-payments', (req, res: Response) => profitPaymentController.delete(req, res));
+router.post('/profit-payment/:id/turn-over', (req, res: Response) => profitPaymentController.createTurnOver(req, res));
+
+router.put('/profit-payment/:id', (req, res: Response) => profitPaymentController.update(req, res));
+
+router.delete('/profit-payment', (req, res: Response) => profitPaymentController.delete(req, res));
 
 router.post('/profit-payments/confirm', (req, res: Response) => profitPaymentController.confirm(req, res));
 

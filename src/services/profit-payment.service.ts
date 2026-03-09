@@ -1,7 +1,8 @@
-import { Repository, In } from 'typeorm';
+import { Repository, In, Not } from 'typeorm';
 import { ProfitPayment } from '../models/profit-payment.entity';
 import { CompanyInfo } from '../models/company-info.entity';
 import { RedisCacheService } from './cache.service';
+import { ProfitPaymentLog } from '../models/profit-payment-log.entity';
 
 export interface ProfitPaymentImportData {
   companyId?: number;
@@ -19,6 +20,7 @@ export class ProfitPaymentService {
 
   constructor(
     private profitPaymentRepository: Repository<ProfitPayment>,
+    private profitPaymentLogRepository: Repository<ProfitPaymentLog>,
     private companyRepository: Repository<CompanyInfo>,
     private cacheService: RedisCacheService,
   ) {}
@@ -76,6 +78,33 @@ export class ProfitPaymentService {
     };
   }
 
+  async findAllLogs(query: any) {
+    const { id, page = 1, size = 10 } = query;
+    const pageNum = parseInt(page as string);
+    const pageSize = parseInt(size as string);
+    const skip = (pageNum - 1) * pageSize;
+
+    const [records, total] = await this.profitPaymentLogRepository
+      .createQueryBuilder('log')
+      .leftJoinAndSelect('log.creator', 'creator')
+      .select([
+        'log',
+        'creator.name',
+      ])
+      .where('log.paymentId = :id', { id: parseInt(id as string) })
+      .orderBy('log.createdAt', 'DESC')
+      .skip(skip)
+      .take(pageSize)
+      .getManyAndCount();
+
+    return {
+      records,
+      total,
+      page: pageNum,
+      size: pageSize
+    };
+  }
+
   async findOne(id: number) {
     const cacheKey = this.getCacheKey('id', id);
     const cached = await this.cacheService.get<ProfitPayment>(cacheKey);
@@ -84,7 +113,7 @@ export class ProfitPaymentService {
     }
 
     const result = await this.profitPaymentRepository.findOne({
-      where: { id },
+      where: { id, status: Not(3) },
       relations: ['company']
     });
     if (result) {
@@ -95,7 +124,7 @@ export class ProfitPaymentService {
 
   async findByCompanyAndYear(companyId: number, businessYear: number) {
     return await this.profitPaymentRepository.findOne({
-      where: { companyId, businessYear }
+      where: { companyId, businessYear, status: Not(3) }
     });
   }
 
@@ -109,7 +138,7 @@ export class ProfitPaymentService {
   async create(data: Partial<ProfitPayment>, userId: number) {
     const existing = await this.findByCompanyAndYear(data.companyId!, data.businessYear!);
     if (existing) {
-      throw new Error(`该单位 ${data.businessYear} 年的利润上缴记录已存在`);
+      throw new Error(`该单位 ${data.businessYear} 年的利润上缴计划已存在`);
     }
 
     const profitPayment = this.profitPaymentRepository.create({
@@ -127,33 +156,65 @@ export class ProfitPaymentService {
     return result;
   }
 
-  async update(id: number, data: Partial<ProfitPayment>, userId: number) {
+  async createTurnOver(data: { id: number, amount: number }, userId: number) {
+    const profitPayment = await this.findOne(data.id);
+    if (!profitPayment) {
+      throw new Error('利润上缴计划不存在');
+    }
+
+    if (profitPayment.status !== 2) {
+      throw new Error('只有待确认已生效状态的记录才能上缴');
+    }
+
+    const turnOver = this.profitPaymentLogRepository.create({
+      paymentId: profitPayment.id,
+      logType: 1,
+      logTime: new Date(),
+      amount: data.amount,
+      createdBy: userId
+    });
+
+    const result = await this.profitPaymentLogRepository.save(turnOver);
+    await this.clearCache();
+    return result;
+  }
+
+  async update(id: number, data: Partial<ProfitPayment>, userId: number, turnOver: boolean = false) {
     const profitPayment = await this.findOne(id);
     if (!profitPayment) {
       throw new Error('利润上缴记录不存在');
     }
 
-    if (profitPayment.status === 2) {
-      throw new Error('已生效的记录不能修改');
+    if (!turnOver) {
+      if (profitPayment.status === 2) {
+        throw new Error('已生效的记录不能修改');
+      }
+      const existing = await this.findByCompanyAndYear(data.companyId!, data.businessYear!);
+      if (existing && Number(existing.id) !== id) {
+        throw new Error(`该单位 ${data.businessYear} 年的利润上缴计划已存在`);
+      }
     }
-
+    
     await this.profitPaymentRepository.update(id, {
       ...data,
-      updatedBy: userId
+      updatedBy: userId,
+      updatedAt: new Date()
     });
 
+    console.log({
+      ...data,
+      updatedBy: userId,
+      updatedAt: new Date()
+    })
+
     await this.clearCache();
-    return await this.findOne(id);
+    return turnOver ? { id } : await this.findOne(id);
   }
 
   async remove(id: number, userId: number) {
     const profitPayment = await this.findOne(id);
     if (!profitPayment) {
       throw new Error('利润上缴记录不存在');
-    }
-
-    if (profitPayment.status === 2) {
-      throw new Error('已生效的记录不能删除');
     }
 
     await this.profitPaymentRepository.update(id, {

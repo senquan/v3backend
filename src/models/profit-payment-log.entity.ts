@@ -1,16 +1,16 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { FixedDeposit } from './fixed-deposit.entity';
+import { ProfitPayment } from './profit-payment.entity';
 import { User } from './user.entity';
 
-@Entity('fixed_deposit_log')
-export class FixedDepositLog {
+@Entity('profit_payment_log')
+export class ProfitPaymentLog {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id!: number;
 
   @Column({ type: 'bigint' })
-  depositId!: number;
+  paymentId!: number;
 
-  @Column({ type: 'smallint', comment: '记录类型：1-定期资金释放' })
+  @Column({ type: 'smallint', comment: '记录类型：1-上缴利润' })
   logType!: number;
 
   @Column({ type: 'date', comment: '日志时间' })
@@ -33,7 +33,7 @@ export class FixedDepositLog {
   @JoinColumn({ name: 'createdBy' })
   creator!: User;
 
-  @ManyToOne(() => FixedDeposit)
-  @JoinColumn({ name: 'depositId' })
-  deposit!: FixedDeposit;
+  @ManyToOne(() => ProfitPayment)
+  @JoinColumn({ name: 'paymentId' })
+  payment!: ProfitPayment;
 }

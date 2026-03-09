@@ -8,6 +8,7 @@ import { ProfitPayment } from '../models/profit-payment.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
 import { FixedDepositLog } from '../models/fixed-deposit-log.entity';
+import { ProfitPaymentLog } from '../models/profit-payment-log.entity';
 import { RedisCacheService } from '../services/cache.service';
 import { ProfitPaymentService } from '../services/profit-payment.service';
 
@@ -599,10 +600,12 @@ export class ImportDepositController {
 
 export class ProfitPaymentController {
   private profitPaymentRepository = AppDataSource.getRepository(ProfitPayment);
+  private profitPaymentLogRepository = AppDataSource.getRepository(ProfitPaymentLog);
   private companyRepository = AppDataSource.getRepository(CompanyInfo);
   private cacheService = new RedisCacheService();
   private profitPaymentService = new ProfitPaymentService(
     this.profitPaymentRepository,
+    this.profitPaymentLogRepository,
     this.companyRepository,
     this.cacheService
   );
@@ -641,36 +644,78 @@ export class ProfitPaymentController {
         return errorResponse(res, 401, '未授权');
       }
 
-      const { companyId, companyName, dueProfit1, dueProfit2, actualAmount, lastPaymentDate, businessYear } = req.body;
+      const { companyId, dueProfit1, dueProfit2, businessYear } = req.body;
 
-      if (!companyName && !companyId) {
+      if (!companyId) {
         return errorResponse(res, 400, '单位名称不能为空');
       }
       if (!businessYear) {
         return errorResponse(res, 400, '业务年份不能为空');
       }
 
-      let companyIdValue = companyId;
-      if (!companyIdValue && companyName) {
-        const company = await this.companyRepository.findOne({ where: { companyName } });
-        if (!company) {
-          return errorResponse(res, 400, '单位不存在');
-        }
-        companyIdValue = company.id;
+      const company = await this.companyRepository.findOne({ where: { id: companyId } });
+      if (!company) {
+        return errorResponse(res, 400, '单位不存在');
       }
 
       const record = await this.profitPaymentService.create({
-        companyId: companyIdValue,
+        companyId,
         dueProfit1: dueProfit1 ? parseFloat(dueProfit1) : 0,
         dueProfit2: dueProfit2 ? parseFloat(dueProfit2) : 0,
-        actualAmount: actualAmount ? parseFloat(actualAmount) : 0,
-        lastPaymentDate: lastPaymentDate ? new Date(lastPaymentDate) : null,
         businessYear: parseInt(businessYear)
       }, userId);
 
       return successResponse(res, record, '创建成功');
     } catch (error: any) {
       return errorResponse(res, 400, error.message || '创建失败');
+    }
+  }
+
+  async getProfitPaymentLogs(req: any, res: Response) {
+    try {
+      const result = await this.profitPaymentService.findAllLogs(req.query);
+      return successResponse(res, result, '查询成功');
+    } catch (error: any) {
+      return errorResponse(res, 500, `查询失败: ${error.message}`);
+    }
+  }
+
+  async createTurnOver(req: any, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
+
+      const { id, amount } = req.body;
+
+      if (isNaN(id)) {
+        return errorResponse(res, 400, '无效的记录ID');
+      }
+
+      const amoutValue = parseFloat(amount)
+      if (!amount || isNaN(amoutValue) || amoutValue <= 0) {
+        return errorResponse(res, 400, '金额不能为空');
+      }
+
+      const record = await this.profitPaymentService.findOne(id);
+      if (!record) {
+        return errorResponse(res, 404, '记录不存在');
+      }
+
+      await this.profitPaymentService.update(id, {
+        actualAmount: Number(record.actualAmount) + amoutValue,
+        lastPaymentDate: new Date()
+      }, userId, true);
+
+      const turnOverRecord = await this.profitPaymentService.createTurnOver({
+        id,
+        amount
+      }, userId);
+
+      return successResponse(res, turnOverRecord, '创建上缴成功');
+    } catch (error: any) {
+      return errorResponse(res, 400, error.message || '创建上缴失败');
     }
   }
 
@@ -686,14 +731,18 @@ export class ProfitPaymentController {
         return errorResponse(res, 400, '无效的记录ID');
       }
 
-      const { dueProfit1, dueProfit2, actualAmount, lastPaymentDate, status } = req.body;
+      const { companyId, dueProfit1, dueProfit2, businessYear } = req.body;
+
+      const company = await this.companyRepository.findOne({ where: { id: companyId } });
+      if (!company) {
+        return errorResponse(res, 400, '单位不存在');
+      }
 
       const record = await this.profitPaymentService.update(id, {
+        companyId,
         dueProfit1: dueProfit1 ? parseFloat(dueProfit1) : undefined,
         dueProfit2: dueProfit2 ? parseFloat(dueProfit2) : undefined,
-        actualAmount: actualAmount ? parseFloat(actualAmount) : undefined,
-        lastPaymentDate: lastPaymentDate ? new Date(lastPaymentDate) : undefined,
-        status: status ? parseInt(status) : undefined
+        businessYear: businessYear ? parseInt(businessYear) : undefined,
       }, userId);
 
       return successResponse(res, record, '更新成功');

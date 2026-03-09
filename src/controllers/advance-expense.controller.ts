@@ -117,7 +117,10 @@ export class AdvanceExpenseController {
   async updateExpense(req: any, res: Response) {
     try {
       const id = parseInt(req.params.id);
-      const record = await this.advanceExpenseRepository.findOne({ where: { id } });
+      const record = await this.advanceExpenseRepository.findOne({
+        relations: ['company'],
+        where: { id }
+      });
 
       if (!record) {
         return errorResponse(res, 404, '记录不存在');
@@ -137,7 +140,10 @@ export class AdvanceExpenseController {
       if (businessYear !== undefined) record.businessYear = parseInt(businessYear);
       if (status !== undefined) record.status = parseInt(status);
 
-      const userId = (req as any).user?.id || 'admin';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 400, '未授权');
+      }
       record.updatedBy = userId;
 
       const updated = await this.advanceExpenseRepository.save(record);
@@ -222,7 +228,10 @@ export class AdvanceExpenseController {
       const { id } = req.body;
 
       const idNum = parseInt(id);
-      const record = await this.advanceExpenseRepository.findOne({ where: { id: idNum } });
+      const record = await this.advanceExpenseRepository.findOne({
+        relations: ['company'],
+        where: { id: idNum }
+      });
 
       if (!record) {
         return errorResponse(res, 404, '记录不存在');

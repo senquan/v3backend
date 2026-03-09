@@ -19,9 +19,9 @@ router.get('/dicts/group/:group', dictController.getByGroup);
 router.get('/dicts/group/:group/value/:value', dictController.getNameByValue);
 router.get('/dicts/map/:group', dictController.getDictMap);
 router.get('/dicts/:id', dictController.getById);
-router.post('/dicts', dictController.create);
-router.put('/dicts/:id', dictController.update);
-router.delete('/dicts/:id', dictController.delete);
+router.post('/dicts', dictController.create.bind(dictController));
+router.put('/dicts/:id', dictController.update.bind(dictController));
+router.delete('/dicts/:id', dictController.delete.bind(dictController));
 
 // 备份管理
 router.get('/backups', backupController.getAll.bind(backupController));

@@ -102,16 +102,24 @@ export class DictController {
 
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { group, name, value, sort, status } = req.body;
+      const { group, name, sort, remark } = req.body;
+      let value = req.body.value;
 
-      if (!group || !name || !value) {
+      if (group === undefined || !name) {
         return errorResponse(res, 400, '分组、名称和值不能为空', null);
       }
+
+      if (value === undefined || value === '') {
+        value = await dictService.getNextValue(group);
+      }
+
+      console.log('value:', value);
 
       const dict = await dictService.create({
         group,
         name,
         value,
+        remark,
         sort: sort || 0
       });
 
@@ -129,12 +137,11 @@ export class DictController {
         return errorResponse(res, 400, '无效的字典ID', null);
       }
 
-      const { group, name, value, sort, status } = req.body;
+      const { name, remark, sort } = req.body;
 
       const dict = await dictService.update(id, {
-        group,
         name,
-        value,
+        remark,
         sort
       });
 

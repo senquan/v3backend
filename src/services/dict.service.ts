@@ -174,4 +174,16 @@ export class DictService {
     await this.cacheService.set(cacheKey, map, this.CACHE_TTL);
     return new Map(Object.entries(map));
   }
+
+  async getNextValue(group: number): Promise<string> {
+    const lastItem = await this.dictRepository.findOne({
+      where: { group },
+      order: { value: 'DESC' }
+    });
+
+    if (lastItem) {
+      return (parseInt(lastItem.value) + 1).toString();
+    }
+    return '1';
+  }
 }
