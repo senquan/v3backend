@@ -11,6 +11,7 @@ import { FixedDepositLog } from '../models/fixed-deposit-log.entity';
 import { ProfitPaymentLog } from '../models/profit-payment-log.entity';
 import { RedisCacheService } from '../services/cache.service';
 import { ProfitPaymentService } from '../services/profit-payment.service';
+import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
 
 export class FinanceController {
   private companyRepository = AppDataSource.getRepository(CompanyInfo);
@@ -404,6 +405,10 @@ export class ImportDepositController {
       await this._updateDepositFixedSummary(record.companyId, queryRunner);
 
       await queryRunner.commitTransaction();
+
+      // 提交后触发事件
+      summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, record.companyId);
+
       return successResponse(res, updated, '释放成功');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -485,6 +490,10 @@ export class ImportDepositController {
       await this._updateDepositFixedSummary(companyId, queryRunner);
 
       await queryRunner.commitTransaction();
+
+      // 提交后触发事件
+      summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, companyId);
+
       return successResponse(res, updated, '确认成功');
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
@@ -542,6 +551,13 @@ export class ImportDepositController {
       }
 
       await queryRunner.commitTransaction();
+
+      // 提交后触发汇总变更事件
+      if (companyIds.length > 0) {
+        for (const item of companyIds) {
+          summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, parseInt(item.companyId));
+        }
+      }
 
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error: any) {

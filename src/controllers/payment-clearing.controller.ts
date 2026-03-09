@@ -5,6 +5,7 @@ import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
 import { In, QueryRunner } from 'typeorm';
+import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
 
 const dataSource = AppDataSource;
 
@@ -231,6 +232,10 @@ export class PaymentClearingController {
       await this._updateDepositIncomingSummary(record.companyId, queryRunner);
 
       await queryRunner.commitTransaction();
+
+      // 提交后触发事件
+      summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, record.companyId);
+
       return successResponse(res, updated, '更新成功');
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
@@ -282,6 +287,13 @@ export class PaymentClearingController {
       }
         
       await queryRunner.commitTransaction();
+
+      // 4. 提交事务后，异步触发汇总变更事件
+      if (companyIds.length > 0) {
+        for (const item of companyIds) {
+          summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, parseInt(item.companyId));
+        }
+      }
         
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error: any) {
