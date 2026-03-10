@@ -223,7 +223,7 @@ export class ProfitPaymentService {
     });
 
     await this.clearCache();
-    return { id, status: 3 };
+    return { id, status: 3, companyId: profitPayment.companyId };
   }
 
   async confirm(id: number, userId: number) {

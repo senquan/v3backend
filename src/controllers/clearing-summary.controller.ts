@@ -37,6 +37,25 @@ export class ClearingSummaryController {
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
+
+  async update(req: Request, res: Response): Promise<Response> {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return errorResponse(res, 400, '无效的ID', null);
+      }
+
+      const result = await clearingSummaryService.update(id, req.body);
+      if (!result) {
+        return errorResponse(res, 404, '记录不存在', null);
+      }
+
+      return successResponse(res, result, '更新成功');
+    } catch (error) {
+      logger.error('更新清算汇总失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
 }
 
 export default new ClearingSummaryController();

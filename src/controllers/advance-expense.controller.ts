@@ -9,6 +9,7 @@ import { successResponse, errorResponse } from '../utils/response';
 import { In } from 'typeorm';
 import { RedisCacheService } from '../services/cache.service';
 import { DictService } from '../services/dict.service';
+import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
 
 export class AdvanceExpenseController {
   private advanceExpenseRepository = AppDataSource.getRepository(AdvanceExpense);
@@ -104,6 +105,9 @@ export class AdvanceExpenseController {
       }
 
       await queryRunner.commitTransaction();
+
+      summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, saved.companyId);
+
       return successResponse(res, saved, '创建成功');
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
@@ -134,6 +138,8 @@ export class AdvanceExpenseController {
         status
       } = req.body;
 
+      const oldAmount = Number(record.amount)
+
       if (expenseType !== undefined) record.expenseType = parseInt(expenseType);
       if (amount !== undefined) record.amount = parseFloat(amount);
       if (remark !== undefined) record.remark = remark || null;
@@ -147,6 +153,11 @@ export class AdvanceExpenseController {
       record.updatedBy = userId;
 
       const updated = await this.advanceExpenseRepository.save(record);
+
+      if (oldAmount !== parseFloat(amount)) {
+        summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, record.companyId);
+      }
+
       return successResponse(res, updated, '更新成功');
     } catch (error) {
       return errorResponse(res, 500, `更新失败: ${error}`);
@@ -240,6 +251,8 @@ export class AdvanceExpenseController {
       record.status = 3;
       await this.advanceExpenseRepository.save(record);
 
+      summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, record.companyId);
+
       return successResponse(res, null, '删除成功');
     } catch (error) {
       return errorResponse(res, 500, `删除失败: ${error}`);
@@ -260,6 +273,18 @@ export class AdvanceExpenseController {
         { id: In(numIds), status: 1 },
         { status: 2 }
       );
+
+      const companyIds = await this.advanceExpenseRepository.createQueryBuilder('expense')
+        .select('expense.companyId', 'companyId')
+        .where('expense.id IN (:...ids)', { ids: numIds })
+        .distinct(true)
+        .getRawMany();
+      
+      if (companyIds.length > 0) {
+        for (const item of companyIds) {
+          summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, parseInt(item.companyId));
+        }
+      }
 
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error) {

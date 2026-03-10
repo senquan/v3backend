@@ -14,6 +14,7 @@ router.use(authMiddleware);
 
 router.get('/clearing-summary', clearingSummaryController.getAll);
 router.get('/clearing-summary/:id', clearingSummaryController.getById);
+router.put('/clearing-summary/:id', clearingSummaryController.update);
 
 router.get('/deposit-loan-summary', depositLoanSummaryController.getAll);
 router.get('/deposit-loan-summary/:id', depositLoanSummaryController.getById);

@@ -681,6 +681,8 @@ export class ProfitPaymentController {
         businessYear: parseInt(businessYear)
       }, userId);
 
+      summaryEventEmitter.emit(SummaryEvents.PROFIT_PAYMENT_CHANGED, parseInt(companyId));
+
       return successResponse(res, record, '创建成功');
     } catch (error: any) {
       return errorResponse(res, 400, error.message || '创建失败');
@@ -729,6 +731,8 @@ export class ProfitPaymentController {
         amount
       }, userId);
 
+      summaryEventEmitter.emit(SummaryEvents.PROFIT_PAYMENT_CHANGED, record.companyId);
+
       return successResponse(res, turnOverRecord, '创建上缴成功');
     } catch (error: any) {
       return errorResponse(res, 400, error.message || '创建上缴失败');
@@ -761,6 +765,8 @@ export class ProfitPaymentController {
         businessYear: businessYear ? parseInt(businessYear) : undefined,
       }, userId);
 
+      summaryEventEmitter.emit(SummaryEvents.PROFIT_PAYMENT_CHANGED, companyId);
+
       return successResponse(res, record, '更新成功');
     } catch (error: any) {
       return errorResponse(res, 400, error.message || '更新失败');
@@ -779,7 +785,12 @@ export class ProfitPaymentController {
         return errorResponse(res, 400, '记录ID不能为空');
       }
 
-      await this.profitPaymentService.remove(parseInt(id), userId);
+      const result = await this.profitPaymentService.remove(parseInt(id), userId);
+
+      if (result && result.companyId) {
+        summaryEventEmitter.emit(SummaryEvents.PROFIT_PAYMENT_CHANGED, result.companyId);
+      }
+
       return successResponse(res, null, '删除成功');
     } catch (error: any) {
       return errorResponse(res, 400, error.message || '删除失败');
@@ -800,6 +811,19 @@ export class ProfitPaymentController {
 
       const numIds = ids.map((id: string | number) => parseInt(id as string));
       const result = await this.profitPaymentService.batchConfirm(numIds, userId);
+
+      const companyIds = await this.profitPaymentRepository
+        .createQueryBuilder('payment')
+        .select('payment.companyId', 'companyId')
+        .where('payment.id IN (:...ids)', { ids: numIds })
+        .distinct(true)
+        .getRawMany();
+
+      if (companyIds && companyIds.length > 0) {
+        companyIds.forEach(companyId => {
+          summaryEventEmitter.emit(SummaryEvents.PROFIT_PAYMENT_CHANGED, companyId.companyId);
+        });
+      }
 
       return successResponse(res, result, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error: any) {
