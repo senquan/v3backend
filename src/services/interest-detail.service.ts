@@ -31,6 +31,9 @@ export class InterestDetailService {
     if (endDate) {
       queryBuilder.andWhere('detail.interestDate <= :endDate', { endDate });
     }
+    if (query.accessableCompanyIds) {
+      queryBuilder.andWhere('detail.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
+    }
 
     queryBuilder.orderBy('detail.interestDate', 'DESC')
       .addOrderBy('detail.id', 'DESC')
@@ -69,6 +72,9 @@ export class InterestDetailService {
     if (isEstimate !== undefined && isEstimate !== '') {
       queryBuilder.andWhere('detail.isEstimate = :isEstimate', { isEstimate: parseInt(isEstimate as string) });
     }
+    if (query.accessableCompanyIds) {
+      queryBuilder.andWhere('detail.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
+    }
 
     queryBuilder.orderBy('detail.interestDate', 'DESC')
       .addOrderBy('detail.id', 'DESC')
@@ -103,6 +109,9 @@ export class InterestDetailService {
     }
     if (endDate) {
       queryBuilder.andWhere('detail.interestReleaseDate <= :endDate', { endDate });
+    }
+    if (query.accessableCompanyIds) {
+      queryBuilder.andWhere('detail.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
     }
 
     queryBuilder.orderBy('detail.interestReleaseDate', 'DESC')

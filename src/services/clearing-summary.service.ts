@@ -388,6 +388,10 @@ export class ClearingSummaryService {
       queryBuilder.andWhere('(summary.companyCode LIKE :keyword OR company.companyName LIKE :keyword)', { keyword: `%${keyword}%` });
     }
 
+    if (query.accessableCompanyIds) {
+      queryBuilder.andWhere('summary.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
+    }
+
     queryBuilder.orderBy('summary.sort', 'ASC')
       .addOrderBy('summary.lastStatDate', 'DESC')
       .skip(skip)
@@ -403,13 +407,19 @@ export class ClearingSummaryService {
     };
   }
 
-  async findOne(id: number) {
-    return await this.clearingSummaryRepository.createQueryBuilder('summary')
+  async findOne(id: number, query: any) {
+
+    const queryBuilder = this.clearingSummaryRepository.createQueryBuilder('summary')
       .innerJoin('summary.company', 'company')
       .addSelect('company.companyCode')
       .addSelect('company.companyName')
-      .where('summary.id = :id', { id })
-      .getOne();
+      .where('summary.id = :id', { id });
+
+    if (query.accessableCompanyIds) {
+      queryBuilder.andWhere('summary.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
+    }
+
+    return await queryBuilder.getOne();
   }
 
   async findByCompanyId(companyId: number) {

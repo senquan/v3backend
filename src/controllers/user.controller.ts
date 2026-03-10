@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { In } from "typeorm";
+import { In, Like } from "typeorm";
 import { AppDataSource } from '../config/database';
+import { CompanyInfo } from '../models/company-info.entity';
 import { User } from '../models/user.entity';
 import { Role } from '../models/role.entity';
 import { UserRole } from '../models/user-roles.entity';
@@ -30,7 +31,7 @@ export class UserController {
       const user = await userRepository.findOne({ 
         select: ['id', 'username', 'password', 'status', 'avatar', 'name', 'email', 'phone'],
         where: { username },
-        relations: ['roles']
+        relations: ['roles', 'company']
       });
       // 用户不存在
       if (!user) return errorResponse(res, 401, '用户名或密码错误', null);
@@ -42,12 +43,21 @@ export class UserController {
 
       // 生成JWT令牌
       const userRoles = user.getRoleCodes();
+      let accessableCompanyIds: number[] = [];
+      if (user.company) {
+        const companyRepository = AppDataSource.getRepository(CompanyInfo);
+        const companies = await companyRepository.find({
+          where: { companyCode: Like(`${user.company?.companyCode}%`) }
+        });
+        accessableCompanyIds = companies.map(company => company.id);
+      }
 
       // 生成 JWT 令牌
       const token = jwt.sign(
         {
           id: user.id,
           roles: userRoles,
+          accessableCompanyIds
         },
         process.env.JWT_SECRET || 'ei(@3kdl20KS21020alsa12',
         { expiresIn: '24h' }

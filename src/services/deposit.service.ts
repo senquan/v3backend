@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { InternalDeposit } from '../models/internal-deposit.entity';
 import { CreateDepositDto, UpdateDepositDto } from '../dtos/deposit.dto';
 
@@ -14,6 +14,10 @@ export class DepositService {
   async findAll(query: any) {
     const { page = 1, size = 10, ...filters } = query;
     const skip = (page - 1) * size;
+    
+    if (query.accessableCompanyIds) {
+      filters.companyId = In(query.accessableCompanyIds);
+    }
     
     const [items, total] = await this.depositRepository.findAndCount({
       where: filters,

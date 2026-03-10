@@ -196,6 +196,10 @@ export class AdvanceExpenseController {
         queryBuilder = queryBuilder.andWhere('expense.companyId = :companyId', { companyId: parseInt(companyId as string) });
       }
 
+      if (req.query.accessableCompanyIds) {
+        queryBuilder = queryBuilder.andWhere('expense.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
+      }
+
       const [records, total] = await queryBuilder
         .innerJoinAndSelect('expense.company', 'company')
         .innerJoinAndSelect('expense.creator', 'creator')

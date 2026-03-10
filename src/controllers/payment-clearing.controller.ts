@@ -174,6 +174,10 @@ export class PaymentClearingController {
         queryBuilder = queryBuilder.andWhere('receive.received = :received', { received: parseInt(received as string) });
       }
 
+      if (req.query.accessableCompanyIds) {
+        queryBuilder = queryBuilder.andWhere('receive.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
+      }
+
       const [records, total] = await queryBuilder
         .innerJoinAndSelect('receive.company', 'company')
         .innerJoinAndSelect('receive.creator', 'creator')

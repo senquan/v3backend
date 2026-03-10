@@ -327,6 +327,10 @@ export class ImportDepositController {
         queryBuilder = queryBuilder.andWhere('deposit.earlyRelease = :isReleased', { isReleased: parseInt(isReleased as string) });
       }
 
+      if (req.query.accessableCompanyIds) {
+        queryBuilder = queryBuilder.andWhere('deposit.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
+      }
+
       const [records, total] = await queryBuilder
         .leftJoinAndSelect('deposit.company', 'company')
         .innerJoinAndSelect('deposit.creator', 'creator')

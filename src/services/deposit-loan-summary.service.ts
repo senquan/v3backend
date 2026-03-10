@@ -25,6 +25,10 @@ export class DepositLoanSummaryService {
       queryBuilder.andWhere('summary.companyId = :companyId', { companyId: parseInt(companyId as string) });
     }
 
+    if (query.accessableCompanyIds) {
+      queryBuilder.andWhere('summary.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
+    }
+
     queryBuilder.orderBy('summary.sort', 'ASC')
       .addOrderBy('summary.lastStatDate', 'DESC')
       .skip(skip)

@@ -8,6 +8,7 @@ import { errorResponse } from '../utils/response';
 interface JwtPayload {
   id: number;
   roles?: string[];
+  accessableCompanyIds?: number[];
 }
 
 /**
@@ -36,7 +37,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { id: decoded.id },
-      relations: ['roles']
+      relations: ['roles', 'company']
     });
     
     if (!user) return errorResponse(res, 401, '用户不存在');
@@ -52,6 +53,9 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     } else {
       // 如果 JWT 中没有角色和平台信息，则从用户对象中获取
       (req as any).userRoles = user.getRoleCodes();
+    }
+    if (decoded.accessableCompanyIds) {
+      (req as any).query.accessableCompanyIds = decoded.accessableCompanyIds;
     }
     next();
   } catch (error) {

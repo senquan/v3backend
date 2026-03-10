@@ -142,6 +142,10 @@ export class FundTransferController {
         queryBuilder = queryBuilder.andWhere('transfer.isLoan = :isLoan', { isLoan: parseInt(isLoan as string) });
       }
 
+      if (req.query.accessableCompanyIds) {
+        queryBuilder = queryBuilder.andWhere('transfer.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
+      }
+
       const [items, total] = await queryBuilder
         .innerJoinAndSelect('transfer.company', 'company')
         .innerJoinAndSelect('transfer.creator', 'creator')

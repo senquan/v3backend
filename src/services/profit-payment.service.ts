@@ -54,6 +54,9 @@ export class ProfitPaymentService {
     if (keyword) {
       queryBuilder.andWhere('(company.companyName LIKE :keyword OR company.companyCode LIKE :keyword)', { keyword: `%${keyword}%` });
     }
+    if (query.accessableCompanyIds) {
+      queryBuilder.andWhere('payment.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
+    }
 
     const [records, total] = await queryBuilder
       .select([

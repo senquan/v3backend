@@ -26,7 +26,7 @@ export class ClearingSummaryController {
         return errorResponse(res, 400, '无效的ID', null);
       }
 
-      const summary = await clearingSummaryService.findOne(id);
+      const summary = await clearingSummaryService.findOne(id, req.query);
       if (!summary) {
         return errorResponse(res, 404, '记录不存在', null);
       }
