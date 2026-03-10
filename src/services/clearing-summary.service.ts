@@ -37,7 +37,7 @@ export class ClearingSummaryService {
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-
+    const startTime = new Date().getTime();
     try {
       // 1. 创建快照主记录
       const snapshot = new ClearingSnapshot();
@@ -144,6 +144,8 @@ export class ClearingSummaryService {
       }
 
       await queryRunner.commitTransaction();
+      const endTime = new Date().getTime();
+      console.log(`创建快照耗时: ${endTime - startTime}ms`);
       return savedSnapshot;
     } catch (error) {
       await queryRunner.rollbackTransaction();
