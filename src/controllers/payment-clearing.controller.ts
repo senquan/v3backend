@@ -1,10 +1,13 @@
 import { Response } from 'express';
 import { CompanyInfo } from '../models/company-info.entity';
+import { Dict } from '../models/dict.entity';
 import { PaymentReceive } from '../models/payment-receive.entity';
 import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
+import { DictService } from '../services/dict.service';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
 import { In, QueryRunner } from 'typeorm';
+import { RedisCacheService } from '../services/cache.service';
 import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
 
 const dataSource = AppDataSource;
@@ -12,9 +15,9 @@ const dataSource = AppDataSource;
 export class PaymentClearingController {
   private paymentReceiveRepository = AppDataSource.getRepository(PaymentReceive);
   private companyInfoRepository = AppDataSource.getRepository(CompanyInfo);
+  private dictRepository = AppDataSource.getRepository(Dict);
+  private dictService = new DictService(this.dictRepository, new RedisCacheService());
   private dataSource = dataSource;
-  
-
   async importPaymentReceive(req: any, res: Response) {
     try {
       const { receives, batchNo, receiveType } = req.body;
@@ -37,6 +40,12 @@ export class PaymentClearingController {
         companyNameToId.set(company.companyName, company.id);
       });
 
+      const banks = await this.dictService.findByGroup(4);
+      const bankNameToId: Map<string, number> = new Map();
+      banks.forEach(bank => {
+        bankNameToId.set(bank.name, Number(bank.value));
+      });
+
       for (let i = 0; i < receives.length; i++) {
         const item = receives[i];
 
@@ -47,6 +56,10 @@ export class PaymentClearingController {
           return errorResponse(res, 400, `第${i + 1}行：单位名称 "${item.companyName}" 不存在于系统中`);
         }
 
+        if (!bankNameToId.has(item.receiveBank)) {
+          return errorResponse(res, 400, `第${i + 1}行：到款银行 "${item.receiveBank}" 不存在于系统中`);
+        }
+
         const payment = new PaymentReceive();
         payment.receiveType = type;
         payment.receiveDate = new Date(item.receiveDate);
@@ -54,7 +67,7 @@ export class PaymentClearingController {
         payment.companyId = companyNameToId.get(item.companyName) || 0;
         payment.customerName = item.customerName || null;
         payment.projectName = item.projectName || null;
-        payment.receiveBank = item.receiveBank || null;
+        payment.receiveBank = bankNameToId.get(item.receiveBank) || 0;
         payment.billNo = item.billNo || null;
         payment.accountSet = item.accountSet || null;
         payment.status = 1;

@@ -25,8 +25,8 @@ export class PaymentReceive {
   @Column({ type: 'varchar', length: 100, nullable: true, comment: '项目名称' })
   projectName!: string | null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true, comment: '到款银行' })
-  receiveBank!: string | null;
+  @Column({ type: 'smallint', default: 0, comment: '到款银行编号' })
+  receiveBank!: number | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true, comment: '票据号码' })
   billNo!: string | null;
