@@ -16,6 +16,12 @@ router.get('/clearing-summary', clearingSummaryController.getAll);
 router.get('/clearing-summary/:id', clearingSummaryController.getById);
 router.put('/clearing-summary/:id', clearingSummaryController.update);
 
+// 清算台账快照接口
+router.post('/clearing-snapshots', clearingSummaryController.createSnapshot);
+router.get('/clearing-snapshots', clearingSummaryController.getSnapshotList);
+router.get('/clearing-snapshots/:id/data', clearingSummaryController.getSnapshotData);
+router.get('/clearing-snapshots/drill-down', clearingSummaryController.getDrillDown);
+
 router.get('/deposit-loan-summary', depositLoanSummaryController.getAll);
 router.get('/deposit-loan-summary/:id', depositLoanSummaryController.getById);
 

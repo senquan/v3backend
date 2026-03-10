@@ -38,6 +38,64 @@ export class ClearingSummaryController {
     }
   }
 
+  // 快照管理相关方法
+  async createSnapshot(req: any, res: Response): Promise<Response> {
+    try {
+      let { name, cutoffDate } = req.body;
+      const userId = req.user?.id;
+      if (!userId) {
+        return errorResponse(res, 400, '未授权', null);
+      }
+
+      if (!cutoffDate) {
+        cutoffDate = new Date().toISOString();
+      }
+
+      if (!name) {
+        name = `快照${cutoffDate.split('T')[0]}`
+      }
+
+      const snapshot = await clearingSummaryService.createSnapshot(name, new Date(cutoffDate), userId);
+      return successResponse(res, snapshot, '快照创建成功');
+    } catch (error: any) {
+      logger.error('创建快照失败:', error);
+      return errorResponse(res, 500, `创建失败: ${error.message}`);
+    }
+  }
+
+  async getSnapshotList(req: Request, res: Response): Promise<Response> {
+    try {
+      const result = await clearingSummaryService.getSnapshotList(req.query);
+      return successResponse(res, result, '查询成功');
+    } catch (error: any) {
+      return errorResponse(res, 500, `查询失败: ${error.message}`);
+    }
+  }
+
+  async getSnapshotData(req: Request, res: Response): Promise<Response> {
+    try {
+      const snapshotId = parseInt(req.params.id);
+      const result = await clearingSummaryService.getSnapshotData(snapshotId);
+      return successResponse(res, result, '查询成功');
+    } catch (error: any) {
+      return errorResponse(res, 500, `查询失败: ${error.message}`);
+    }
+  }
+
+  async getDrillDown(req: Request, res: Response): Promise<Response> {
+    try {
+      const { snapshotId, companyId, field } = req.query;
+      const result = await clearingSummaryService.getSnapshotDrillDown(
+        Number(snapshotId),
+        Number(companyId),
+        field as string
+      );
+      return successResponse(res, result, '查询成功');
+    } catch (error: any) {
+      return errorResponse(res, 500, `查询失败: ${error.message}`);
+    }
+  }
+
   async update(req: Request, res: Response): Promise<Response> {
     try {
       const id = parseInt(req.params.id);

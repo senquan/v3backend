@@ -1,9 +1,15 @@
-import { Repository } from 'typeorm';
+import { Repository, QueryRunner, LessThanOrEqual } from 'typeorm';
 import { calculateSum } from '../utils';
 import { AdvanceExpense } from '../models/advance-expense.entity';
 import { ClearingSummary } from '../models/clearing-summary.entity';
 import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { ProfitPayment } from '../models/profit-payment.entity';
+import { FixedDeposit } from '../models/fixed-deposit.entity';
+import { FundTransfer } from '../models/fund-transfer.entity';
+import { PaymentReceive } from '../models/payment-receive.entity';
+import { ClearingSnapshot } from '../models/clearing-snapshot.entity';
+import { ClearingSnapshotData } from '../models/clearing-snapshot-data.entity';
+import { CompanyInfo } from '../models/company-info.entity';
 import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
 import { AppDataSource } from '../config/database';
 
@@ -11,10 +17,215 @@ export class ClearingSummaryService {
   private depositLoanSummaryRepository = AppDataSource.getRepository(DepositLoanSummary);
   private advanceExpenseRepository = AppDataSource.getRepository(AdvanceExpense);
   private profitPaymentRepository = AppDataSource.getRepository(ProfitPayment);
+  private companyRepository = AppDataSource.getRepository(CompanyInfo);
+  private snapshotRepository = AppDataSource.getRepository(ClearingSnapshot);
+  private snapshotDataRepository = AppDataSource.getRepository(ClearingSnapshotData);
+
   constructor(
     private clearingSummaryRepository: Repository<ClearingSummary>,
   ) {
     this.initEventListeners();
+  }
+
+  /**
+   * 创建清算台账快照
+   * @param name 快照名称
+   * @param cutoffDate 截至日期
+   * @param userId 创建人ID
+   */
+  async createSnapshot(name: string, cutoffDate: Date, userId: number) {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. 创建快照主记录
+      const snapshot = new ClearingSnapshot();
+      snapshot.snapshotName = name;
+      snapshot.cutoffDate = cutoffDate;
+      snapshot.createdById = userId;
+      const savedSnapshot = await queryRunner.manager.save(snapshot);
+
+      // 2. 获取所有单位
+      const companies = await queryRunner.manager.find(CompanyInfo, { where: { status: 1 } });
+
+      // 3. 计算并保存每个单位在截至日期的汇总数据
+      for (const company of companies) {
+        const companyId = company.id;
+        
+        // 计算内部存款余额 (截至日期前已确认的数据)
+        const paymentSum = await queryRunner.manager.createQueryBuilder(PaymentReceive, 'payment')
+          .select('SUM(payment.accountAmount)', 'total')
+          .where('payment.companyId = :companyId', { companyId })
+          .andWhere('payment.received = 1')
+          .andWhere('payment.status = 2')
+          .andWhere('payment.receiveDate <= :cutoffDate', { cutoffDate })
+          .getRawOne();
+        
+        const transferUpSum = await queryRunner.manager.createQueryBuilder(FundTransfer, 'transfer')
+          .select('SUM(transfer.transferAmount)', 'total')
+          .where('transfer.companyId = :companyId', { companyId })
+          .andWhere('transfer.transferType = 1')
+          .andWhere('transfer.transferStatus = 2')
+          .andWhere('transfer.transferDate <= :cutoffDate', { cutoffDate })
+          .getRawOne();
+          
+        const transferDownSum = await queryRunner.manager.createQueryBuilder(FundTransfer, 'transfer')
+          .select('SUM(transfer.transferAmount)', 'total')
+          .where('transfer.companyId = :companyId', { companyId })
+          .andWhere('transfer.transferType = 2')
+          .andWhere('transfer.transferStatus = 2')
+          .andWhere('transfer.transferDate <= :cutoffDate', { cutoffDate })
+          .getRawOne();
+
+        const fixedToFixedSum = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
+          .select('SUM(deposit.remainingAmount)', 'total')
+          .where('deposit.companyId = :companyId', { companyId })
+          .andWhere('deposit.status = 2')
+          .andWhere('deposit.startDate <= :cutoffDate', { cutoffDate })
+          .getRawOne();
+        
+        const releaseSum = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
+          .select('SUM(deposit.releaseAmount)', 'total')
+          .where('deposit.companyId = :companyId', { companyId })
+          .andWhere('deposit.status = 2')
+          .andWhere('deposit.earlyRelease = 1')
+          .andWhere('deposit.releaseDate <= :cutoffDate', { cutoffDate })
+          .getRawOne();
+
+        const internalDepositBalance = 
+          Number(paymentSum.total || 0) + 
+          Number(transferUpSum.total || 0) + 
+          Number(releaseSum.total || 0) - 
+          Number(transferDownSum.total || 0) - 
+          Number(fixedToFixedSum.total || 0);
+
+        // 计算各项代垫费用
+        const getExpenseSum = async (typeId: number) => {
+          const res = await queryRunner.manager.createQueryBuilder(AdvanceExpense, 'expense')
+            .select('SUM(expense.amount)', 'total')
+            .where('expense.companyId = :companyId', { companyId })
+            .andWhere('expense.expenseType = :typeId', { typeId })
+            .andWhere('expense.status = 2')
+            .andWhere('expense.updatedAt <= :cutoffDate', { cutoffDate })
+            .getRawOne();
+          return Number(res.total || 0);
+        };
+
+        const incomeTaxSettlement = await getExpenseSum(1); // 所得税
+        const dueBillAdvance = await getExpenseSum(2);    // 代垫票据
+        const expenseAdvance = await getExpenseSum(3);     // 代垫费用
+        const salaryAdvance = await getExpenseSum(4);      // 代垫薪酬
+
+        // 计算上缴利润
+        const profitSum = await queryRunner.manager.createQueryBuilder(ProfitPayment, 'profit')
+          .select('SUM(profit.dueProfit1)', 'totalDue1')
+          .addSelect('SUM(profit.dueProfit2)', 'totalDue2')
+          .addSelect('SUM(profit.actualAmount)', 'totalPaid')
+          .where('profit.companyId = :companyId', { companyId })
+          .andWhere('profit.status = 2')
+          .andWhere('profit.businessYear <= :year', { year: cutoffDate.getFullYear() })
+          .getRawOne();
+
+        const snapshotData = new ClearingSnapshotData();
+        snapshotData.snapshotId = savedSnapshot.id;
+        snapshotData.companyId = companyId;
+        snapshotData.internalDepositBalance = internalDepositBalance;
+        snapshotData.incomeTaxSettlement = incomeTaxSettlement;
+        snapshotData.dueBillAdvance = dueBillAdvance;
+        snapshotData.expenseAdvance = expenseAdvance;
+        snapshotData.salaryAdvance = salaryAdvance;
+        snapshotData.dueProfit1 = Number(profitSum.totalDue1 || 0);
+        snapshotData.dueProfit2 = Number(profitSum.totalDue2 || 0);
+        snapshotData.profitPaid = Number(profitSum.totalPaid || 0);
+        snapshotData.lastStatDate = new Date();
+        
+        await queryRunner.manager.save(snapshotData);
+      }
+
+      await queryRunner.commitTransaction();
+      return savedSnapshot;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * 获取快照明细穿透数据
+   */
+  async getSnapshotDrillDown(snapshotId: number, companyId: number, field: string) {
+    const snapshot = await this.snapshotRepository.findOne({ where: { id: snapshotId } });
+    if (!snapshot) throw new Error('快照不存在');
+
+    const cutoffDate = snapshot.cutoffDate;
+
+    switch (field) {
+      case 'internalDepositBalance':
+        // 穿透到 PaymentReceive, FundTransfer, FixedDeposit
+        const payments = await AppDataSource.getRepository(PaymentReceive).find({
+          where: { companyId, status: 2, receiveDate: LessThanOrEqual(cutoffDate) },
+          relations: ['company']
+        });
+        const transfers = await AppDataSource.getRepository(FundTransfer).find({
+          where: { companyId, transferStatus: 2, transferDate: LessThanOrEqual(cutoffDate) },
+          relations: ['company']
+        });
+        return { payments, transfers };
+      case 'expenseAdvance':
+      case 'incomeTaxSettlement':
+      case 'dueBillAdvance':
+      case 'salaryAdvance':
+        // 穿透到 AdvanceExpense
+        const typeMap: Record<string, number> = {
+          'incomeTaxSettlement': 1,
+          'dueBillAdvance': 2,
+          'expenseAdvance': 3,
+          'salaryAdvance': 4
+        };
+        return await AppDataSource.getRepository(AdvanceExpense).find({
+          where: { 
+            companyId, 
+            status: 2, 
+            expenseType: typeMap[field],
+            updatedAt: LessThanOrEqual(cutoffDate)
+          },
+          relations: ['company', 'type']
+        });
+
+      case 'profitPaid':
+        return await AppDataSource.getRepository(ProfitPayment).find({
+          where: { 
+            companyId, 
+            status: 2,
+            businessYear: LessThanOrEqual(cutoffDate.getFullYear())
+          },
+          relations: ['company']
+        });
+
+      default:
+        return [];
+    }
+  }
+
+  async getSnapshotList(query: any) {
+    const { page = 1, size = 10 } = query;
+    const [records, total] = await this.snapshotRepository.findAndCount({
+      relations: ['creator'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * size,
+      take: size
+    });
+    return { records, total };
+  }
+
+  async getSnapshotData(snapshotId: number) {
+    return await this.snapshotDataRepository.find({
+      where: { snapshotId },
+      relations: ['company']
+    });
   }
 
   private initEventListeners() {
