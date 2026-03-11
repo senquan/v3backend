@@ -148,19 +148,22 @@ export class PaymentClearingController {
 
   async getReceiveList(req: any, res: Response) {
     try {
-      const { receiveType, companyName, status, batchNo, received, page = 1, size = 10 } = req.query;
+      const { receiveType, keyword, status, batchNo, received, page = 1, size = 10, companyId } = req.query;
       const pageNum = parseInt(page as string);
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
 
       let queryBuilder = this.paymentReceiveRepository.createQueryBuilder('receive')
+        .innerJoinAndSelect('receive.company', 'company')
+        .innerJoinAndSelect('receive.creator', 'creator')
+        .innerJoinAndSelect('receive.updater', 'updater')
         .andWhere('receive.status != 4');
 
       if (receiveType && receiveType > 0) {
         queryBuilder = queryBuilder.andWhere('receive.receiveType = :receiveType', { receiveType: parseInt(receiveType as string) });
       }
-      if (companyName) {
-        queryBuilder = queryBuilder.andWhere('receive.companyName LIKE :companyName', { companyName: `%${companyName}%` });
+      if (keyword) {
+        queryBuilder = queryBuilder.andWhere('(company.companyName LIKE :keyword OR receive.customerName LIKE :keyword OR receive.projectName LIKE :keyword)', { keyword: `%${keyword}%` });
       }
       if (status && status > 0) {
         queryBuilder = queryBuilder.andWhere('receive.status = :status', { status: parseInt(status as string) });
@@ -173,15 +176,14 @@ export class PaymentClearingController {
       if (received !== undefined) {
         queryBuilder = queryBuilder.andWhere('receive.received = :received', { received: parseInt(received as string) });
       }
-
+      if (companyId) {
+        queryBuilder = queryBuilder.andWhere('receive.companyId = :companyId', { companyId: parseInt(companyId as string) });
+      }
       if (req.query.accessableCompanyIds) {
         queryBuilder = queryBuilder.andWhere('receive.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
       }
 
       const [records, total] = await queryBuilder
-        .innerJoinAndSelect('receive.company', 'company')
-        .innerJoinAndSelect('receive.creator', 'creator')
-        .innerJoinAndSelect('receive.updater', 'updater')
         .select(['receive', 'company', 'creator.name', 'updater.name'])
         .orderBy('receive.createdAt', 'DESC')
         .skip(skip)
@@ -328,12 +330,12 @@ export class PaymentClearingController {
   private async _updateDepositIncomingSummary(companyId: number, queryRunner: QueryRunner) {
     // 计算到款总额
     const amount = await queryRunner.manager.createQueryBuilder(PaymentReceive, 'payment')
-      .select('SUM(payment.accountAmount)', 'receiveAmount')
+      .select('SUM(CASE WHEN payment.receiveType = 2 AND payment.discountAmount > 0 THEN payment.discountAmount ELSE payment.accountAmount END)', 'receiveAmount')
       .where('payment.companyId = :companyId', { companyId })
       .andWhere('payment.received = 1')
       .andWhere('payment.status = 2')
       .getRawOne();
-      
+    
     const receiveAmount = amount.receiveAmount || 0;
     // 查找或创建汇总记录
     let summary = await queryRunner.manager.findOne(DepositLoanSummary, {

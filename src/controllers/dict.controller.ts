@@ -113,8 +113,6 @@ export class DictController {
         value = await dictService.getNextValue(group);
       }
 
-      console.log('value:', value);
-
       const dict = await dictService.create({
         group,
         name,

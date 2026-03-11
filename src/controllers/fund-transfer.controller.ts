@@ -133,7 +133,7 @@ export class FundTransferController {
         queryBuilder = queryBuilder.andWhere('transfer.transferDate <= :endDate', { endDate: new Date(endDate as string) });
       }
       if (keyword) {
-        queryBuilder = queryBuilder.andWhere('company.companyName LIKE :keyword', { keyword: `%${keyword}%` });
+        queryBuilder = queryBuilder.andWhere('(company.companyName LIKE :keyword OR transfer.transferCode LIKE :keyword OR transfer.remark LIKE :keyword)', { keyword: `%${keyword}%` });
       }
       if (companyId) {
         queryBuilder = queryBuilder.andWhere('transfer.companyId = :companyId', { companyId: parseInt(companyId as string) });

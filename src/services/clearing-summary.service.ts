@@ -385,7 +385,7 @@ export class ClearingSummaryService {
       .where('1=1');
 
     if (keyword) {
-      queryBuilder.andWhere('(summary.companyCode LIKE :keyword OR company.companyName LIKE :keyword)', { keyword: `%${keyword}%` });
+      queryBuilder.andWhere('(company.companyCode LIKE :keyword OR company.companyName LIKE :keyword)', { keyword: `%${keyword}%` });
     }
 
     if (query.accessableCompanyIds) {

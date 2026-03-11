@@ -174,7 +174,6 @@ export class ImportDepositController {
       const currentBatchNo = batchNo || `IMP${Date.now()}`;
       const importedRecords: FixedDeposit[] = [];
       const errors: string[] = [];
-
       
       // 获取存款类型字典
       const depositTypeData = await this.dictRepository.find({ where: { group: 1 }, select: ['value', 'name'] });
@@ -298,18 +297,21 @@ export class ImportDepositController {
 
   async getFixedDepositRecords(req: any, res: Response) {
     try {
-      const { keyword, type, status, companyId, isReleased, startDate, endDate, page = 1, size = 10 } = req.query;
+      const { keyword, type, status, companyId, isReleased, startDate, endDate, depositPeriod, page = 1, size = 10 } = req.query;
       const pageNum = parseInt(page as string);
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
 
-      let queryBuilder = this.fixedDepositRepository.createQueryBuilder('deposit');
+      let queryBuilder = this.fixedDepositRepository.createQueryBuilder('deposit')
+        .leftJoinAndSelect('deposit.company', 'company')
+        .innerJoinAndSelect('deposit.creator', 'creator')
+        .leftJoinAndSelect('deposit.updater', 'updater');
       
       if (type && type > 0) {
         queryBuilder = queryBuilder.andWhere('deposit.depositType = :type', { type: parseInt(type as string) });
       }
       if (keyword) {
-        queryBuilder = queryBuilder.andWhere('(deposit.companyName LIKE :keyword OR deposit.batchNo LIKE :keyword)', { keyword: `%${keyword}%` });
+        queryBuilder = queryBuilder.andWhere('(company.companyName LIKE :keyword OR deposit.batchNo LIKE :keyword)', { keyword: `%${keyword}%` });
       }
       if (status && status > 0) {
         queryBuilder = queryBuilder.andWhere('deposit.status = :status', { status: parseInt(status as string) });
@@ -326,15 +328,14 @@ export class ImportDepositController {
       if (isReleased) {
         queryBuilder = queryBuilder.andWhere('deposit.earlyRelease = :isReleased', { isReleased: parseInt(isReleased as string) });
       }
-
+      if (depositPeriod) {
+        queryBuilder = queryBuilder.andWhere('deposit.depositPeriod = :depositPeriod', { depositPeriod: parseInt(depositPeriod as string) });
+      }
       if (req.query.accessableCompanyIds) {
         queryBuilder = queryBuilder.andWhere('deposit.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
       }
 
       const [records, total] = await queryBuilder
-        .leftJoinAndSelect('deposit.company', 'company')
-        .innerJoinAndSelect('deposit.creator', 'creator')
-        .leftJoinAndSelect('deposit.updater', 'updater')
         .select(['deposit', 'company', 'creator.name', 'updater.name'])
         .orderBy('deposit.createdAt', 'DESC')
         .skip(skip)

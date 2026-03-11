@@ -179,10 +179,15 @@ export class AdvanceExpenseController {
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
 
-      let queryBuilder = this.advanceExpenseRepository.createQueryBuilder('expense');
+      let queryBuilder = this.advanceExpenseRepository.createQueryBuilder('expense')
+        .innerJoinAndSelect('expense.company', 'company')
+        .innerJoinAndSelect('expense.creator', 'creator')
+        .innerJoinAndSelect('expense.updater', 'updater')
+        .leftJoinAndSelect('expense.details', 'details')
+        .leftJoinAndSelect('details.expenseType', 'expenseType');
 
       if (keyword) {
-        queryBuilder = queryBuilder.andWhere('expense.companyName LIKE :keyword', { keyword: `%${keyword}%` });
+        queryBuilder = queryBuilder.andWhere('company.companyName LIKE :keyword', { keyword: `%${keyword}%` });
       }
       if (status && status > 0) {
         queryBuilder = queryBuilder.andWhere('expense.status = :status', { status: parseInt(status as string) });
@@ -201,11 +206,6 @@ export class AdvanceExpenseController {
       }
 
       const [records, total] = await queryBuilder
-        .innerJoinAndSelect('expense.company', 'company')
-        .innerJoinAndSelect('expense.creator', 'creator')
-        .innerJoinAndSelect('expense.updater', 'updater')
-        .leftJoinAndSelect('expense.details', 'details')
-        .leftJoinAndSelect('details.expenseType', 'expenseType')
         .select(['expense', 'company', 'creator.name', 'updater.name', 'details', 'expenseType'])
         .orderBy('expense.createdAt', 'DESC')
         .skip(skip)

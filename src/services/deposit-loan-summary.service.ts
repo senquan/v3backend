@@ -10,7 +10,7 @@ export class DepositLoanSummaryService {
   ) {}
 
   async findAll(query: any) {
-    const { page = 1, size = 10, companyId } = query;
+    const { page = 1, size = 10, companyId, keyword } = query;
     const pageNum = parseInt(page as string);
     const pageSize = parseInt(size as string);
     const skip = (pageNum - 1) * pageSize;
@@ -23,6 +23,10 @@ export class DepositLoanSummaryService {
 
     if (companyId) {
       queryBuilder.andWhere('summary.companyId = :companyId', { companyId: parseInt(companyId as string) });
+    }
+
+    if (keyword) {
+      queryBuilder.andWhere('(company.companyCode LIKE :keyword OR company.companyName LIKE :keyword)', { keyword: `%${keyword}%` });
     }
 
     if (query.accessableCompanyIds) {
