@@ -29,6 +29,8 @@ router.get('/loan-deposit-summary/:id', (req, res: Response) => financeControlle
 
 router.post('/import-deposit', (req, res: Response) => importDepositController.importDeposit(req, res));
 
+router.post('/fixed-deposits', (req, res: Response) => importDepositController.createRecord(req, res));
+
 router.get('/fixed-deposits', (req, res: Response) => importDepositController.getFixedDepositRecords(req, res));
 
 router.put('/fixed-deposits/:id/release', (req, res: Response) => importDepositController.releaseFixedDeposit(req, res));
@@ -40,6 +42,8 @@ router.post('/import-deposit/confirm', (req, res: Response) => importDepositCont
 router.delete('/import-deposit/:id', (req, res: Response) => importDepositController.deleteRecord(req, res));
 
 // 到款清算管理
+router.post('/receive', (req, res: Response) => paymentClearingController.createReceive(req, res));
+
 router.post('/import-receive', (req, res: Response) => paymentClearingController.importPaymentReceive(req, res));
 
 router.get('/payment-receives', (req, res: Response) => paymentClearingController.getReceiveList(req, res));

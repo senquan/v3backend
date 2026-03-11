@@ -295,6 +295,49 @@ export class ImportDepositController {
     }
   }
 
+  async createRecord(req: any, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return errorResponse(res, 401, '未授权');
+
+      const { depositCode, depositType, startDate, companyId, amount, depositPeriod, remark } = req.body;
+
+      if (!depositCode || !depositType || !startDate || !companyId || !amount || !depositPeriod) {
+        return errorResponse(res, 400, '必填项不能为空');
+      }
+
+      // 计算到期日
+      const start = new Date(startDate);
+      const end = new Date(startDate);
+      end.setMonth(end.getMonth() + parseInt(depositPeriod));
+
+      const fixedDeposit = new FixedDeposit();
+      fixedDeposit.depositCode = depositCode;
+      fixedDeposit.depositType = parseInt(depositType);
+      fixedDeposit.startDate = start;
+      fixedDeposit.companyId = parseInt(companyId);
+      fixedDeposit.amount = parseFloat(amount);
+      fixedDeposit.depositPeriod = parseInt(depositPeriod);
+      fixedDeposit.endDate = end;
+      fixedDeposit.remark = remark || null;
+      fixedDeposit.earlyRelease = 0;
+      fixedDeposit.releaseDate = null;
+      fixedDeposit.interestDays = 0;
+      fixedDeposit.releaseAmount = 0;
+      fixedDeposit.remainingAmount = parseFloat(amount);
+      fixedDeposit.status = 1; // 待确认
+      fixedDeposit.createdBy = userId;
+      fixedDeposit.batchNo = `MAN${Date.now()}`;
+      fixedDeposit.lastInterestDate = this._getRecentInterestDate(fixedDeposit);
+
+      const saved = await this.fixedDepositRepository.save(fixedDeposit);
+      return successResponse(res, saved, '创建成功');
+    } catch (error: any) {
+      console.error('创建定期存款失败:', error);
+      return errorResponse(res, 500, `创建失败: ${error.message || error}`);
+    }
+  }
+
   async getFixedDepositRecords(req: any, res: Response) {
     try {
       const { keyword, type, status, companyId, isReleased, startDate, endDate, depositPeriod, page = 1, size = 10 } = req.query;

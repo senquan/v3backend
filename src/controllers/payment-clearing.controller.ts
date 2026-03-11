@@ -146,6 +146,65 @@ export class PaymentClearingController {
     }
   }
 
+  async createReceive(req: any, res: Response) {
+    try {
+      const userId = (req as any).user?.id || 'admin';
+      const { 
+        receiveType, 
+        receiveDate, 
+        sapCode, 
+        companyId, 
+        customerName, 
+        projectName, 
+        receiveAmount, 
+        receiveBank, 
+        billNo, 
+        billType, 
+        billAmount, 
+        dueDate, 
+        collectionDate, 
+        accountSet 
+      } = req.body;
+
+      if (!receiveType || !receiveDate || !companyId) {
+        return errorResponse(res, 400, '必填项不能为空');
+      }
+
+      const payment = new PaymentReceive();
+      payment.receiveType = parseInt(receiveType);
+      payment.receiveDate = new Date(receiveDate);
+      payment.sapCode = sapCode || null;
+      payment.companyId = parseInt(companyId);
+      payment.customerName = customerName || null;
+      payment.projectName = projectName || null;
+      payment.receiveBank = receiveBank ? parseInt(receiveBank) : 0;
+      payment.accountSet = accountSet || null;
+      payment.status = 1; // 待确认
+      payment.createdBy = userId;
+      payment.updatedBy = userId;
+      payment.batchNo = `MAN${Date.now()}`;
+
+      if (payment.receiveType === 1) {
+        payment.accountAmount = parseFloat(receiveAmount) || 0;
+        payment.received = 1;
+      } else {
+        payment.billNo = billNo || null;
+        payment.billType = billType || '1';
+        payment.billAmount = parseFloat(billAmount) || 0;
+        payment.dueDate = dueDate ? new Date(dueDate) : null;
+        payment.collectionDate = collectionDate ? new Date(collectionDate) : null;
+        payment.received = payment.collectionDate ? 1 : 0;
+        payment.accountAmount = payment.billAmount; // 初始到账金额等于票据金额
+      }
+
+      const saved = await this.paymentReceiveRepository.save(payment);
+      return successResponse(res, saved, '创建成功');
+    } catch (error: any) {
+      console.error('创建收款记录失败:', error);
+      return errorResponse(res, 500, `创建失败: ${error.message || error}`);
+    }
+  }
+
   async getReceiveList(req: any, res: Response) {
     try {
       const { receiveType, keyword, status, batchNo, received, page = 1, size = 10, companyId } = req.query;
