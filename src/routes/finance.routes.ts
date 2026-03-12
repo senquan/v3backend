@@ -3,6 +3,7 @@ import { FinanceController, ImportDepositController, ProfitPaymentController } f
 import { PaymentClearingController } from '../controllers/payment-clearing.controller';
 import { FundTransferController } from '../controllers/fund-transfer.controller';
 import { AdvanceExpenseController } from '../controllers/advance-expense.controller';
+import { BatchFileController } from '../controllers/batch-file.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -13,6 +14,7 @@ const paymentClearingController = new PaymentClearingController();
 const fundTransferController = new FundTransferController();
 const advanceExpenseController = new AdvanceExpenseController();
 const profitPaymentController = new ProfitPaymentController();
+const batchFileController = new BatchFileController();
 
 // 应用认证中间件
 router.use(authMiddleware);
@@ -109,5 +111,8 @@ router.post('/profit-payments/confirm', (req, res: Response) => profitPaymentCon
 
 router.post('/import-profit', (req, res: Response) => profitPaymentController.importProfit(req, res));
 
+// 导入文件管理
+
+router.post('/batch-file', (req, res: Response) => batchFileController.create(req, res));
 
 export default router;

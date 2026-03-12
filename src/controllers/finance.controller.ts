@@ -517,7 +517,10 @@ export class ImportDepositController {
 
     try {
       const id = parseInt(req.params.id);
-      const userId = (req as any).user?.id || 'admin';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
       const record = await queryRunner.manager.findOne(FixedDeposit, { where: { id } });
 
       if (!record) {

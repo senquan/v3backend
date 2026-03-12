@@ -204,7 +204,6 @@ export class UserController {
       });
 
       if (!user) return errorResponse(res, 404, '用户不存在', null);
-
       // 更新用户信息
       await userRepository.update(user.id, {
         name: name || user.name,
@@ -213,8 +212,7 @@ export class UserController {
         avatar: avatar || user.avatar,
         updatedAt: new Date()
       });
-
-      return successResponse(res, null, '用户信息更新成功');
+      return successResponse(res, null, '用户个人信息更新成功');
     } catch (error) {
       logger.error('更新用户信息失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);

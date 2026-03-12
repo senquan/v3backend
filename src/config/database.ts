@@ -4,6 +4,7 @@ import * as dotenv from 'dotenv';
 import { AdvanceExpense } from '../models/advance-expense.entity';
 import { AdvanceExpenseDetail } from '../models/advance-expense-detail.entity';
 import { AdvanceExpenseType } from '../models/advance-expense-type.entity';
+import { BatchFile } from '../models/batch-file.entity';
 import { ClearingSummary } from '../models/clearing-summary.entity';
 import { CompanyInfo } from '../models/company-info.entity';
 import { DailyCurrentInterestDetail } from '../models/current-interest-detail.entity';
@@ -44,7 +45,7 @@ export const AppDataSource = new DataSource({
   schema: process.env.DB_SCHEMA || 'fms',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [ClearingSummary, CompanyInfo, DailyCurrentInterestDetail, DailyFixedInterestDetail, FixedToCurrentInterestDetail, DepositLoanSummary, Dict,
+  entities: [BatchFile, ClearingSummary, CompanyInfo, DailyCurrentInterestDetail, DailyFixedInterestDetail, FixedToCurrentInterestDetail, DepositLoanSummary, Dict,
     FundTransfer, InviteCode, Permission, Role, RolePermission, User, UserRole,
     InterestRate, InternalDeposit, AdvanceExpense, AdvanceExpenseDetail, AdvanceExpenseType, ProfitPayment, FixedDeposit, Settings, PaymentReceive, OperationLog,
     FixedDepositLog, ProfitPaymentLog, ClearingSnapshot, ClearingSnapshotData],

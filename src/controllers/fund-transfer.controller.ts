@@ -13,13 +13,10 @@ export class FundTransferController {
   async createTransfer(req: any, res: Response) {
     try {
       const {
-        transferCode,
+        transferType,
         companyId,
         transferAmount,
-        transferType,
         transferDate,
-        transferStatus,
-        bankAccount,
         isLoan,
         dueDate,
         remark
@@ -38,17 +35,23 @@ export class FundTransferController {
         return errorResponse(res, 400, '转账日期不能为空');
       }
 
-      const userId = (req as any).user?.id || 'admin';
+      if (isLoan === 2 && !dueDate) {
+        return errorResponse(res, 400, '贷款期限不能为空');
+      }
+
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
 
       const transfer = new FundTransfer();
-      transfer.transferCode = transferCode || this.generateTransferCode();
+      transfer.transferCode = this.generateTransferCode();
       transfer.companyId = companyId;
       transfer.transferAmount = parseFloat(transferAmount);
       transfer.transferType = parseInt(transferType);
       transfer.transferDate = new Date(transferDate);
-      transfer.transferStatus = transferStatus ? parseInt(transferStatus) : 1;
-      transfer.bankAccount = bankAccount || null;
-      transfer.isLoan = isLoan ? parseInt(isLoan) : 0;
+      transfer.transferStatus = 1;
+      transfer.isLoan = Number(isLoan) === 1 ? 1 : 0;
       transfer.dueDate = dueDate ? new Date(dueDate) : null;
       transfer.remark = remark || null;
       transfer.createdBy = userId;
@@ -90,7 +93,10 @@ export class FundTransferController {
       if (dueDate !== undefined) record.dueDate = dueDate ? new Date(dueDate) : null;
       if (remark !== undefined) record.remark = remark || null;
 
-      const userId = (req as any).user?.id || 'admin';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
       record.updatedBy = userId;
 
       const updated = await this.fundTransferRepository.save(record);
@@ -194,7 +200,10 @@ export class FundTransferController {
 
     try {
       const { transfers, batchNo, transferType } = req.body;
-      const userId = (req as any).user?.id || 'admin';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
 
       if (!transfers || !Array.isArray(transfers) || transfers.length === 0) {
         await queryRunner.rollbackTransaction();

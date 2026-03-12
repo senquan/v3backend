@@ -26,16 +26,27 @@ filename: (req, file, cb) => {
 
 // 文件过滤器
 const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
-allowedMimeTypes.includes(file.mimetype) 
-    ? cb(null, true) 
-    : cb(null, false);
+    const isImage = ['image/jpeg', 'image/png', 'image/gif'].includes(file.mimetype);
+    const ext = extname(file.originalname).toLowerCase();
+    const isExcel = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'application/octet-stream'
+    ].includes(file.mimetype) || ['.xlsx', '.xls', '.csv'].includes(ext);
+
+    if ((req as any).path.includes('/image')) {
+        // 图片上传接口只允许图片
+        isImage ? cb(null, true) : cb(null, false);
+    } else {
+        // 文件上传接口允许图片和 Excel
+        (isImage || isExcel) ? cb(null, true) : cb(null, false);
+    }
 };
 
 // 创建 multer 实例
 const uploadMiddleware = multer.default({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 20 * 1024 * 1024 }, // 增加到 20MB
     fileFilter
 });
 
@@ -67,6 +78,30 @@ router.post('/images', uploadMiddleware.array('images', 10), (req, res) => {
         });
     }
     const result = uploadController.uploadImages(req.files as Express.Multer.File[]);
+    return res.json(result);
+});
+
+router.post('/file', uploadMiddleware.single('file'), (req, res) => {
+    if (!req.file) {
+        console.log("req:", req)
+        return res.status(400).json({
+            code: 1,
+            message: '未接收到文件'
+        });
+    }
+    const result = uploadController.uploadFile(req.file);
+    return res.json(result);
+});
+
+// 多文件上传路由
+router.post('/files', uploadMiddleware.array('files', 10), (req, res) => {
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+            code: 1,
+            message: '未接收到文件'
+        });
+    }
+    const result = uploadController.uploadFiles(req.files as Express.Multer.File[]);
     return res.json(result);
 });
 
