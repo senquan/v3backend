@@ -19,6 +19,7 @@ export class DepositLoanSummaryService {
       .leftJoin('summary.company', 'company')
       .addSelect('company.companyCode')
       .addSelect('company.companyName')
+      .addSelect('company.initCurrentBalance')
       .where('1=1');
 
     if (companyId) {

@@ -81,7 +81,8 @@ export class CompanyController {
         accountName,
         parentCompanyId,
         companyLevel,
-        status
+        status,
+        initCurrentBalance
       } = req.body;
 
       if (!companyCode || !companyName) {
@@ -95,7 +96,8 @@ export class CompanyController {
         accountName,        
         parentCompanyId: parentCompanyId || null,
         companyLevel: companyLevel || 1,
-        status: status || 1
+        status: status || 1,
+        initCurrentBalance: initCurrentBalance || 0
       }, userId);
 
       return res.json({

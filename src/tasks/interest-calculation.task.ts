@@ -1,25 +1,21 @@
 import 'reflect-metadata';
 import { AppDataSource } from '../config/database';
 import { parseTime } from '../utils';
-import { FundTransfer } from '../models/fund-transfer.entity';
-import { PaymentReceive } from '../models/payment-receive.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
-import { CompanyInfo } from '../models/company-info.entity';
+import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { DailyCurrentInterestDetail } from '../models/current-interest-detail.entity';
 import { DailyFixedInterestDetail } from '../models/fixed-interest-detail.entity';
 import { FixedToCurrentInterestDetail } from '../models/f2c-interest-detail.entity';
 import { InterestRate } from '../models/interest-rate.entity';
-import { LessThanOrEqual, MoreThanOrEqual, Between, IsNull } from 'typeorm';
+import { LessThanOrEqual } from 'typeorm';
 
 export class InterestCalculationTask {
-  private fundTransferRepository = AppDataSource.getRepository(FundTransfer);
-  private paymentReceiveRepository = AppDataSource.getRepository(PaymentReceive);
   private fixedDepositRepository = AppDataSource.getRepository(FixedDeposit);
-  private companyRepository = AppDataSource.getRepository(CompanyInfo);
   private dailyCurrentInterestRepository = AppDataSource.getRepository(DailyCurrentInterestDetail);
   private dailyFixedInterestRepository = AppDataSource.getRepository(DailyFixedInterestDetail);
   private fixedToCurrentInterestRepository = AppDataSource.getRepository(FixedToCurrentInterestDetail);
   private interestRateRepository = AppDataSource.getRepository(InterestRate);
+  private depositLoanSummaryRepository = AppDataSource.getRepository(DepositLoanSummary);
 
   async execute() {
     console.log('开始执行利息计算任务...');
@@ -58,36 +54,26 @@ export class InterestCalculationTask {
     const dailyRate = await this.getDailyRate();
     console.log(`当前日利率: ${dailyRate}`);
 
-    const companies = await this.companyRepository.find({ where: { status: 1 } });
-    console.log(`共 ${companies.length} 个单位`);
+    // 存贷款汇总表获取数据
+    const summaries = await this.depositLoanSummaryRepository.find({ relations: ['company'] });
+    console.log(`共 ${summaries.length} 个单位`);
 
-    for (const company of companies) {
-      // 上划资金、银行到款资金
-      const fundTransfers = await this.fundTransferRepository.find({
-        where: {
-          companyId: company.id,
-          transferType: 1,
-          transferDate: LessThanOrEqual(today)
-        }
-      });
+    for (const summary of summaries) {
 
-      const payments = await this.paymentReceiveRepository.find({
-        where: {
-          companyId: company.id,
-          receiveType: 1,
-          receiveDate: LessThanOrEqual(today)
-        }
-      });
+      if (!summary.company) continue;
 
-      let totalBalance = 0;
-      fundTransfers.forEach(t => totalBalance += Number(t.transferAmount));
-      payments.forEach(p => totalBalance += Number(p.accountAmount || 0));
+      let totalBalance = Number(summary.company.initCurrentBalance || 0) +
+        Number(summary.depositIncoming || 0) + 
+        Number(summary.depositTransferUp || 0) + 
+        Number(summary.depositFromFixed || 0) - 
+        Number(summary.depositTransferDown || 0) - 
+        Number(summary.depositToFixed || 0)
 
       const dailyInterest = totalBalance * dailyRate;
 
       const existing = await this.dailyCurrentInterestRepository.findOne({
         where: {
-          companyId: company.id,
+          companyId: summary.company.id,
           interestDate: today
         }
       });
@@ -98,16 +84,16 @@ export class InterestCalculationTask {
           dailyRate: dailyRate,
           dailyInterest: dailyInterest
         });
-        console.log(`更新单位 ${company.id} 活期利息: 余额=${totalBalance}, 利息=${dailyInterest}`);
+        console.log(`更新单位 ${summary.company.companyName} 活期利息: 余额=${totalBalance}, 利息=${dailyInterest}`);
       } else {
         await this.dailyCurrentInterestRepository.save({
-          companyId: company.id,
+          companyId: summary.company.id,
           interestDate: today,
           currentBalance: totalBalance,
           dailyRate: dailyRate,
           dailyInterest: dailyInterest
         });
-        console.log(`新增单位 ${company.id} 活期利息: 余额=${totalBalance}, 利息=${dailyInterest}`);
+        console.log(`新增单位 ${summary.company.companyName} 活期利息: 余额=${totalBalance}, 利息=${dailyInterest}`);
       }
     }
 

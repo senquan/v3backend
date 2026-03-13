@@ -30,6 +30,9 @@ export class CompanyInfo {
   @Column({ type: 'smallint', default: 1, comment: '状态：1-启用，0-停用' })
   status!: number;
 
+  @Column({ type: 'bigint', default: 0, comment: '活期存款期初额' })
+  initCurrentBalance!: number;
+
   @Column({ type: 'smallint', default: 0, comment: '是否删除：1-是，0-否' })
   isDeleted!: number;
 

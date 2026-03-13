@@ -267,6 +267,7 @@ export class ClearingSummaryService {
   async syncInternalDepositBalance(companyId: number) {
     // 1. 获取最新的存款贷款汇总数据 (使用标准存储库以避免 QueryRunner 释放问题)
     const depositSummary = await this.depositLoanSummaryRepository.findOne({
+      relations: ['company'],
       where: { companyId }
     });
 
@@ -276,7 +277,7 @@ export class ClearingSummaryService {
     const depositFixedTotal = calculateSum([depositSummary.depositFixed || {}]);
 
     // 2. 计算内部存款余额 (含利息)
-    const internalDepositBalance = 
+    const internalDepositBalance = Number(depositSummary.company?.initCurrentBalance || 0)
       Number(depositSummary.depositIncoming || 0) + 
       Number(depositSummary.depositTransferUp || 0) + 
       Number(depositSummary.depositFromFixed || 0) - 
