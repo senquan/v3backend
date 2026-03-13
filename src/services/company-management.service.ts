@@ -85,6 +85,14 @@ export class CompanyService {
     });
   }
 
+  async findLastPathCode(pathCode: string, level: number) {
+    const pattern = pathCode ? `${pathCode}.%` : `%.%`;
+    return await this.companyRepository.findOne({
+      where: { pathCode: Like(pattern), companyLevel: level },
+      order: { pathCode: 'DESC' }
+    });
+  }
+
   async getTree() {
     const cacheKey = this.getCacheKey('tree');
     const cached = await this.cacheService.get<CompanyInfo[]>(cacheKey);
@@ -136,15 +144,26 @@ export class CompanyService {
     }
 
     let companyLevel = 1;
+    let parentPathCode = '';
     if (data.parentCompanyId) {
       const parent = await this.findOne(data.parentCompanyId);
       if (parent) {
         companyLevel = parent.companyLevel + 1;
+        parentPathCode = parent.pathCode;
       }
+    }
+
+    let nextPathCode = '';
+    const lastChild = await this.findLastPathCode(parentPathCode, companyLevel);
+    if (lastChild) {
+      nextPathCode = `${parentPathCode}.${(Number(lastChild.pathCode.substring(lastChild.pathCode.lastIndexOf('.') + 1)) + 1).toString().padStart(4, '0')}`;
+    } else {
+      nextPathCode = `${parentPathCode}.0001`;
     }
 
     const company = this.companyRepository.create({
       ...data,
+      pathCode: nextPathCode,
       companyLevel,
       status: data.status || 1,
       createdBy: userId,
@@ -152,6 +171,7 @@ export class CompanyService {
     });
 
     const result = await this.companyRepository.save(company);
+
     await this.clearCache();
     return result;
   }

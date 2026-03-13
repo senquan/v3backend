@@ -18,10 +18,14 @@ export class PaymentClearingController {
   private dictRepository = AppDataSource.getRepository(Dict);
   private dictService = new DictService(this.dictRepository, new RedisCacheService());
   private dataSource = dataSource;
+
   async importPaymentReceive(req: any, res: Response) {
     try {
       const { receives, batchNo, receiveType } = req.body;
-      const userId = (req as any).user?.id || 'admin';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
 
       if (!receives || !Array.isArray(receives) || receives.length === 0) {
         return errorResponse(res, 400, '导入数据不能为空');
@@ -149,7 +153,10 @@ export class PaymentClearingController {
 
   async createReceive(req: any, res: Response) {
     try {
-      const userId = (req as any).user?.id || 'admin';
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
       const { 
         receiveType, 
         receiveDate, 
@@ -157,7 +164,7 @@ export class PaymentClearingController {
         companyId, 
         customerName, 
         projectName, 
-        receiveAmount, 
+        accountAmount, 
         receiveBank, 
         billNo, 
         billType, 
@@ -186,7 +193,7 @@ export class PaymentClearingController {
       payment.batchNo = `MAN${Date.now()}`;
 
       if (payment.receiveType === 1) {
-        payment.accountAmount = parseFloat(receiveAmount) || 0;
+        payment.accountAmount = parseFloat(accountAmount) || 0;
         payment.received = 1;
       } else {
         payment.billNo = billNo || null;
@@ -195,7 +202,7 @@ export class PaymentClearingController {
         payment.dueDate = dueDate ? new Date(dueDate) : null;
         payment.collectionDate = collectionDate ? new Date(collectionDate) : null;
         payment.received = payment.collectionDate ? 1 : 0;
-        payment.accountAmount = payment.billAmount; // 初始到账金额等于票据金额
+        payment.accountAmount = payment.accountAmount;
       }
 
       const saved = await this.paymentReceiveRepository.save(payment);

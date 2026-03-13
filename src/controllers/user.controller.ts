@@ -47,7 +47,7 @@ export class UserController {
       if (user.company) {
         const companyRepository = AppDataSource.getRepository(CompanyInfo);
         const companies = await companyRepository.find({
-          where: { companyCode: Like(`${user.company?.companyCode}%`) }
+          where: { pathCode: Like(`${user.company?.pathCode}%`) }
         });
         accessableCompanyIds = companies.map(company => company.id);
       }

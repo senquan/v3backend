@@ -7,6 +7,9 @@ export class CompanyInfo {
   id!: number;
 
   @Column({ type: 'varchar', length: 20, unique: true, comment: '单位编号' })
+  pathCode: string | '' = '';
+
+  @Column({ type: 'varchar', length: 20, unique: true, comment: '单位编号' })
   companyCode: string | '' = '';
 
   @Column({ type: 'varchar', length: 100, comment: '单位名称' })
