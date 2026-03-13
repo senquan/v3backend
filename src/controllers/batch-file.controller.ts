@@ -32,4 +32,14 @@ export class BatchFileController {
           return errorResponse(res, 500, `创建失败: ${error.message || error}`);
         }
     }
+
+    async getBatchByNo(req: any, res: Response) {
+      try {
+        const batch = await this.batchFileRepository.findOne({ where: { batchNo: req.params.no } });
+        return successResponse(res, batch, '获取成功');
+      } catch (error: any) {
+        console.error('获取批次失败:', error);
+        return errorResponse(res, 500, `获取批次失败: ${error.message || error}`);
+      }
+    }
 }

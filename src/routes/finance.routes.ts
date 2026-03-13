@@ -115,4 +115,6 @@ router.post('/import-profit', (req, res: Response) => profitPaymentController.im
 
 router.post('/batch-file', (req, res: Response) => batchFileController.create(req, res));
 
+router.get('/batch-file/:no', (req, res: Response) => batchFileController.getBatchByNo(req, res));
+
 export default router;
