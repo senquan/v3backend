@@ -12,7 +12,7 @@ export class BatchFileController {
           const userId = (req as any).user?.id;
           if (!userId) return errorResponse(res, 401, '未授权');
     
-          const { url, batchNo } = req.body;
+          const { url, batchNo, remark } = req.body;
     
           if (!url || !batchNo) {
             return errorResponse(res, 400, '必填项不能为空');
@@ -21,6 +21,7 @@ export class BatchFileController {
           const batchFile = new BatchFile();
           batchFile.url = url;
           batchFile.batchNo = batchNo;
+          batchFile.remark = remark;
           batchFile.createdBy = userId;
           batchFile.createdAt = new Date()
     
