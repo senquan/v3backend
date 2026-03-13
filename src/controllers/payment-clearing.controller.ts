@@ -215,7 +215,20 @@ export class PaymentClearingController {
 
   async getReceiveList(req: any, res: Response) {
     try {
-      const { receiveType, keyword, status, batchNo, received, page = 1, size = 10, companyId } = req.query;
+      const {
+        receiveType,
+        keyword,
+        status,
+        batchNo,
+        received,
+        page = 1,
+        size = 10,
+        companyId,
+        startDate,
+        endDate,
+        amountFrom,
+        amountTo
+      } = req.query;
       const pageNum = parseInt(page as string);
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
@@ -240,8 +253,20 @@ export class PaymentClearingController {
       if (batchNo) {
         queryBuilder = queryBuilder.andWhere('receive.batchNo = :batchNo', { batchNo });
       }
+      if (startDate) {
+        queryBuilder = queryBuilder.andWhere('receive.receiveDate >= :startDate', { startDate: new Date(startDate as string) });
+      }
+      if (endDate) {
+        queryBuilder = queryBuilder.andWhere('receive.receiveDate <= :endDate', { endDate: new Date(endDate as string) });
+      }
       if (received !== undefined) {
         queryBuilder = queryBuilder.andWhere('receive.received = :received', { received: parseInt(received as string) });
+      }
+      if (amountFrom && amountFrom > 0) {
+        queryBuilder = queryBuilder.andWhere('receive.accountAmount >= :amountFrom', { amountFrom: parseInt(amountFrom as string) });
+      }
+      if (amountTo && amountTo > 0) {
+        queryBuilder = queryBuilder.andWhere('receive.accountAmount <= :amountTo', { amountTo: parseInt(amountTo as string) });
       }
       if (companyId) {
         queryBuilder = queryBuilder.andWhere('receive.companyId = :companyId', { companyId: parseInt(companyId as string) });
