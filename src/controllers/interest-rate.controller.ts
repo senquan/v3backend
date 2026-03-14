@@ -4,6 +4,7 @@ import { InterestRate } from '../models/interest-rate.entity';
 import { InterestRateService } from '../services/interest-rate.service';
 import { errorResponse, successResponse } from '../utils/response';
 import { logger } from '../utils/logger';
+import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
 
 const interestRateRepository = AppDataSource.getRepository(InterestRate);
 const interestRateService = new InterestRateService(interestRateRepository);
@@ -99,8 +100,15 @@ export class InterestRateController {
       }
 
       const userId = (req as any).user?.id;
-      const newRate = await interestRateService.confirmUpdate(id, rateValue, generateRateCode(), remark, userId);
+      const [oldValue, newRate] = await interestRateService.confirmUpdate(id, rateValue, generateRateCode(), remark, userId);
 
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_MODIFY,
+        desc: `修改利率: ${oldValue} -> ${rateValue}`,
+        module: 'system',
+        userId
+      });
+      
       return successResponse(res, newRate, '确认修改成功，原记录已置为无效');
     } catch (error: any) {
       logger.error('确认修改利率失败:', error);
@@ -132,5 +140,3 @@ function generateRateCode() {
   const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0")
   return `RT${year}${month}${day}${random}`
 }
-
-export default new InterestRateController();

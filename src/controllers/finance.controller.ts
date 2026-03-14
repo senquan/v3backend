@@ -544,7 +544,11 @@ export class ImportDepositController {
 
       // 提交后触发事件
       summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, companyId);
-
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_CONFIRM,
+        desc: `确认定期存款记录: ${id}`,
+        userId
+      });
       return successResponse(res, updated, '确认成功');
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
@@ -600,6 +604,11 @@ export class ImportDepositController {
           await this._updateDepositFixedSummary(companyId, queryRunner);
         }
       }
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_CONFIRM,
+        desc: `确认定期存款记录: ${ids.join(",")}`,
+        userId
+      });
 
       await queryRunner.commitTransaction();
 
@@ -609,6 +618,11 @@ export class ImportDepositController {
           summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, parseInt(item.companyId));
         }
       }
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_CONFIRM,
+        desc: `确认记录: ${ids.join(",")}`,
+        userId
+      });
 
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error: any) {
@@ -875,6 +889,11 @@ export class ProfitPaymentController {
           summaryEventEmitter.emit(SummaryEvents.PROFIT_PAYMENT_CHANGED, companyId.companyId);
         });
       }
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_CONFIRM,
+        desc: `确认利润上缴计划: ${ids.join(",")}`,
+        userId
+      });
 
       return successResponse(res, result, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error: any) {

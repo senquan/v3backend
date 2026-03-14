@@ -271,6 +271,11 @@ export class AdvanceExpenseController {
         return errorResponse(res, 400, '请选择要确认的记录');
       }
 
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 400, '未授权');
+      }
+
       const numIds = ids.map((id: string | number) => parseInt(id as string));
 
       const result = await this.advanceExpenseRepository.update(
@@ -289,6 +294,11 @@ export class AdvanceExpenseController {
           summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, parseInt(item.companyId));
         }
       }
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_CONFIRM,
+        desc: `确认代垫记录: ${ids}`,
+        userId
+      });
 
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error) {

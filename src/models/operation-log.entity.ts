@@ -6,22 +6,13 @@ export class OperationLog {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id!: number;
 
-  @Column({ type: 'varchar', length: 30, unique: true, comment: '日志编号' })
-  logCode!: string;
-
   @Column({ type: 'bigint', comment: '用户ID' })
   userId!: number;
-
-  @Column({ type: 'varchar', length: 50, comment: '用户名' })
-  userName!: string;
-
-  @Column({ type: 'varchar', length: 100, comment: '真实姓名' })
-  realName!: string;
 
   @Column({ type: 'varchar', length: 50, comment: '操作模块' })
   operationModule!: string;
 
-  @Column({ type: 'smallint', comment: '操作类型：1-新增，2-修改，3-删除，4-查询，5-导出，6-登录，7-登出' })
+  @Column({ type: 'smallint', comment: '操作类型：1-新增，2-修改，3-删除，4-查询，5-导入确认，6-登录，7-登出' })
   operationType!: number;
 
   @Column({ type: 'varchar', length: 200, comment: '操作描述' })
@@ -58,9 +49,6 @@ export class OperationLog {
   @Column({ type: 'smallint', default: 1, comment: '状态：1-成功，2-失败' })
   status!: number;
 
-  @Column({ type: 'varchar', length: 200, nullable: true, comment: '备注' })
-  remark: string | null = null;
-
   @Column({ type: 'bigint', comment: '创建人' })
   createdBy!: number;
 
@@ -71,17 +59,6 @@ export class OperationLog {
   })
   createdAt!: Date;
 
-  @Column({ type: 'bigint', comment: '最后修改人' })
-  updatedBy!: number;
-
-  @Column({ 
-    type: 'timestamp', 
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-    comment: '最后修改时间' 
-  })
-  updatedAt!: Date;
-
   // 关系映射
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
@@ -90,8 +67,4 @@ export class OperationLog {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'createdBy' })
   creator!: User;
-
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'updatedBy' })
-  updater!: User;
 }

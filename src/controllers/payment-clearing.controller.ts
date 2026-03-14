@@ -361,6 +361,10 @@ export class PaymentClearingController {
       
     try {
       const { ids } = req.body;
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
   
       if (!ids || !Array.isArray(ids) || ids.length === 0) {
         return errorResponse(res, 400, '请选择要确认的记录');
@@ -405,6 +409,12 @@ export class PaymentClearingController {
           summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, parseInt(item.companyId));
         }
       }
+
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_CONFIRM,
+        desc: `确认到款记录: ${ids}`,
+        userId
+      });
         
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error: any) {

@@ -44,11 +44,6 @@ export class OperationLogController {
     try {
       const createDto: CreateOperationLogDto = req.body;
       
-      // 自动生成日志编号
-      if (!createDto.logCode) {
-        createDto.logCode = await this.operationLogService.generateLogCode();
-      }
-
       // 设置用户信息
       const userId = (req as any).user?.id || 1;
       createDto.userId = userId;
@@ -65,36 +60,6 @@ export class OperationLogController {
       return successResponse(res, log, '创建成功');
     } catch (error: any) {
       return errorResponse(res, 500, `创建失败: ${error.message}`);
-    }
-  }
-
-  async updateLog(req: any, res: Response) {
-    try {
-      const id = parseInt(req.params.id);
-      const updateDto: UpdateOperationLogDto = req.body;
-      
-      if (isNaN(id)) {
-        return errorResponse(res, 400, '无效的日志ID');
-      }
-
-      const existingLog = await this.operationLogService.findOne(id);
-      if (!existingLog) {
-        return errorResponse(res, 404, '日志不存在');
-      }
-
-      // 设置更新人
-      updateDto.updatedBy = (req as any).user?.id || 1;
-
-      // 验证更新参数
-      const errors = await validate(updateDto);
-      if (errors.length > 0) {
-        return errorResponse(res, 400, '参数验证失败', errors);
-      }
-
-      const log = await this.operationLogService.update(id, updateDto);
-      return successResponse(res, log, '更新成功');
-    } catch (error: any) {
-      return errorResponse(res, 500, `更新失败: ${error.message}`);
     }
   }
 

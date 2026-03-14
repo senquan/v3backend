@@ -38,17 +38,8 @@ export class OperationLogQueryDto {
 }
 
 export class CreateOperationLogDto {
-  @IsString()
-  logCode!: string;
-
   @IsNumber()
   userId!: number;
-
-  @IsString()
-  userName!: string;
-
-  @IsString()
-  realName!: string;
 
   @IsString()
   operationModule!: string;
@@ -91,10 +82,6 @@ export class CreateOperationLogDto {
   @Min(1)
   @Max(2)
   status!: number;
-
-  @IsOptional()
-  @IsString()
-  remark?: string;
 
   @IsNumber()
   createdBy!: number;

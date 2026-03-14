@@ -2,12 +2,45 @@ import { Repository, Between, Like } from 'typeorm';
 import { OperationLog } from '../models/operation-log.entity';
 import { AppDataSource } from '../config/database';
 import { CreateOperationLogDto, UpdateOperationLogDto, OperationLogQueryDto } from '../dtos/operation-log.dto';
+import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
 
 export class OperationLogService {
   private readonly operationLogRepository: Repository<OperationLog>;
+  private static eventListenersInitialized = false;
   
   constructor() {
     this.operationLogRepository = AppDataSource.getRepository(OperationLog);
+    this.initEventListeners();
+  }
+
+  private initEventListeners() {
+    if (OperationLogService.eventListenersInitialized) {
+      return;
+    }
+    
+    summaryEventEmitter.on(SummaryEvents.LOG_OPERATIONS, async (data: any) => {
+      try {
+        const { type, desc, userId, module } = data;
+        console.log('[OperationLogService] 事件收到')
+        await this.create({
+          userId,
+          operationModule: module || 'finance',
+          operationType: type,
+          operationDesc: desc,
+          requestUrl: '',
+          requestMethod: '',
+          clientIp: '',
+          status: 1,
+          createdBy: userId,
+          updatedBy: userId,
+          executionTime: 0
+        });
+      } catch (error) {
+        console.error('[OperationLogService] 写入导入确认日志失败:', error);
+      }
+    });
+    
+    OperationLogService.eventListenersInitialized = true;
   }
 
   async findAll(query: OperationLogQueryDto) {
@@ -17,7 +50,7 @@ export class OperationLogService {
     let whereConditions: any = {};
     
     if (keyword) {
-      whereConditions.userName = Like(`%${keyword}%`);
+      whereConditions.operationDesc = Like(`%${keyword}%`);
     }
     
     if (operationModule) {
@@ -45,11 +78,16 @@ export class OperationLogService {
       skip,
       take: size,
       order: { operationTime: 'DESC' },
-      relations: ['user', 'creator', 'updater']
+      relations: ['user']
     });
 
+    const sanitizedRecords = records.map(record => ({
+      ...record,
+      user: record.user ? { name: record.user.name } : null
+    }));
+
     return {
-      records,
+      records: sanitizedRecords,
       total,
       page: parseInt(page as any),
       size: parseInt(size as any)
@@ -57,56 +95,32 @@ export class OperationLogService {
   }
 
   async findOne(id: number) {
-    return await this.operationLogRepository.findOne({
+    const operationLog = await this.operationLogRepository.findOne({
       where: { id },
-      relations: ['user', 'creator', 'updater']
+      relations: ['user']
     });
+
+    if (operationLog && operationLog.user) {
+      return {
+        ...operationLog,
+        user: { name: operationLog.user.name }
+      };
+    }
+
+    return operationLog;
   }
 
   async create(createOperationLogDto: CreateOperationLogDto) {
     const operationLog = this.operationLogRepository.create({
       ...createOperationLogDto,
       operationTime: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: new Date()
     });
-    
     return await this.operationLogRepository.save(operationLog);
-  }
-
-  async update(id: number, updateOperationLogDto: UpdateOperationLogDto) {
-    await this.operationLogRepository.update(id, {
-      ...updateOperationLogDto,
-      updatedAt: new Date()
-    });
-    return await this.findOne(id);
   }
 
   async remove(id: number) {
     return await this.operationLogRepository.delete(id);
-  }
-
-  async generateLogCode(): Promise<string> {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const dateStr = `${year}${month}${day}`;
-    
-    // 获取当天最大的日志编号
-    const maxLog = await this.operationLogRepository
-      .createQueryBuilder('log')
-      .where('log.logCode LIKE :prefix', { prefix: `LOG${dateStr}%` })
-      .orderBy('log.logCode', 'DESC')
-      .getOne();
-    
-    let sequence = 1;
-    if (maxLog) {
-      const lastSequence = parseInt(maxLog.logCode.slice(-4));
-      sequence = lastSequence + 1;
-    }
-    
-    return `LOG${dateStr}${String(sequence).padStart(4, '0')}`;
   }
 
   async batchDelete(ids: number[]) {

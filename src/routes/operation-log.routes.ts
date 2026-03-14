@@ -17,9 +17,6 @@ router.get('/:id', operationLogController.getLogDetail.bind(operationLogControll
 // 创建操作日志
 router.post('/', operationLogController.createLog.bind(operationLogController));
 
-// 更新操作日志
-router.put('/:id', operationLogController.updateLog.bind(operationLogController));
-
 // 删除操作日志
 router.delete('/:id', operationLogController.deleteLog.bind(operationLogController));
 

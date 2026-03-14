@@ -283,6 +283,11 @@ export class FundTransferController {
       const type = parseInt(req.body.type) || 1;
       const { ids } = req.body;
 
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 401, '未授权');
+      }
+
       if (!ids || !Array.isArray(ids) || ids.length === 0) {
         return errorResponse(res, 400, '请选择要确认的记录');
       }
@@ -348,6 +353,11 @@ export class FundTransferController {
           summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, parseInt(item.companyId));
         }
       }
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_CONFIRM,
+        desc: `确认${type === 1 ? "上划" : "下拨"}记录: ${ids}`,
+        userId
+      });
 
       return successResponse(res, { affected: result.affected }, `确认成功，共确认 ${result.affected} 条记录`);
     } catch (error: any) {

@@ -124,7 +124,8 @@ export class InterestRateService {
       updatedBy: userId
     });
 
-    return await this.interestRateRepository.save(newRate);
+    const saved = await this.interestRateRepository.save(newRate)
+    return [interestRate.rateValue, saved];
   }
 
   async remove(id: number) {

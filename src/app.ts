@@ -11,6 +11,7 @@ import http from 'http';
 import { RedisCacheService } from './services/cache.service';
 import { CacheQueryMiddleware } from './middlewares/cache-query.middleware';
 import { WebSocketService } from './utils/websocket';
+import { OperationLogService } from './services/operation-log.service';
 
 // 加载环境变量
 dotenv.config();
