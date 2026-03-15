@@ -54,7 +54,7 @@ export class OperationLogService {
     }
     
     if (operationModule) {
-      whereConditions.operationModule = Like(`%${operationModule}%`);
+      whereConditions.operationModule = operationModule;
     }
     
     if (operationType) {

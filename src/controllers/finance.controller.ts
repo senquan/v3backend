@@ -604,11 +604,6 @@ export class ImportDepositController {
           await this._updateDepositFixedSummary(companyId, queryRunner);
         }
       }
-      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
-        type: SummaryEvents.LOG_TYPE_CONFIRM,
-        desc: `确认定期存款记录: ${ids.join(",")}`,
-        userId
-      });
 
       await queryRunner.commitTransaction();
 
@@ -620,7 +615,7 @@ export class ImportDepositController {
       }
       summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
         type: SummaryEvents.LOG_TYPE_CONFIRM,
-        desc: `确认记录: ${ids.join(",")}`,
+        desc: `确认定期存款记录: ${ids.join(",")}`,
         userId
       });
 
