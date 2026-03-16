@@ -11,7 +11,8 @@
         "process-gallery": "ts-node src/scripts/process-gallery.ts",
         "generate-thumbnails": "ts-node src/scripts/generate-thumbnails.ts",
         "upgrade-ticket-priority": "ts-node src/scripts/upgrade-ticket-priority.ts",
-        "test-ticket-priority": "ts-node src/scripts/test-ticket-priority.ts"
+        "test-ticket-priority": "ts-node src/scripts/test-ticket-priority.ts",
+        "calculate-interest": "ts-node src/tasks/interest-calculation.task.ts"
     },
     "dependencies": {
         "@nestjs/common": "^11.1.9",

@@ -95,6 +95,20 @@ export class InterestCalculationTask {
         });
         console.log(`新增单位 ${summary.company.companyName} 活期利息: 余额=${totalBalance}, 利息=${dailyInterest}`);
       }
+
+      const totalCurrentInterest = await this.dailyCurrentInterestRepository
+        .createQueryBuilder('detail')
+        .select('SUM(detail.dailyInterest)', 'total')
+        .where('detail.companyId = :companyId', { companyId: summary.company.id })
+        .getRawOne();
+
+      const totalInterestAmount = Number(totalCurrentInterest?.total || 0);
+      
+      await this.depositLoanSummaryRepository.update(summary.id, {
+        depositCurrentInterest: totalInterestAmount
+      });
+      
+      console.log(`更新单位 ${summary.company.companyName} 活期利息总额: ${totalInterestAmount}`);
     }
 
     console.log('活期利息计算完成');
@@ -168,12 +182,16 @@ export class InterestCalculationTask {
     });
     console.log(`共 ${fixedDeposits.length} 条定期存款记录`);
 
-    const rate = await this.interestRateRepository.findOne({
+    const rateData = await this.interestRateRepository.find({
       where: { rateType: 1, status: 1 },
       order: { createdAt: 'DESC' }
     });
-    const dailyRate = rate ? Number(rate.rateValue) / 100 / 360 : 0;
-    console.log(`当前定期日利率: ${dailyRate}`);
+    const rateMap = rateData.reduce((map, rate) => {
+      map[rate.rateType] = Number(rate.rateValue);
+      return map;
+    }, {} as Record<number, number>);
+
+    const companyMap = new Map<number, number>()
 
     for (const deposit of fixedDeposits) {
       const endDate = new Date(deposit.endDate);
@@ -186,6 +204,7 @@ export class InterestCalculationTask {
       const isEstimate = endDate.getTime() !== today.getTime() ? 1 : 0;
       const days = deposit.depositPeriod * 30;
 
+      const dailyRate = rateMap[deposit.depositPeriod] ? rateMap[deposit.depositPeriod] / 100 / 360 : 0;
       const interestAmount = Number(deposit.amount) * dailyRate * days;
 
       await this.dailyFixedInterestRepository.save({
@@ -193,13 +212,13 @@ export class InterestCalculationTask {
         companyId: deposit.companyId,
         interestDate: today,
         currentBalance: deposit.amount,
-        currentRate: rate ? Number(rate.rateValue) : 0,
+        currentRate: rateMap[deposit.depositPeriod] || 0,
         depositPeriod: deposit.depositPeriod,
         interestAmount: interestAmount,
         isEstimate: isEstimate
       });
 
-      console.log(`计算定期利息: ${deposit.depositCode}, 余额=${deposit.amount}, 存期=${deposit.depositPeriod}月, 利息=${interestAmount}, 是否预估=${isEstimate === 1 ? '是' : '否'}`);
+      console.log(`计算定期利息: ${deposit.depositCode}, 余额=${deposit.amount}, 存期=${deposit.depositPeriod}, 利率=${rateMap[deposit.depositPeriod]}, 利息=${interestAmount}, 是否预估=${isEstimate === 1 ? '是' : '否'}`);
 
       if (isEstimate === 1) {
         const nextInterestDate = new Date(lastInterestDate);
@@ -220,8 +239,28 @@ export class InterestCalculationTask {
           lastInterestDate: newLastInterestDate
         });
       }
+
+      if (companyMap.get(deposit.companyId)) {
+        companyMap.set(deposit.companyId, (companyMap.get(deposit.companyId) || 0) + interestAmount)
+      } else {
+        companyMap.set(deposit.companyId, interestAmount)
+      }
     }
 
+    for (const [companyId, totalInterest] of companyMap) {
+      const summary = await this.depositLoanSummaryRepository.findOne({
+        where: { companyId }
+      });
+
+      if (summary) {
+        await this.depositLoanSummaryRepository.update(summary.id, {
+          depositFixedInterest: totalInterest
+        });
+        console.log(`更新单位 ${companyId} 定期利息总额: ${totalInterest}`);
+      } else {
+        console.warn(`未找到单位 ${companyId} 的存贷款汇总记录`);
+      }
+    }
     console.log('定期利息计算完成');
   }
 }

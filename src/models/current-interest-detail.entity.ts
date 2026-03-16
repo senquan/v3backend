@@ -18,7 +18,7 @@ export class DailyCurrentInterestDetail {
   @Column({ type: 'decimal', precision: 10, scale: 6, comment: '日利率' })
   dailyRate!: number;
 
-  @Column({ type: 'decimal', precision: 18, scale: 2, comment: '当日利息' })
+  @Column({ type: 'decimal', precision: 10, scale: 6, comment: '当日利息' })
   dailyInterest!: number;
 
   @CreateDateColumn({ type: 'timestamp', comment: '创建时间' })
