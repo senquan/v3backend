@@ -30,7 +30,7 @@ export class ProfitPaymentService {
   }
 
   async findAll(query: any) {
-    const { page = 1, size = 10, companyId, businessYear, status, keyword } = query;
+    const { page = 1, size = 10, companyId, year, status, keyword, amountFrom, amountTo, sort } = query;
     const pageNum = parseInt(page as string);
     const pageSize = parseInt(size as string);
     const skip = (pageNum - 1) * pageSize;
@@ -43,19 +43,36 @@ export class ProfitPaymentService {
     if (companyId) {
       queryBuilder.andWhere('payment.companyId = :companyId', { companyId: parseInt(companyId as string) });
     }
-    if (businessYear) {
-      queryBuilder.andWhere('payment.businessYear = :businessYear', { businessYear: parseInt(businessYear as string) });
+    if (year) {
+      queryBuilder.andWhere('payment.businessYear = :year', { year: parseInt(year as string) });
     }
     if (status) {
       queryBuilder.andWhere('payment.status = :status', { status: parseInt(status as string) });
     } else {
       queryBuilder.andWhere('payment.status != 3');
     }
+    if (amountFrom && amountFrom > 0) {
+      queryBuilder.andWhere('(payment.dueProfit1 >= :amountFrom OR payment.dueProfit2 >= :amountFrom)', { amountFrom: parseInt(amountFrom as string) });
+    }
+    if (amountTo && amountTo > 0) {
+      queryBuilder.andWhere('(payment.dueProfit1 <= :amountTo OR payment.dueProfit2 <= :amountTo)', { amountTo: parseInt(amountTo as string) });
+    }
     if (keyword) {
       queryBuilder.andWhere('(company.companyName LIKE :keyword OR company.companyCode LIKE :keyword)', { keyword: `%${keyword}%` });
     }
     if (query.accessableCompanyIds) {
       queryBuilder.andWhere('payment.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
+    }
+
+    if (sort && sort !== "") {
+      // 排序处理
+      const sortName = (sort as string).substring(0, 1);
+      const sortType = sortName === '-' ? 'DESC' : 'ASC';
+      const sortField = (sort as string).substring(1);
+      queryBuilder.addOrderBy(`payment.${sortField}`, sortType as 'ASC' | 'DESC');
+    } else {
+      queryBuilder.orderBy('payment.businessYear', 'DESC')
+      queryBuilder.addOrderBy('payment.createdAt', 'DESC')
     }
 
     const [records, total] = await queryBuilder
@@ -67,8 +84,6 @@ export class ProfitPaymentService {
         'updater.name',
         'company.companyName'
       ])
-      .orderBy('payment.businessYear', 'DESC')
-      .addOrderBy('payment.createdAt', 'DESC')
       .skip(skip)
       .take(pageSize)
       .getManyAndCount();

@@ -172,7 +172,11 @@ export class AdvanceExpenseController {
         type,
         status,
         page = 1,
-        size = 10
+        size = 10,
+        year,
+        amountFrom,
+        amountTo,
+        sort
       } = req.query;
 
       const pageNum = parseInt(page as string);
@@ -200,14 +204,32 @@ export class AdvanceExpenseController {
       if (companyId && companyId > 0) {
         queryBuilder = queryBuilder.andWhere('expense.companyId = :companyId', { companyId: parseInt(companyId as string) });
       }
+      if (year) {
+        queryBuilder.andWhere('expense.businessYear = :year', { year: parseInt(year as string) });
+      }
+      if (amountFrom && amountFrom > 0) {
+        queryBuilder.andWhere('expense.amount >= :amountFrom', { amountFrom: parseInt(amountFrom as string) });
+      }
+      if (amountTo && amountTo > 0) {
+        queryBuilder.andWhere('expense.amount <= :amountTo', { amountTo: parseInt(amountTo as string) });
+      }
 
       if (req.query.accessableCompanyIds) {
         queryBuilder = queryBuilder.andWhere('expense.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
       }
 
+      if (sort && sort !== "") {
+        // 排序处理
+        const sortName = (sort as string).substring(0, 1);
+        const sortType = sortName === '-' ? 'DESC' : 'ASC';
+        const sortField = (sort as string).substring(1);
+        queryBuilder = queryBuilder.addOrderBy(`expense.${sortField}`, sortType as 'ASC' | 'DESC');
+      } else {
+        queryBuilder = queryBuilder.addOrderBy('expense.createdAt', 'DESC')
+      }
+
       const [records, total] = await queryBuilder
         .select(['expense', 'company', 'creator.name', 'updater.name', 'details', 'expenseType'])
-        .orderBy('expense.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)
         .getManyAndCount();

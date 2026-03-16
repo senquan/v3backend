@@ -118,7 +118,6 @@ async function initOperationLogs() {
       Object.assign(operationLog, logData);
       operationLog.operationTime = new Date();
       operationLog.createdAt = new Date();
-      operationLog.updatedAt = new Date();
 
       await operationLogRepository.save(operationLog);
       console.log(`已创建操作日志: ${logData.logCode}`);

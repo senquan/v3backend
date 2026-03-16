@@ -340,7 +340,21 @@ export class ImportDepositController {
 
   async getFixedDepositRecords(req: any, res: Response) {
     try {
-      const { keyword, type, status, companyId, isReleased, startDate, endDate, depositPeriod, page = 1, size = 10 } = req.query;
+      const {
+        keyword,
+        type,
+        status,
+        companyId,
+        isReleased,
+        startDate,
+        endDate,
+        depositPeriod,
+        page = 1,
+        size = 10,
+        amountFrom,
+        amountTo,
+        sort
+      } = req.query;
       const pageNum = parseInt(page as string);
       const pageSize = parseInt(size as string);
       const skip = (pageNum - 1) * pageSize;
@@ -374,16 +388,33 @@ export class ImportDepositController {
       if (depositPeriod) {
         queryBuilder = queryBuilder.andWhere('deposit.depositPeriod = :depositPeriod', { depositPeriod: parseInt(depositPeriod as string) });
       }
+      if (amountFrom && amountFrom > 0) {
+        queryBuilder.andWhere('deposit.amount >= :amountFrom', { amountFrom: parseInt(amountFrom as string) });
+      }
+      if (amountTo && amountTo > 0) {
+        queryBuilder.andWhere('deposit.amount <= :amountTo', { amountTo: parseInt(amountTo as string) });
+      }
       if (req.query.accessableCompanyIds) {
         queryBuilder = queryBuilder.andWhere('deposit.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
       }
 
+      if (sort && sort !== "") {
+        // 排序处理
+        const sortName = (sort as string).substring(0, 1);
+        const sortType = sortName === '-' ? 'DESC' : 'ASC';
+        const sortField = (sort as string).substring(1);
+        queryBuilder = queryBuilder.addOrderBy(`deposit.${sortField}`, sortType as 'ASC' | 'DESC');
+      } else {
+        queryBuilder = queryBuilder.addOrderBy('deposit.createdAt', 'DESC')
+      }
+
       const [records, total] = await queryBuilder
         .select(['deposit', 'company', 'creator.name', 'updater.name'])
-        .orderBy('deposit.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)
         .getManyAndCount();
+
+      // console.log(queryBuilder.getSql())
 
       return successResponse(res, { records, total }, '查询成功');
     } catch (error) {

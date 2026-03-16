@@ -117,7 +117,10 @@ export class FundTransferController {
         endDate,
         isLoan,
         page = 1, 
-        size = 10 
+        size = 10,
+        amountFrom,
+        amountTo,
+        sort
       } = req.query;
 
       const pageNum = parseInt(page as string);
@@ -147,9 +150,25 @@ export class FundTransferController {
       if (isLoan) {
         queryBuilder = queryBuilder.andWhere('transfer.isLoan = :isLoan', { isLoan: parseInt(isLoan as string) });
       }
+      if (amountFrom && amountFrom > 0) {
+        queryBuilder.andWhere('transfer.transferAmount >= :amountFrom', { amountFrom: parseInt(amountFrom as string) });
+      }
+      if (amountTo && amountTo > 0) {
+        queryBuilder.andWhere('transfer.transferAmount <= :amountTo', { amountTo: parseInt(amountTo as string) });
+      }
 
       if (req.query.accessableCompanyIds) {
         queryBuilder = queryBuilder.andWhere('transfer.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
+      }
+
+      if (sort && sort !== "") {
+        // 排序处理
+        const sortName = (sort as string).substring(0, 1);
+        const sortType = sortName === '-' ? 'DESC' : 'ASC';
+        const sortField = (sort as string).substring(1);
+        queryBuilder = queryBuilder.addOrderBy(`transfer.${sortField}`, sortType as 'ASC' | 'DESC');
+      } else {
+        queryBuilder = queryBuilder.addOrderBy('transfer.createdAt', 'DESC')
       }
 
       const [items, total] = await queryBuilder
@@ -157,7 +176,6 @@ export class FundTransferController {
         .innerJoinAndSelect('transfer.creator', 'creator')
         .innerJoinAndSelect('transfer.updater', 'updater')
         .select(['transfer', 'company', 'creator.name', 'updater.name'])
-        .orderBy('transfer.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)
         .getManyAndCount();

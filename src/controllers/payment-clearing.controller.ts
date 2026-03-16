@@ -227,7 +227,8 @@ export class PaymentClearingController {
         startDate,
         endDate,
         amountFrom,
-        amountTo
+        amountTo,
+        sort
       } = req.query;
       const pageNum = parseInt(page as string);
       const pageSize = parseInt(size as string);
@@ -275,9 +276,18 @@ export class PaymentClearingController {
         queryBuilder = queryBuilder.andWhere('receive.companyId IN (:...ids)', { ids: req.query.accessableCompanyIds });
       }
 
+      if (sort && sort !== "") {
+        // 排序处理
+        const sortName = (sort as string).substring(0, 1);
+        const sortType = sortName === '-' ? 'DESC' : 'ASC';
+        const sortField = (sort as string).substring(1);
+        queryBuilder = queryBuilder.addOrderBy(`receive.${sortField}`, sortType as 'ASC' | 'DESC');
+      } else {
+        queryBuilder = queryBuilder.addOrderBy('receive.createdAt', 'DESC')
+      }
+
       const [records, total] = await queryBuilder
         .select(['receive', 'company', 'creator.name', 'updater.name'])
-        .orderBy('receive.createdAt', 'DESC')
         .skip(skip)
         .take(pageSize)
         .getManyAndCount();

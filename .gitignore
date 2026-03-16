@@ -23,6 +23,7 @@ types/auto/*
 
 # test
 test-*
+init-*
 
 # Backup
 backups/**/*
