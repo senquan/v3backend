@@ -20,6 +20,7 @@ export class ClearingSummaryService {
   private companyRepository = AppDataSource.getRepository(CompanyInfo);
   private snapshotRepository = AppDataSource.getRepository(ClearingSnapshot);
   private snapshotDataRepository = AppDataSource.getRepository(ClearingSnapshotData);
+  private fundTransferRepository = AppDataSource.getRepository(FundTransfer);
 
   constructor(
     private clearingSummaryRepository: Repository<ClearingSummary>,
@@ -258,6 +259,15 @@ export class ClearingSummaryService {
         console.error(`[ClearingSummaryService] 同步单位 ${companyId} 利润上缴失败:`, error);
       }
     });
+
+    // 上划下拨变动
+    summaryEventEmitter.on(SummaryEvents.TRANSFER_CHANGED, async (companyId: number) => {
+      try {
+        await this.syncDepositLoanBalance(companyId);
+      } catch (error) {
+        console.error(`[ClearingSummaryService] 同步单位 ${companyId} 存贷款余额失败:`, error);
+      }
+    });
   }
 
   /**
@@ -371,6 +381,47 @@ export class ClearingSummaryService {
     
     await this.clearingSummaryRepository.save(clearingSummary);
     console.log(`[ClearingSummaryService] 已同步单位 ${companyId} 的利润上缴: ${profitPayment.dueProfit1} / ${profitPayment.dueProfit2} / ${profitPayment.actualAmount}`);
+  }
+  /**
+   * 上划下拨变动
+   */
+  async syncDepositLoanBalance(companyId: number) {
+
+    let summary = await this.depositLoanSummaryRepository.findOne({
+      relations: ['company'],
+      where: { companyId }
+    });
+
+    if (!summary) {
+      summary = new DepositLoanSummary();
+      summary.companyId = companyId;
+    }
+    const transferResult = await this.fundTransferRepository.createQueryBuilder('transfer')
+      .where('transfer.companyId = :companyId', { companyId })
+      .andWhere('transfer.transferStatus = 2')  
+      .getMany();
+    let totalUp = 0;
+    let totalLoan = 0;
+    let totalDown = 0;
+    for (const item of transferResult) {
+      if (item.transferType === 1) {
+        totalUp += Number(item.transferAmount);
+      } else {
+        if (item.isLoan === 1) {
+          totalLoan += Number(item.transferAmount);
+        } else {
+          totalDown += Number(item.transferAmount);
+        }
+      }
+    }
+    summary.depositTransferUp = totalUp;
+    summary.depositTransferDown = totalDown;
+    summary.loanBalance = totalLoan;
+    summary.lastStatDate = new Date();
+    await this.depositLoanSummaryRepository.save(summary);
+
+    // 更新清算汇总表
+    await this.syncInternalDepositBalance(companyId);
   }
 
   async findAll(query: any) {

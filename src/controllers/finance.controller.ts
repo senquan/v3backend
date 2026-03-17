@@ -372,6 +372,8 @@ export class ImportDepositController {
       }
       if (status && status > 0) {
         queryBuilder = queryBuilder.andWhere('deposit.status = :status', { status: parseInt(status as string) });
+      } else {
+        queryBuilder = queryBuilder.andWhere('deposit.status != :status', { status: 3 });
       }
       if (startDate) {
         queryBuilder = queryBuilder.andWhere('deposit.startDate >= :startDate', { startDate: new Date(`${startDate} 00:00:00`) });

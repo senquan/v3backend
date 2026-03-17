@@ -249,7 +249,7 @@ export class PaymentClearingController {
       if (status && status > 0) {
         queryBuilder = queryBuilder.andWhere('receive.status = :status', { status: parseInt(status as string) });
       } else {
-        queryBuilder = queryBuilder.andWhere('receive.status != 4');
+        queryBuilder = queryBuilder.andWhere('receive.status != 3');
       }
       if (batchNo) {
         queryBuilder = queryBuilder.andWhere('receive.batchNo = :batchNo', { batchNo });

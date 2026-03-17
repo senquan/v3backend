@@ -57,7 +57,7 @@ export class FundTransferController {
       transfer.createdBy = userId;
       transfer.updatedBy = userId;
 
-      const saved = await this.fundTransferRepository.save(transfer);
+      const saved = await this.fundTransferRepository.save(transfer);      
       return successResponse(res, saved, '创建成功');
     } catch (error) {
       return errorResponse(res, 500, `创建失败: ${error}`);
@@ -112,7 +112,7 @@ export class FundTransferController {
         keyword,
         companyId,
         type, 
-        transferStatus, 
+        status, 
         startDate, 
         endDate,
         isLoan,
@@ -132,8 +132,10 @@ export class FundTransferController {
       if (type && type > 0) {
         queryBuilder = queryBuilder.andWhere('transfer.transferType = :transferType', { transferType: parseInt(type as string) });
       }
-      if (transferStatus && transferStatus > 0) {
-        queryBuilder = queryBuilder.andWhere('transfer.transferStatus = :transferStatus', { transferStatus: parseInt(transferStatus as string) });
+      if (status && status > 0) {
+        queryBuilder = queryBuilder.andWhere('transfer.transferStatus = :transferStatus', { transferStatus: parseInt(status as string) });
+      } else {
+        queryBuilder = queryBuilder.andWhere('transfer.transferStatus != :transferStatus', { transferStatus: 3 });
       }
       if (startDate) {
         queryBuilder = queryBuilder.andWhere('transfer.transferDate >= :startDate', { startDate: new Date(startDate as string) });
@@ -341,46 +343,11 @@ export class FundTransferController {
       if (companyIds.length > 0) {
         for (const item of companyIds) {
           const companyId = parseInt(item.companyId);
-
-          let summary = await queryRunner.manager.findOne(DepositLoanSummary, {
-            relations: ['company'],
-            where: { companyId }
-          });
-
-          if (!summary) {
-            summary = new DepositLoanSummary();
-            summary.companyId = companyId;
-          }
-
-          if (type === 1) {
-            const upAmountResult = await queryRunner.manager.createQueryBuilder(FundTransfer, 'transfer')
-              .select('SUM(transfer.transferAmount)', 'total')
-              .where('transfer.companyId = :companyId', { companyId })
-              .andWhere('transfer.transferType = 1')
-              .andWhere('transfer.transferStatus = 2')
-              .getRawOne();
-            summary.depositTransferUp = upAmountResult.total || 0;
-          } else if (type === 2) {
-            const downAmountResult = await queryRunner.manager.createQueryBuilder(FundTransfer, 'transfer')
-              .select('SUM(transfer.transferAmount)', 'total')
-              .where('transfer.companyId = :companyId', { companyId })
-              .andWhere('transfer.transferType = 2')
-              .andWhere('transfer.transferStatus = 2')
-              .getRawOne();
-            summary.depositTransferDown = downAmountResult.total || 0;
-          }
-          summary.lastStatDate = new Date();
-          await queryRunner.manager.save(DepositLoanSummary, summary);
+          summaryEventEmitter.emit(SummaryEvents.TRANSFER_CHANGED, companyId);
         }
       }
       await queryRunner.commitTransaction();
 
-      // 提交后触发汇总变更事件
-      if (companyIds.length > 0) {
-        for (const item of companyIds) {
-          summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, parseInt(item.companyId));
-        }
-      }
       summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
         type: SummaryEvents.LOG_TYPE_CONFIRM,
         desc: `确认${type === 1 ? "上划" : "下拨"}记录: ${ids}`,

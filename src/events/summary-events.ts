@@ -12,6 +12,10 @@ export const SummaryEvents = {
   // 利润上缴汇总变更事件
   PROFIT_PAYMENT_CHANGED: 'profit_payment_changed',
 
+  // 内部存贷款汇总
+  // 上划下拨变动
+  TRANSFER_CHANGED: 'transfer_changed',
+
   // 操作日志事件
   LOG_TYPE_MODIFY: 2,
   LOG_TYPE_DELETE: 3,
