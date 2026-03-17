@@ -81,7 +81,7 @@ export class InterestCalculationTask {
       if (existing) {
         await this.dailyCurrentInterestRepository.update(existing.id, {
           currentBalance: totalBalance,
-          dailyRate: dailyRate,
+          dailyRate: dailyRate * 100,
           dailyInterest: dailyInterest
         });
         console.log(`更新单位 ${summary.company.companyName} 活期利息: 余额=${totalBalance}, 利息=${dailyInterest}`);
@@ -90,7 +90,7 @@ export class InterestCalculationTask {
           companyId: summary.company.id,
           interestDate: today,
           currentBalance: totalBalance,
-          dailyRate: dailyRate,
+          dailyRate: dailyRate * 100,
           dailyInterest: dailyInterest
         });
         console.log(`新增单位 ${summary.company.companyName} 活期利息: 余额=${totalBalance}, 利息=${dailyInterest}`);
