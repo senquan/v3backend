@@ -47,11 +47,18 @@ export class CacheQueryMiddleware {
       const originalJson = res.json;
       
       res.json = (data) => {
-        // 将响应数据存入缓存
-        console.log('Cache set:', cacheKey);
-        this.cacheService.set(cacheKey, data, cacheOptions.ttl || this.DEFAULT_TTL).catch(err => {
-          console.error('Cache set error:', err);
-        });
+        // 只在响应成功时缓存 (HTTP 2xx 且业务code为0)
+        const isSuccessHttp = res.statusCode >= 200 && res.statusCode < 300;
+        const isSuccessBusiness = data && typeof data === 'object' && data.code === 0;
+        
+        if (isSuccessHttp && isSuccessBusiness) {
+          console.log('Cache set:', cacheKey);
+          this.cacheService.set(cacheKey, data, cacheOptions.ttl || this.DEFAULT_TTL).catch(err => {
+            console.error('Cache set error:', err);
+          });
+        } else {
+          console.log('Cache skip (non-success response):', cacheKey, 'HTTP:', res.statusCode, 'Code:', data?.code);
+        }
         
         // 调用原始的res.json方法
         return originalJson.call(res, data);

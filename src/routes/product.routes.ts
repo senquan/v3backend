@@ -68,7 +68,7 @@ router.delete('/series/:id', productController.deleteSeries);
 router.post('/model/', productController.createModel);
 
 // 更新系列
-router.put('/model/:id', productController.updateModel);
+router.put('/model/:id', cacheClearMiddleware('/api/v1/product/list'), productController.updateModel);
 
 // 删除系列
 router.delete('/model/:id', productController.deleteModel);

@@ -14,8 +14,6 @@ import { Tag } from '../models/tag.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { PlatformTags } from '../models/platform-tags.model';
-import * as path from 'path';
-import sharp from 'sharp';
 
 export class ProductController {
   // 获取商品列表
@@ -824,6 +822,7 @@ export class ProductController {
             }
 
             // 检查并更新名称
+            console.log(`更新商品名称: ${existingProduct.name} -> ${productData.name}`);
             if (productData.name !== undefined && productData.name !== existingProduct.name) {
               existingProduct.name = productData.name;
               isUpdated = true;
