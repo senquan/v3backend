@@ -262,22 +262,33 @@ export class AdvanceExpenseController {
 
   async deleteExpense(req: any, res: Response) {
     try {
-      const { id } = req.body;
-
-      const idNum = parseInt(id);
-      const record = await this.advanceExpenseRepository.findOne({
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 403, '未授权'); 
+      }
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return errorResponse(res, 400, '请选择要确认的记录');
+      }
+      const numIds = ids.map(Number);
+      const records = await this.advanceExpenseRepository.find({
         relations: ['company'],
-        where: { id: idNum }
+        where: { id: In(numIds) }
       });
-
-      if (!record) {
+      if (!records || records.length === 0) {
         return errorResponse(res, 404, '记录不存在');
       }
+      for (const record of records) {
+        record.status = 3;
+        await this.advanceExpenseRepository.save(record);
+        summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, record.companyId);
+      }
 
-      record.status = 3;
-      await this.advanceExpenseRepository.save(record);
-
-      summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, record.companyId);
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_DELETE,
+        desc: `删除代垫费用记录: ${ids.join(",")}`,
+        userId
+      });
 
       return successResponse(res, null, '删除成功');
     } catch (error) {

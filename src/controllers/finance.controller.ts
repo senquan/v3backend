@@ -602,7 +602,6 @@ export class ImportDepositController {
         return errorResponse(res, 403, '未授权');
       }
       const { ids } = req.body;
-
       if (!ids || !Array.isArray(ids) || ids.length === 0) {
         return errorResponse(res, 400, '请选择要确认的记录');
       }
@@ -660,17 +659,29 @@ export class ImportDepositController {
     }
   }
 
-  async deleteRecord(req: any, res: Response) {
+  async deleteRecords(req: any, res: Response) {
     try {
-      const id = parseInt(req.params.id);
-      const record = await this.fixedDepositRepository.findOne({ where: { id } });
-
-      if (!record) {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 403, '未授权'); 
+      }
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return errorResponse(res, 400, '请选择要确认的记录');
+      }
+      const numIds = ids.map(Number);
+      const records = await this.fixedDepositRepository.find({
+        relations: ['company'],
+        where: { id: In(numIds), status: 1 }
+      });
+      if (!records || records.length === 0) {
         return errorResponse(res, 404, '记录不存在');
       }
 
-      await this.fixedDepositRepository.remove(record);
-
+      for (const record of records) {
+        record.status = 3;
+        await this.fixedDepositRepository.save(record);
+      }
       return successResponse(res, null, '删除成功');
     } catch (error) {
       return errorResponse(res, 500, `删除失败: ${error}`);
@@ -868,21 +879,36 @@ export class ProfitPaymentController {
     try {
       const userId = (req as any).user?.id;
       if (!userId) {
-        return errorResponse(res, 401, '未授权');
+        return errorResponse(res, 403, '未授权');
+      }
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return errorResponse(res, 400, '请选择要删除的记录');
+      }
+      const numIds = ids.map((id: string | number) => parseInt(id as string));
+
+      const result = await this.profitPaymentService.removeAll(numIds, userId);
+
+      const companyIds = await this.profitPaymentRepository
+        .createQueryBuilder('payment')
+        .select('payment.companyId', 'companyId')
+        .where('payment.id IN (:...ids)', { ids: numIds })
+        .distinct(true)
+        .getRawMany();
+
+      if (companyIds && companyIds.length > 0) {
+        companyIds.forEach(companyId => {
+          summaryEventEmitter.emit(SummaryEvents.PROFIT_PAYMENT_CHANGED, companyId.companyId);
+        });
       }
 
-      const { id } = req.body;
-      if (!id) {
-        return errorResponse(res, 400, '记录ID不能为空');
-      }
+      summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
+        type: SummaryEvents.LOG_TYPE_DELETE,
+        desc: `删除利润上缴计划: ${ids.join(",")}`,
+        userId
+      });
 
-      const result = await this.profitPaymentService.remove(parseInt(id), userId);
-
-      if (result && result.companyId) {
-        summaryEventEmitter.emit(SummaryEvents.PROFIT_PAYMENT_CHANGED, result.companyId);
-      }
-
-      return successResponse(res, null, '删除成功');
+      return successResponse(res, null, `删除成功，共删除 ${result.affected} 条记录`);
     } catch (error: any) {
       return errorResponse(res, 400, error.message || '删除失败');
     }

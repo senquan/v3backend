@@ -41,7 +41,7 @@ router.put('/import-deposit/:id/confirm', (req, res: Response) => importDepositC
 
 router.post('/import-deposit/confirm', (req, res: Response) => importDepositController.batchConfirm(req, res));
 
-router.delete('/import-deposit/:id', (req, res: Response) => importDepositController.deleteRecord(req, res));
+router.delete('/fixed-deposits', (req, res: Response) => importDepositController.deleteRecords(req, res));
 
 // 到款清算管理
 router.post('/receive', (req, res: Response) => paymentClearingController.createReceive(req, res));
@@ -63,7 +63,7 @@ router.get('/fund-transfers', (req, res: Response) => fundTransferController.get
 
 router.put('/fund-transfer/:id', (req, res: Response) => fundTransferController.updateTransfer(req, res));
 
-router.delete('/fund-transfer', (req, res: Response) => fundTransferController.deleteTransfer(req, res));
+router.delete('/fund-transfers', (req, res: Response) => fundTransferController.deleteTransfer(req, res));
 
 router.post('/import-transfer', (req, res: Response) => fundTransferController.batchImport(req, res));
 
@@ -76,7 +76,7 @@ router.get('/advance-expenses', (req, res: Response) => advanceExpenseController
 
 router.put('/advance-expense/:id', (req, res: Response) => advanceExpenseController.updateExpense(req, res));
 
-router.delete('/advance-expense', (req, res: Response) => advanceExpenseController.deleteExpense(req, res));
+router.delete('/advance-expenses', (req, res: Response) => advanceExpenseController.deleteExpense(req, res));
 
 router.post('/advance-expense/confirm', (req, res: Response) => advanceExpenseController.confirmExpense(req, res));
 
@@ -105,7 +105,7 @@ router.post('/profit-payment/:id/turn-over', (req, res: Response) => profitPayme
 
 router.put('/profit-payment/:id', (req, res: Response) => profitPaymentController.update(req, res));
 
-router.delete('/profit-payment', (req, res: Response) => profitPaymentController.delete(req, res));
+router.delete('/profit-payments', (req, res: Response) => profitPaymentController.delete(req, res));
 
 router.post('/profit-payments/confirm', (req, res: Response) => profitPaymentController.confirm(req, res));
 

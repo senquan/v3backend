@@ -466,24 +466,27 @@ export class PaymentClearingController {
 
   async deleteReceive(req: any, res: Response) {
     try {
-      const { id } = req.body;
-      
-      const idNum = parseInt(id);
-      const record = await this.paymentReceiveRepository.findOne({
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 403, '未授权');
+      }
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return errorResponse(res, 400, '请选择要确认的记录');
+      }
+      const numIds = ids.map((id: string | number) => parseInt(id as string));
+      const records = await this.paymentReceiveRepository.find({
         relations: ['company'],
-        where: { id: idNum }
+        where: { id: In(numIds), status: 1 }
       });
 
-      if (!record) {
+      if (!records || records.length === 0) {
         return errorResponse(res, 404, '记录不存在');
       }
-      if (record.status !== 1) {
-        return errorResponse(res, 400, '只能删除未确认的记录');
+      for (const record of records) {
+        record.status = 3;
+        await this.paymentReceiveRepository.save(record);
       }
-
-      record.status = 4;
-      await this.paymentReceiveRepository.save(record);
-
       return successResponse(res, null, '删除成功');
     } catch (error) {
       return errorResponse(res, 500, `删除失败: ${error}`);

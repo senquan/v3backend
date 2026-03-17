@@ -14,6 +14,7 @@ export const SummaryEvents = {
 
   // 操作日志事件
   LOG_TYPE_MODIFY: 2,
+  LOG_TYPE_DELETE: 3,
   LOG_TYPE_CONFIRM: 5,
   LOG_OPERATIONS: 'log_operations',
 };

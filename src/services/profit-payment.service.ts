@@ -244,6 +244,16 @@ export class ProfitPaymentService {
     return { id, status: 3, companyId: profitPayment.companyId };
   }
 
+  async removeAll(ids: number[], userId: number) {
+    const result = await this.profitPaymentRepository.update(
+      { id: In(ids) },
+      { status: 3, updatedBy: userId }
+    );
+
+    await this.clearCache();
+    return { affected: result.affected };
+  }
+
   async confirm(id: number, userId: number) {
     const profitPayment = await this.findOne(id);
     if (!profitPayment) {

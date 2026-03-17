@@ -194,17 +194,27 @@ export class FundTransferController {
 
   async deleteTransfer(req: any, res: Response) {
     try {
-      const { id } = req.body;
-      
-      const idNum = parseInt(id);
-      const record = await this.fundTransferRepository.findOne({ where: { id: idNum } });
-
-      if (!record) {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 403, '未授权'); 
+      }
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return errorResponse(res, 400, '请选择要确认的记录');
+      }
+      const numIds = ids.map(Number);
+      const records = await this.fundTransferRepository.find({
+        relations: ['company'],
+        where: { id: In(numIds), transferStatus: 1 }
+      });
+      if (!records || records.length === 0) {
         return errorResponse(res, 404, '记录不存在');
       }
 
-      await this.fundTransferRepository.remove(record);
-
+      for (const record of records) {
+        record.transferStatus = 3;
+        await this.fundTransferRepository.save(record);
+      }
       return successResponse(res, null, '删除成功');
     } catch (error) {
       return errorResponse(res, 500, `删除失败: ${error}`);
