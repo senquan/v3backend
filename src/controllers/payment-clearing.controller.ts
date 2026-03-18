@@ -350,12 +350,10 @@ export class PaymentClearingController {
       }
 
       const updated = await queryRunner.manager.save(PaymentReceive, record);
-      await this._updateDepositIncomingSummary(record.companyId, queryRunner);
-
       await queryRunner.commitTransaction();
 
       // 提交后触发事件
-      summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, record.companyId);
+      summaryEventEmitter.emit(SummaryEvents.RECEIVED_CHANGED, record.companyId);
 
       return successResponse(res, updated, '更新成功');
     } catch (error: any) {
@@ -403,20 +401,13 @@ export class PaymentClearingController {
         .where('receive.id IN (:...ids)', { ids: numIds })
         .distinct(true)
         .getRawMany();
-      
-      if (companyIds.length > 0) {
-        // 3. 为每个公司重新计算到款汇总
-        for (const item of companyIds) {
-          await this._updateDepositIncomingSummary(parseInt(item.companyId), queryRunner);
-        }
-      }
         
       await queryRunner.commitTransaction();
 
-      // 4. 提交事务后，异步触发汇总变更事件
       if (companyIds.length > 0) {
+        // 3. 为每个公司重新计算到款汇总
         for (const item of companyIds) {
-          summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, parseInt(item.companyId));
+          summaryEventEmitter.emit(SummaryEvents.RECEIVED_CHANGED, parseInt(item.companyId));
         }
       }
 
@@ -437,31 +428,6 @@ export class PaymentClearingController {
       // 释放连接
       await queryRunner.release();
     }
-  }
-
-  private async _updateDepositIncomingSummary(companyId: number, queryRunner: QueryRunner) {
-    // 计算到款总额
-    const amount = await queryRunner.manager.createQueryBuilder(PaymentReceive, 'payment')
-      .select('SUM(CASE WHEN payment.receiveType = 2 AND payment.discountAmount > 0 THEN payment.discountAmount ELSE payment.accountAmount END)', 'receiveAmount')
-      .where('payment.companyId = :companyId', { companyId })
-      .andWhere('payment.received = 1')
-      .andWhere('payment.status = 2')
-      .getRawOne();
-    
-    const receiveAmount = amount.receiveAmount || 0;
-    // 查找或创建汇总记录
-    let summary = await queryRunner.manager.findOne(DepositLoanSummary, {
-      relations: ['company'],
-      where: { companyId }
-    });
-      
-    if (!summary) {
-      summary = new DepositLoanSummary();
-      summary.companyId = companyId;
-    }
-    summary.depositIncoming = receiveAmount;
-    summary.lastStatDate = new Date();
-    await queryRunner.manager.save(DepositLoanSummary, summary);
   }
 
   async deleteReceive(req: any, res: Response) {

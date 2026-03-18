@@ -482,13 +482,10 @@ export class ImportDepositController {
       fundLog.createdAt = new Date();
       await queryRunner.manager.save(fundLog);
 
-      // 更新定期转入活期总额
-      await this._updateDepositFixedSummary(record.companyId, queryRunner);
-
       await queryRunner.commitTransaction();
 
       // 提交后触发事件
-      summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, record.companyId);
+      summaryEventEmitter.emit(SummaryEvents.FIXED_DEPOSIT_CHANGED, record.companyId);
 
       return successResponse(res, updated, '释放成功');
     } catch (error) {
@@ -497,50 +494,6 @@ export class ImportDepositController {
     } finally {
       await queryRunner.release();
     }
-  }
-
-  private async _updateDepositFixedSummary(companyId: number, queryRunner: QueryRunner) {
-    // 计算活期转入定期总额 (depositToFixed) 及现有定期
-    const toFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
-      .where('deposit.companyId = :companyId', { companyId })
-      .andWhere('deposit.status = 2')
-      .getMany();
-      
-    let depositToFixed = 0;
-    const depositFixedObj: Record<string, number> = {};
-    for (const item of toFixedResult) {
-      const periodKey = item.depositPeriod.toString();
-      depositFixedObj[periodKey] = Number(item.remainingAmount) + (depositFixedObj[periodKey] || 0);
-      if (item.depositType === 2) {
-        depositToFixed += Number(item.remainingAmount);
-      }
-    }
-
-    // 计算定期转入活期总额 (depositFromFixed)
-    const fromFixedResult = await queryRunner.manager.createQueryBuilder(FixedDeposit, 'deposit')
-      .select('SUM(deposit.releaseAmount)', 'total')
-      .where('deposit.companyId = :companyId', { companyId })
-      .andWhere('deposit.status = 2')
-      .andWhere('deposit.earlyRelease = 1')
-      .getRawOne();
-    const depositFromFixed = parseFloat(fromFixedResult.total) || 0;
-
-    // 查找或创建汇总记录
-    let summary = await queryRunner.manager.findOne(DepositLoanSummary, {
-      relations: ['company'],
-      where: { companyId }
-    });
-
-    if (!summary) {
-      summary = new DepositLoanSummary();
-      summary.companyId = companyId;
-    }
-
-    summary.depositToFixed = depositToFixed;
-    summary.depositFromFixed = depositFromFixed;
-    summary.depositFixed = depositFixedObj;
-    summary.lastStatDate = new Date();
-    await queryRunner.manager.save(DepositLoanSummary, summary);
   }
 
   async confirmRecord(req: any, res: Response) {
@@ -568,15 +521,10 @@ export class ImportDepositController {
       record.updatedBy = userId;
       const updated = await queryRunner.manager.save(FixedDeposit, record);
 
-      const companyId = record.companyId;
-
-      // 更新定期转入活期总额
-      await this._updateDepositFixedSummary(companyId, queryRunner);
-
       await queryRunner.commitTransaction();
 
       // 提交后触发事件
-      summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, companyId);
+      summaryEventEmitter.emit(SummaryEvents.FIXED_DEPOSIT_CHANGED, record.companyId);
       summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
         type: SummaryEvents.LOG_TYPE_CONFIRM,
         desc: `确认定期存款记录: ${id}`,
@@ -628,21 +576,14 @@ export class ImportDepositController {
         .distinct(true)
         .getRawMany();
 
-      if (companyIds.length > 0) {
-        // 3. 为每个公司重新计算汇总
-        for (const item of companyIds) {
-          const companyId = parseInt(item.companyId);
-          // 更新定期转入活期总额
-          await this._updateDepositFixedSummary(companyId, queryRunner);
-        }
-      }
+      
 
       await queryRunner.commitTransaction();
 
-      // 提交后触发汇总变更事件
       if (companyIds.length > 0) {
         for (const item of companyIds) {
-          summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, parseInt(item.companyId));
+          const companyId = parseInt(item.companyId);
+          summaryEventEmitter.emit(SummaryEvents.FIXED_DEPOSIT_CHANGED, companyId);
         }
       }
       summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {

@@ -15,6 +15,10 @@ export const SummaryEvents = {
   // 内部存贷款汇总
   // 上划下拨变动
   TRANSFER_CHANGED: 'transfer_changed',
+  // 到款变动
+  RECEIVED_CHANGED: 'received_changed',
+  // 定期变动
+  FIXED_DEPOSIT_CHANGED: 'fixed_deposit_changed',
 
   // 操作日志事件
   LOG_TYPE_MODIFY: 2,
