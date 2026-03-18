@@ -102,7 +102,8 @@ export class CompanyService {
 
     const allCompanies = await this.companyRepository.find({
       where: { isDeleted: 0 },
-      relations: ['parentCompany']
+      relations: ['parentCompany'],
+      order: { companyName: 'ASC' }
     });
     
     await this.cacheService.set(cacheKey, allCompanies, this.CACHE_TTL);
@@ -133,7 +134,6 @@ export class CompanyService {
         }
       }
     });
-
     return roots;
   }
 
