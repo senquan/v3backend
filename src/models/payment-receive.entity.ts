@@ -31,8 +31,8 @@ export class PaymentReceive {
   @Column({ type: 'varchar', length: 50, nullable: true, comment: '票据号码' })
   billNo!: string | null;
 
-  @Column({ type: 'varchar', length: 50, nullable: true, comment: '票据类型：1-银行承兑汇票，2-商业承兑汇票' })
-  billType!: string | null;
+  @Column({ type: 'smallint', nullable: true, comment: '票据类型：1-银行承兑汇票，2-商业承兑汇票' })
+  billType: number | null = null;
 
   @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, comment: '票据金额' })
   billAmount!: number;

@@ -44,6 +44,18 @@ export class PaymentClearingController {
         companyNameToId.set(company.companyName, company.id);
       });
 
+      const banks = await this.dictService.findByGroup(4);
+      const bankNameToId: Map<string, number> = new Map();
+      banks.forEach(bank => {
+        bankNameToId.set(bank.name, Number(bank.value));
+      });
+
+      const billTypes = await this.dictService.findByGroup(5);
+      const billTypeToId: Map<string, number> = new Map();
+      billTypes.forEach(type => {
+        billTypeToId.set(type.name, Number(type.value));
+      });
+
       for (let i = 0; i < receives.length; i++) {
         const item = receives[i];
 
@@ -74,12 +86,6 @@ export class PaymentClearingController {
             continue;
           }
 
-          const banks = await this.dictService.findByGroup(4);
-          const bankNameToId: Map<string, number> = new Map();
-          banks.forEach(bank => {
-            bankNameToId.set(bank.name, Number(bank.value));
-          });
-
           if (!bankNameToId.has(item.receiveBank)) {
             return errorResponse(res, 400, `第${i + 1}行：到款银行 "${item.receiveBank}" 不存在于系统中`);
           }
@@ -100,9 +106,12 @@ export class PaymentClearingController {
             errors.push(`第${i + 1}行：到期日不能为空`);
             continue;
           }
+          if (!billTypeToId.has(item.billType)) {
+            return errorResponse(res, 400, `第${i + 1}行：票据类型 "${item.billType}" 不存在于系统中`);
+          }
 
           payment.billNo = item.billNo;
-          payment.billType = item.billType || '1';
+          payment.billType = billTypeToId.get(item.billType) || null
           payment.billAmount = parseFloat(item.billAmount);
           payment.dueDate = new Date(item.dueDate);
           payment.collectionDate = item.collectionDate ? new Date(item.collectionDate) : null;
@@ -197,7 +206,7 @@ export class PaymentClearingController {
         payment.received = 1;
       } else {
         payment.billNo = billNo || null;
-        payment.billType = billType || '1';
+        payment.billType = Number(billType);
         payment.billAmount = parseFloat(billAmount) || 0;
         payment.dueDate = dueDate ? new Date(dueDate) : null;
         payment.collectionDate = collectionDate ? new Date(collectionDate) : null;
