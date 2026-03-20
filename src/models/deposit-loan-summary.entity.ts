@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { calculateSum } from '../utils';
 import { CompanyInfo } from './company-info.entity';
 
 @Entity('deposit_loan_summary')
@@ -47,4 +48,31 @@ export class DepositLoanSummary {
 
   @ManyToOne(() => CompanyInfo)
   company: CompanyInfo | null = null;
+
+  // 活期余额
+  getDepositCurrent() {
+    return Number(this.company?.initCurrentBalance || 0) +
+      Number(this.depositIncoming || 0) +
+      Number(this.depositTransferUp || 0) +
+      Number(this.depositFromFixed || 0) -
+      Number(this.depositTransferDown || 0) -
+      Number(this.depositToFixed || 0)
+  }
+
+  // 计算定期存款总额 (来自 JSONB 字段)
+  getDepositFixedTotal() {
+    return calculateSum([this.depositFixed || {}]);
+  }
+
+  // 利息总额
+  getInterestTotal() {
+    return Number(this.depositCurrentInterest || 0) +
+      Number(this.depositFixedInterest || 0)
+  }
+
+  getInternalDepositBalance() {
+    return this.getDepositCurrent() +
+      this.getDepositFixedTotal() +
+      this.getInterestTotal()
+  }
 }

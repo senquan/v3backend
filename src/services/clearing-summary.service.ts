@@ -1,5 +1,4 @@
-import { Repository, QueryRunner, LessThanOrEqual } from 'typeorm';
-import { calculateSum } from '../utils';
+import { Repository, LessThanOrEqual } from 'typeorm';
 import { AdvanceExpense } from '../models/advance-expense.entity';
 import { ClearingSummary } from '../models/clearing-summary.entity';
 import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
@@ -100,19 +99,8 @@ export class ClearingSummaryService {
 
     if (!depositSummary) return;
 
-    // 计算定期存款总额 (来自 JSONB 字段)
-    const depositFixedTotal = calculateSum([depositSummary.depositFixed || {}]);
-
     // 2. 计算内部存款余额 (含利息)
-    const internalDepositBalance = Number(depositSummary.company?.initCurrentBalance || 0) +
-      Number(depositSummary.depositIncoming || 0) + 
-      Number(depositSummary.depositTransferUp || 0) + 
-      Number(depositSummary.depositFromFixed || 0) - 
-      Number(depositSummary.depositTransferDown || 0) - 
-      Number(depositSummary.depositToFixed || 0) +
-      depositFixedTotal +
-      Number(depositSummary.depositCurrentInterest || 0) +
-      Number(depositSummary.depositFixedInterest || 0);
+    const internalDepositBalance = depositSummary.getInternalDepositBalance();
 
     // 3. 更新或创建清算汇总记录
     let clearingSummary = await this.clearingSummaryRepository.findOne({

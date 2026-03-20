@@ -25,10 +25,6 @@ router.get('/expenses', (req, res: Response) => financeController.getExpenses(re
 
 router.get('/payments', (req, res: Response) => financeController.getPayments(req, res));
 
-router.get('/loan-deposit-summary', (req, res: Response) => financeController.getLoanDepositSummary(req, res));
-
-router.get('/loan-deposit-summary/:id', (req, res: Response) => financeController.getLoanDepositSummaryById(req, res));
-
 router.post('/import-deposit', (req, res: Response) => importDepositController.importDeposit(req, res));
 
 router.post('/fixed-deposits', (req, res: Response) => importDepositController.createRecord(req, res));
@@ -116,5 +112,14 @@ router.post('/import-profit', (req, res: Response) => profitPaymentController.im
 router.post('/batch-file', (req, res: Response) => batchFileController.create(req, res));
 
 router.get('/batch-file/:no', (req, res: Response) => batchFileController.getBatchByNo(req, res));
+
+// 综合
+
+router.get('/expiring', (req, res: Response) => financeController.getExpiring(req, res));
+
+// 公司账户柱图
+router.get('/balance-chart', (req, res: Response) => financeController.getCompanyBalanceChart(req, res));
+// 存贷余额饼图
+router.get('/loan-deposit-chart', (req, res: Response) => financeController.getCompanyLoanDepositChart(req, res));
 
 export default router;

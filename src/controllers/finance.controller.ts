@@ -1,10 +1,10 @@
 import { Response } from 'express';
-import { In, QueryRunner } from 'typeorm';
+import { In, MoreThan, MoreThanOrEqual } from 'typeorm';
 import { CompanyInfo } from '../models/company-info.entity';
 import { Dict } from '../models/dict.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
-import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { ProfitPayment } from '../models/profit-payment.entity';
+import { PaymentReceive } from '../models/payment-receive.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
 import { FixedDepositLog } from '../models/fixed-deposit-log.entity';
@@ -12,9 +12,15 @@ import { ProfitPaymentLog } from '../models/profit-payment-log.entity';
 import { RedisCacheService } from '../services/cache.service';
 import { ProfitPaymentService } from '../services/profit-payment.service';
 import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
+import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
+import { DepositLoanSummaryService } from '../services/deposit-loan-summary.service';
 
 export class FinanceController {
   private companyRepository = AppDataSource.getRepository(CompanyInfo);
+  private fixedDepositRepository = AppDataSource.getRepository(FixedDeposit);
+  private paymentReceiveRepository = AppDataSource.getRepository(PaymentReceive);
+  private depositLoanSummaryRepository = AppDataSource.getRepository(DepositLoanSummary);
+  private depositLoanSummaryService = new DepositLoanSummaryService(this.depositLoanSummaryRepository);
 
   getCompanies(req: any, res: Response) {
     return successResponse(res, {
@@ -52,106 +58,96 @@ export class FinanceController {
     }, '查询成功');
   }
 
-  private generateMockData(company: CompanyInfo, endDate: string) {
-    const currentDepositInitial = Math.random() * 1000000 + 500000;
-    const currentDepositReceived = Math.random() * 500000 + 200000;
-    const currentDepositTransferUp = Math.random() * 300000 + 100000;
-    const currentDepositTransferDown = Math.random() * 200000 + 50000;
-    const currentDepositToFixed = Math.random() * 100000 + 20000;
+  async getExpiring(req: any, res: Response) {
 
-    const currentDepositSubtotal = currentDepositInitial + currentDepositReceived 
-      + currentDepositTransferUp - currentDepositTransferDown - currentDepositToFixed;
+    const {page, size} = req.query
+    const pageSize = parseInt(size) || 10;
+    const currentPage = parseInt(page) || 1;
+    const start = (currentPage - 1) * pageSize;
+    const end = currentPage * pageSize;
 
-    const fixedDeposit3Months = Math.random() * 300000 + 100000;
-    const fixedDeposit6Months = Math.random() * 200000 + 50000;
-    const fixedDeposit12Months = Math.random() * 150000 + 30000;
-    const fixedDepositSubtotal = fixedDeposit3Months + fixedDeposit6Months + fixedDeposit12Months;
+    const receivesData = await this.paymentReceiveRepository.find({
+      relations: ['company'],
+      where: { status: 2, receiveType: 2, received: 0, dueDate: MoreThanOrEqual(new Date())},
+      order: { dueDate: 'DESC' }
+    });
+    const receives = receivesData.map((item: any) => ({
+      id: item.id,
+      type: 1,
+      name: item.billNo,
+      company: item.company.companyName,
+      expiryDate: item.dueDate,
+      amount: item.billAmount
+    }));
 
-    const depositTotal = currentDepositSubtotal + fixedDepositSubtotal;
+    const depositsData = await this.fixedDepositRepository.find({
+      relations: ['company'],
+      where: { status: 2, remainingAmount: MoreThan(0), endDate: MoreThanOrEqual(new Date()) },
+      order: { endDate: 'DESC' }
+    });
+    const deposits = depositsData.map((item: any) => ({
+      id: item.id,
+      type: 2,
+      name: item.depositCode,
+      company: item.company.companyName,
+      expiryDate: item.endDate,
+      amount: item.remainingAmount
+    }));
 
-    const interestCurrent = currentDepositSubtotal * 0.0015;
-    const interestFixed = fixedDepositSubtotal * 0.025;
-    const interestSubtotal = interestCurrent + interestFixed;
+    const result = [...receives, ...deposits].sort((a, b) =>
+       new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime()
+    ).slice(start, end)
+    return successResponse(res, { records: result }, '查询成功');
 
-    const loanBalance = Math.random() * 1500000 + 500000;
-    const loanInterest = loanBalance * 0.035;
-    const loanSubtotal = loanBalance + loanInterest;
-
-    const total = depositTotal + interestSubtotal - loanSubtotal;
-
-    return {
-      id: company.id,
-      companyCode: company.companyCode || '',
-      companyName: company.companyName || '',
-      reportDate: endDate || new Date().toISOString().split('T')[0],
-      loanBalance: Math.round(loanBalance * 100) / 100,
-      loanInterest: Math.round(loanInterest * 100) / 100,
-      loanSubtotal: Math.round(loanSubtotal * 100) / 100,
-      currentDepositInitial: Math.round(currentDepositInitial * 100) / 100,
-      currentDepositReceived: Math.round(currentDepositReceived * 100) / 100,
-      currentDepositTransferUp: Math.round(currentDepositTransferUp * 100) / 100,
-      currentDepositTransferDown: Math.round(currentDepositTransferDown * 100) / 100,
-      currentDepositToFixed: Math.round(currentDepositToFixed * 100) / 100,
-      currentDepositSubtotal: Math.round(currentDepositSubtotal * 100) / 100,
-      fixedDeposit3Months: Math.round(fixedDeposit3Months * 100) / 100,
-      fixedDeposit6Months: Math.round(fixedDeposit6Months * 100) / 100,
-      fixedDeposit12Months: Math.round(fixedDeposit12Months * 100) / 100,
-      fixedDepositSubtotal: Math.round(fixedDepositSubtotal * 100) / 100,
-      depositTotal: Math.round(depositTotal * 100) / 100,
-      interestCurrent: Math.round(interestCurrent * 100) / 100,
-      interestFixed: Math.round(interestFixed * 100) / 100,
-      interestSubtotal: Math.round(interestSubtotal * 100) / 100,
-      total: Math.round(total * 100) / 100,
-      status: 1,
-      createdBy: 'system',
-      createdAt: new Date().toISOString()
-    };
   }
 
-  async getLoanDepositSummary(req: any, res: Response) {
-    try {
-      const { companyName, companyCode, startDate, endDate, page = 1, size = 10 } = req.query;
-      const pageNum = parseInt(page as string);
-      const pageSize = parseInt(size as string);
-      const skip = (pageNum - 1) * pageSize;
-
-      let queryBuilder = this.companyRepository.createQueryBuilder('company');
-
-      if (companyName) {
-        queryBuilder = queryBuilder.andWhere('company.companyName LIKE :companyName', { companyName: `%${companyName}%` });
-      }
-      if (companyCode) {
-        queryBuilder = queryBuilder.andWhere('company.companyCode LIKE :companyCode', { companyCode: `%${companyCode}%` });
-      }
-
-      const [companies, total] = await queryBuilder
-        .skip(skip)
-        .take(pageSize)
-        .getManyAndCount();
-
-      const items = companies.map(company => this.generateMockData(company, endDate as string));
-
-      return successResponse(res, { items, total }, '查询成功');
-    } catch (error) {
-      return errorResponse(res, 500, `查询失败: ${error}`);
+  async getCompanyBalanceChart(req: any, res: Response) {
+    
+    const result = {
+      loan: [] as number[],
+      balance: [] as number[],
+      names: [] as string[]
     }
+    const summaryData = await this.depositLoanSummaryService.findAll(req.query);
+    if (summaryData.records && summaryData.records.length > 0) {
+      for (const summary of summaryData.records) {
+        result.loan.push(summary.loanBalance);
+        result.balance.push(summary.getInternalDepositBalance());
+        result.names.push(summary.company?.companyName || '-');
+      }
+    }
+    return successResponse(res, result, '查询成功');
   }
 
-  async getLoanDepositSummaryById(req: any, res: Response) {
-    try {
-      const id = parseInt(req.params.id);
-      const company = await this.companyRepository.findOne({ where: { id } });
-      
-      if (!company) {
-        return errorResponse(res, 404, '记录不存在');
+  async getCompanyLoanDepositChart(req: any, res: Response) {
+    
+    const result = [] as any[]
+    const summaryData = await this.depositLoanSummaryService.findAll(req.query);
+    if (summaryData.records && summaryData.records.length > 0) {
+      for (const summary of summaryData.records) {
+        result.push([
+          summary.company?.companyName || '-',
+          Number(summary.loanBalance),
+          1
+        ])
+        result.push([
+          summary.company?.companyName || '-',
+          Number(summary.loanInterest),
+          4
+        ])
+        result.push([
+          summary.company?.companyName || '-',
+          summary.getDepositCurrent() + summary.getDepositFixedTotal(),
+          2
+        ])
+        result.push([
+          summary.company?.companyName || '-',
+          summary.getInterestTotal(),
+          3
+        ])
       }
-
-      const item = this.generateMockData(company, '');
-
-      return successResponse(res, item, '查询成功');
-    } catch (error) {
-      return errorResponse(res, 500, `查询失败: ${error}`);
     }
+    return successResponse(res, result, '查询成功');
   }
 }
 
