@@ -115,6 +115,17 @@ export class BackupController {
     }
   }
 
+  async getConfig(req: Request, res: Response): Promise<Response> {
+    
+    return successResponse(res, {
+      enable: process.env.BACKUP_ENABLED === 'true',
+      frequency: process.env.BACKUP_FREQUENCY,
+      weekday: process.env.BACKUP_WEEKDAY,
+      day: process.env.BACKUP_DAY,
+      keepCount: process.env.BACKUP_KEEP_COUNT
+    }, '配置文件读取成功');
+  }
+
   async create(req: Request, res: Response): Promise<Response> {
     try {
       const { backupName, backupType, backupMode, remark } = req.body;
@@ -181,7 +192,7 @@ export class BackupController {
     }
   }
   
-  async getBackupList(req: Request, res: Response): Promise<Response> {
+  async getBackupList(_req: Request, res: Response): Promise<Response> {
     try {
       const backups = await this.backupService.getBackupList();
       return successResponse(res, { items: backups, total: backups.length }, '获取备份列表成功');
@@ -270,6 +281,125 @@ export class BackupController {
       return successResponse(res, null, '下载成功');
     } catch (error: any) {
       logger.error('下载备份文件失败:', error);
+      return errorResponse(res, 400, error.message || '操作失败', null);
+    }
+  }
+
+  async config(req: Request, res: Response): Promise<Response> {
+    try {
+      const { enable, frequency, weekday, day, keepCount } = req.body;
+
+      // 读取当前 .env 文件内容
+      const fs = require('fs');
+      const path = require('path');
+      const envPath = path.join(process.cwd(), '.env');
+      
+      if (!fs.existsSync(envPath)) {
+        throw new Error('.env 文件不存在');
+      }
+
+      let envContent = fs.readFileSync(envPath, 'utf8');
+
+      // 转换 enable 为布尔值字符串
+      const enableValue = enable !== undefined ? (enable ? 'true' : 'false') : undefined;
+      const weekdayValue = weekday !== undefined ? weekday.toString() : undefined;
+      const dayValue = day !== undefined ? day.toString() : undefined;
+      const keepCountValue = keepCount !== undefined ? keepCount.toString() : undefined;
+
+      // 更新备份配置的函数
+      const updateEnvVariable = (key: string, value: string | undefined) => {
+        if (value === undefined) return;
+
+        const regex = new RegExp(`^${key}=.*`, 'm');
+        if (regex.test(envContent)) {
+          // 替换现有配置
+          envContent = envContent.replace(regex, `${key}=${value}`);
+        } else {
+          // 如果不存在，在备份设置区域添加
+          const backupSectionIndex = envContent.indexOf('# 备份设置');
+          if (backupSectionIndex !== -1) {
+            // 找到备份设置区域的下一行开始位置
+            const nextLineIndex = envContent.indexOf('\n', backupSectionIndex) + 1;
+            if (nextLineIndex > 0) {
+              envContent = envContent.slice(0, nextLineIndex) + `${key}=${value}\n` + envContent.slice(nextLineIndex);
+            } else {
+              envContent += `${key}=${value}\n`;
+            }
+          } else {
+            // 如果没有备份设置区域，在文件末尾添加
+            envContent += `\n# 备份设置\n${key}=${value}\n`;
+          }
+        }
+      };
+
+      // 处理频率相关配置
+      if (frequency !== undefined) {
+        // 如果设置为每天（频率=1），清除 WEEKDAY 和 DAY 设置
+        if (frequency === 1) {
+          // 每天备份，不需要特定的星期几或日期
+          const regexWeekday = new RegExp(`^BACKUP_WEEKDAY=.*`, 'm');
+          const regexDay = new RegExp(`^BACKUP_DAY=.*`, 'm');
+          if (regexWeekday.test(envContent)) {
+            envContent = envContent.replace(regexWeekday, '');
+          }
+          if (regexDay.test(envContent)) {
+            envContent = envContent.replace(regexDay, '');
+          }
+        }
+        // 如果设置为每周（频率=2），确保有 weekday 设置
+        else if (frequency === 2) {
+          if (weekdayValue === undefined) {
+            // 如果没有提供 weekday，使用默认值
+            updateEnvVariable('BACKUP_WEEKDAY', '1');
+          }
+        }
+        // 如果设置为每月（频率=3），确保有 day 设置
+        else if (frequency === 3) {
+          if (dayValue === undefined) {
+            // 如果没有提供 day，使用默认值
+            updateEnvVariable('BACKUP_DAY', '1');
+          }
+        }
+      }
+
+
+      // 更新所有配置
+      if (enableValue !== undefined) updateEnvVariable('BACKUP_ENABLED', enableValue);
+      if (frequency !== undefined) updateEnvVariable('BACKUP_FREQUENCY', frequency);
+      if (weekdayValue !== undefined) updateEnvVariable('BACKUP_WEEKDAY', weekdayValue);
+      if (dayValue !== undefined) updateEnvVariable('BACKUP_DAY', dayValue);
+      if (keepCountValue !== undefined) updateEnvVariable('BACKUP_KEEP_COUNT', keepCountValue);
+
+      // 写入更新后的 .env 文件
+      fs.writeFileSync(envPath, envContent, 'utf8');
+
+      // 更新环境变量（当前进程）
+      if (enableValue !== undefined) process.env.BACKUP_ENABLED = enableValue;
+      if (frequency !== undefined) process.env.BACKUP_FREQUENCY = frequency;
+      if (weekdayValue !== undefined) process.env.BACKUP_WEEKDAY = weekdayValue;
+      if (dayValue !== undefined) process.env.BACKUP_DAY = dayValue;
+      if (keepCountValue !== undefined) process.env.BACKUP_KEEP_COUNT = keepCountValue;
+
+      logger.info('备份配置已更新', { 
+        enable: enableValue, 
+        weekday: weekdayValue, 
+        day: dayValue, 
+        keepCount: keepCountValue,
+        frequency 
+      });
+
+      return successResponse(res, { 
+        message: '配置更新成功',
+        config: {
+          enable: enableValue !== undefined ? enableValue === 'true' : process.env.BACKUP_ENABLED === 'true',
+          frequency: frequency !== undefined ? parseInt(frequency) : parseInt(process.env.BACKUP_FREQUENCY || '1'),
+          weekday: weekdayValue !== undefined ? parseInt(weekdayValue) : parseInt(process.env.BACKUP_WEEKDAY || '1'),
+          day: dayValue !== undefined ? parseInt(dayValue) : parseInt(process.env.BACKUP_DAY || '1'),
+          keepCount: keepCountValue !== undefined ? parseInt(keepCountValue) : parseInt(process.env.BACKUP_KEEP_COUNT || '30')
+        }
+      }, '配置更新成功');
+    } catch (error: any) {
+      logger.error('配置更新失败:', error);
       return errorResponse(res, 400, error.message || '操作失败', null);
     }
   }

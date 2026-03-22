@@ -44,12 +44,11 @@ export class DatabaseBackupService {
     this.dbPassword = process.env.DB_PASS || '';
     this.dbName = process.env.DB_NAME || 'training';
     
-    // 设置 PostgreSQL 客户端工具路径（Windows）
-    const postgresBinDir = process.env.PG_BIN_DIR || 'D:\\PostgreSQL\\15\\bin';
-    this.pgDumpPath = path.join(postgresBinDir, 'pg_dump.exe');
-    this.psqlPath = path.join(postgresBinDir, 'psql.exe');
+    // 设置 PostgreSQL 客户端工具路径
+    const postgresBinDir = process.env.PG_BIN_DIR || '';
+    this.pgDumpPath = path.join(postgresBinDir, process.env.PG_EXEC_DUMP || 'pg_dump');
+    this.psqlPath = path.join(postgresBinDir, process.env.PG_EXEC_PSQL || 'psql');
   }
-
   /**
    * 执行完整的数据库备份
    * @param backupName 备份名称
@@ -362,6 +361,37 @@ export class DatabaseBackupService {
         
         if (ageInDays > daysToKeep) {
           await this.deleteBackup(backup.fileName);
+          deletedCount++;
+        }
+      }
+
+      return deletedCount;
+    } catch (error: any) {
+      throw new Error(`清理旧备份失败：${error.message}`);
+    }
+  }
+
+  /**
+   * 清理旧备份（保留最近 N 个备份）
+   * @param countToKeep 保留数量
+   */
+  async cleanupOldBackupsByCount(countToKeep: number = 30): Promise<number> {
+    try {
+      const backups = await this.getBackupList();
+      let deletedCount = 0;
+
+      // 备份列表已按时间排序（最新的在前）
+      // 删除超出保留数量的旧备份
+      if (backups.length > countToKeep) {
+        const backupsToDelete = backups.slice(countToKeep);
+        
+        for (const backup of backupsToDelete) {
+          await this.deleteBackup(backup.fileName);
+          // 同时删除可能存在的压缩文件
+          const gzPath = `${backup.filePath}.gz`;
+          if (fs.existsSync(gzPath)) {
+            fs.unlinkSync(gzPath);
+          }
           deletedCount++;
         }
       }
