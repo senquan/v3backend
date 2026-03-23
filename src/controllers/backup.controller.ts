@@ -10,6 +10,7 @@ interface Backup {
   backupName: string
   backupType: number
   backupMode: number
+  fileName: string // 添加 fileName 字段
   filePath: string
   fileSize: number
   fileUrl: string
@@ -43,6 +44,7 @@ export class BackupController {
         backupName: file.fileName.replace('.sql', '').replace(/_/g, '-'),
         backupType: file.fileName.includes('incremental') ? 2 : file.fileName.includes('differential') ? 3 : 1,
         backupMode: 1, // 默认为完整备份
+        fileName: file.fileName,
         filePath: file.filePath,
         fileSize: file.fileSize,
         fileUrl: `/api/v1/system/backups/download?file=${file.fileName}`,
@@ -98,6 +100,7 @@ export class BackupController {
         backupName: file.fileName.replace('.sql', '').replace(/_/g, '-'),
         backupType: file.fileName.includes('incremental') ? 2 : file.fileName.includes('differential') ? 3 : 1,
         backupMode: 1,
+        fileName: file.fileName,
         filePath: file.filePath,
         fileSize: file.fileSize,
         fileUrl: `/api/v1/system/backups/download?file=${file.fileName}`,
@@ -129,6 +132,11 @@ export class BackupController {
   async create(req: Request, res: Response): Promise<Response> {
     try {
       const { backupName, backupType, backupMode, remark } = req.body;
+
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return errorResponse(res, 400, '未授权', null);
+      }
       
       // 根据备份类型执行不同的备份策略
       let backupResult;
@@ -159,12 +167,13 @@ export class BackupController {
         backupName: backupName || `备份-${new Date().toLocaleDateString()}`,
         backupType: backupType || 1,
         backupMode: backupMode || 1,
+        fileName: path.basename(backupResult.filePath || ''),
         filePath: backupResult.filePath || '',
         fileSize: backupResult.fileSize || 0,
-        fileUrl: `/api/v1/system/backups/download?file=${path.basename(backupResult.filePath || '')}`,
+        fileUrl: `/system/backups/download?file=${path.basename(backupResult.filePath || '')}`,
         status: 2, // 已完成
         remark: remark || backupResult.message,
-        createdBy: "admin",
+        createdBy: userId,
         createdAt: new Date().toISOString(),
         completedAt: new Date().toISOString()
       };
@@ -183,6 +192,8 @@ export class BackupController {
       if (!fileName) {
         return errorResponse(res, 400, '文件名不能为空', null);
       }
+
+      logger.info('删除备份文件，参数 fileName:', fileName);
   
       await this.backupService.deleteBackup(fileName);
       return successResponse(res, null, '删除成功');
@@ -262,7 +273,7 @@ export class BackupController {
       if (!file) {
         return errorResponse(res, 400, '文件名不能为空', null);
       }
-  
+
       const filePath = path.join(process.env.BACKUP_PATH || './backups', file as string);
         
       // 验证文件是否存在
@@ -270,15 +281,35 @@ export class BackupController {
       if (!fs.existsSync(filePath)) {
         return errorResponse(res, 404, '备份文件不存在', null);
       }
-  
+
+      // 获取文件信息
+      const stats = fs.statSync(filePath);
+      const fileName = path.basename(filePath);
+      
       // 设置响应头，触发文件下载
-      res.setHeader('Content-Disposition', `attachment; filename="${file}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
       res.setHeader('Content-Type', 'application/sql');
-        
+      res.setHeader('Content-Length', stats.size);
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      // 创建可读流并管道到响应
       const readStream = fs.createReadStream(filePath);
+      
+      // 处理流错误
+      readStream.on('error', (error: Error) => {
+        logger.error('文件流读取错误:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ code: 500, message: '文件读取失败', data: null });
+        }
+      });
+      
+      // 管道到响应
       readStream.pipe(res);
-        
-      return successResponse(res, null, '下载成功');
+      
+      // 返回一个空的 Promise，因为响应已经通过流发送
+      return new Promise(() => {});
     } catch (error: any) {
       logger.error('下载备份文件失败:', error);
       return errorResponse(res, 400, error.message || '操作失败', null);

@@ -27,13 +27,13 @@ router.delete('/dicts/:id', dictController.delete.bind(dictController));
 router.get('/backups', backupController.getAll.bind(backupController));
 router.get('/backups/list', backupController.getBackupList.bind(backupController));
 router.get('/backups/config', backupController.getConfig.bind(backupController));
+router.get('/backups/download', backupController.download.bind(backupController));
 router.get('/backups/:id', backupController.getById.bind(backupController));
 router.post('/backups', backupController.create.bind(backupController));
 router.delete('/backups', backupController.delete.bind(backupController));
 router.post('/backups/cleanup', backupController.cleanupOldBackups.bind(backupController));
 router.post('/backups/verify', backupController.verifyBackup.bind(backupController));
 router.post('/backups/restore', backupController.restore.bind(backupController));
-router.get('/backups/download', backupController.download.bind(backupController));
 router.post('/backups/config', backupController.config.bind(backupController));
 
 // 系统配置

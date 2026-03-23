@@ -27,6 +27,7 @@ export class DatabaseBackupService {
   private readonly dbName: string;
   private readonly pgDumpPath: string;
   private readonly psqlPath: string;
+  private readonly pgPassEnvName: string;
 
   constructor() {
     // 设置备份目录
@@ -48,6 +49,7 @@ export class DatabaseBackupService {
     const postgresBinDir = process.env.PG_BIN_DIR || '';
     this.pgDumpPath = path.join(postgresBinDir, process.env.PG_EXEC_DUMP || 'pg_dump');
     this.psqlPath = path.join(postgresBinDir, process.env.PG_EXEC_PSQL || 'psql');
+    this.pgPassEnvName = process.env.PG_PWD_ENV_NAME || 'PGPASSWORD';
   }
   /**
    * 执行完整的数据库备份
@@ -61,7 +63,7 @@ export class DatabaseBackupService {
 
     try {
       // 构建 pg_dump 命令（使用完整路径）
-      let dumpCommand = `"${this.pgDumpPath}" -h ${this.dbHost} -p ${this.dbPort} -U ${this.dbUser} -d ${this.dbName}`;
+      let dumpCommand = `"${this.pgDumpPath}" -h ${this.dbHost} -p ${this.dbPort} -U ${this.dbUser} -d ${this.dbName} -w`;
       
       if (includeSchema) {
         // 完整备份（包含 schema 和数据）
@@ -72,7 +74,7 @@ export class DatabaseBackupService {
       }
 
       // 设置环境变量（包含密码）
-      const env = { ...process.env, PGPASSWORD: this.dbPassword };
+      const env = { ...process.env, [this.pgPassEnvName]: this.dbPassword };
 
       // 执行备份命令
       await execAsync(dumpCommand, { env });
@@ -279,11 +281,18 @@ export class DatabaseBackupService {
 
   /**
    * 删除备份文件
-   * @param fileName 文件名
+   * @param fileName 文件名或完整路径
    */
   async deleteBackup(fileName: string): Promise<boolean> {
     try {
-      const filePath = path.join(this.backupDir, fileName);
+      let filePath: string;
+      
+      if (path.isAbsolute(fileName)) {
+        filePath = fileName;
+      } else {
+        filePath = path.join(this.backupDir, fileName);
+      }
+      filePath = path.normalize(filePath);
       
       if (!fs.existsSync(filePath)) {
         throw new Error('备份文件不存在:' + filePath);
