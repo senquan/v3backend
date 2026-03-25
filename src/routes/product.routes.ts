@@ -55,6 +55,9 @@ router.post('/batch/delete', cacheClearMiddleware('/api/v1/product/list'), produ
 // 批量导入商品
 router.post('/import', cacheClearMiddleware('/api/v1/product/list'), productController.importProducts);
 
+// 批量导入商品SKU
+router.post('/import-skus', productController.importProductSkus);
+
 // 创建系列
 router.post('/series/', productController.createSeries);
 

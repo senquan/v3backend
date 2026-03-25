@@ -5,10 +5,12 @@ import { OrderItem } from '../models/order-item.model';
 import { ReturnOrder } from '../models/return-order.model';
 import { PlatformTags } from '../models/platform-tags.model';
 import { OrderStatusLogService } from '../services/order-status-log.service';
+import { ShortLinkService } from '../services/short-link.service';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { Dict } from '../models/dict.model';
 import { OrderCalculationLog } from '../models/order-calculation-log.model';
+import { ProductTbSku } from '../models/product-tb-sku.model';
 
 interface DiscountMatchLog {
   productId: number;
@@ -23,6 +25,7 @@ export class OrderController {
 
   constructor(
     private readonly orderStatusLogService: OrderStatusLogService = new OrderStatusLogService(),
+    private readonly shortLinkService: ShortLinkService = new ShortLinkService(),
   ) {}
 
   async create(req: Request, res: Response): Promise<Response> {

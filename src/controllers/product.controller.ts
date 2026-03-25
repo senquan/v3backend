@@ -14,6 +14,7 @@ import { Tag } from '../models/tag.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { PlatformTags } from '../models/platform-tags.model';
+import { ProductTbSku } from '../models/product-tb-sku.model';
 
 export class ProductController {
   // 获取商品列表
@@ -946,7 +947,114 @@ export class ProductController {
     }
   }
 
-  // 批量更新商品价格
+  async importProductSkus(req: Request, res: Response): Promise<Response> {
+
+    try {
+      const products = req.body.products;
+      if (!Array.isArray(products) || products.length === 0) {
+        return errorResponse(res, 400, "请提供有效的商品数据", null);
+      }
+      const productSkuRepository = AppDataSource.getRepository(ProductTbSku);
+      const productRepository = AppDataSource.getRepository(Product);
+
+      const existingProducts = await productRepository.find({
+        where: { isDeleted: 0 }
+      });
+      const productMap = existingProducts.reduce((map, product) => {
+        map.set(product.materialId, product);
+        return map;
+      }, new Map<string, Product>());
+
+      const existingSkus = await productSkuRepository.find();
+      const skuMap = existingSkus.reduce((map, sku) => {
+        map.set(sku.productId, sku);
+        return map;
+      }, new Map<number, ProductTbSku>());
+
+      const results = {
+        success: 0,
+        ignored: 0,
+        updated: 0,
+        error: 0,
+        errorMessages: [] as string[]
+      };
+      
+      for (const productData of products) {
+        try {
+
+          // 验证必填字段
+          if (!productData.materialId || !productData.tbItemId || productData.skuId) {
+            results.error++;
+            results.errorMessages.push(`必要字段缺失，跳过该商品`);
+            continue;
+          }
+
+          if (!/^[a-zA-Z0-9]+$/.test(productData.materialId)) {
+            results.error++;
+            results.errorMessages.push(`物料编号 ${productData.materialId} 格式不正确，只能包含数字和字母，跳过该商品`);
+            continue;
+          }
+          
+          const product = productMap.get(String(productData.materialId));
+          if (!product) {
+            results.error++;
+            results.errorMessages.push(`物料编号 ${productData.materialId} 不存在，跳过该商品`);
+            continue;
+          }
+
+          // 检查物料编号是否已存在
+          const sku = skuMap.get(product.id)
+          if (sku) {
+            let isUpdated = false;
+
+            // 检查并更新商品ID
+            if (productData.tbItemId !== undefined && String(productData.tbItemId) !== sku.tbItemId) {
+              sku.tbItemId = String(productData.tbItemId);
+              isUpdated = true;
+            }
+
+            // 检查并更新SKUID
+            if (productData.tbSkuId !== undefined && String(productData.tbSkuId) !== sku.tbSkuId) {
+              sku.tbSkuId = String(productData.tbSkuId);
+              isUpdated = true;
+            }
+            if (isUpdated) {
+              await productSkuRepository.save(sku);
+              results.updated++;
+              results.errorMessages.push(`物料编号 ${productData.materialId} SKU信息已更新`);
+            } else {
+              results.ignored++;
+              results.errorMessages.push(`物料编号 ${productData.materialId} 已存在，且信息无变更，跳过该商品`);
+            }
+            continue;
+          }
+
+
+          // 创建新商品
+          const newSku = new ProductTbSku();
+          
+          // 设置基本属性
+          newSku.tbItemId = productData.tbItemId || 0;
+          newSku.tbSkuId = String(productData.tbSkuId || "");
+          newSku.productId = product.id;
+
+          // 保存SKU
+          await productSkuRepository.save(newSku);
+          results.success++;
+        } catch (error) {
+          results.error++;
+          const errorMessage = error instanceof Error ? error.message : "未知错误";
+          results.errorMessages.push(`处理物料编号 ${productData.materialId} 时出错: ${errorMessage}`);
+          logger.error(`导入商品失败 [${productData.materialId}]:`, error);
+        }
+      }
+      return successResponse(res, results, `批量导入完成，成功: ${results.success}，失败: ${results.error}`);
+    } catch (error) {
+      logger.error("批量导入商品SKU失败:", error);
+      return errorResponse(res, 500, "服务器内部错误", null);
+    }
+  }
+
   async batchUpdatePrices(req: Request, res: Response): Promise<Response> {
     try {
       const { ids, scope, adjustType, values, searchParams} = req.body;

@@ -1,0 +1,315 @@
+import { AppDataSource } from '../config/database';
+import { ShortLink } from '../models/short-link.model';
+import { ProductTbSku } from '../models/product-tb-sku.model';
+import { nanoid } from 'nanoid';
+import QRCode from 'qrcode';
+import { logger } from '../utils/logger';
+
+interface GenerateLinkOptions {
+  ids?: number[];
+  quantities?: number[];
+}
+
+interface LinkItem {
+  materialCode: string;
+  quantity: number;
+  itemId: string;
+  skuId: string;
+}
+
+/**
+ * 短链接服务
+ * 提供短链接生成、解析、二维码生成功能
+ */
+export class ShortLinkService {
+  private shortLinkRepository = AppDataSource.getRepository(ShortLink);
+
+  /**
+   * 生成短链接
+   * @param options 生成选项
+   * @returns 生成的短链接信息
+   */
+  async generateShortLink(options: GenerateLinkOptions): Promise<{
+    id: number;
+    shortCode?: string;
+    originalUrl: string;
+    shortUrl: string;
+    expiresAt?: Date;
+  }> {
+    const { ids, quantities } = options;
+    if (!ids || !quantities || ids.length !== quantities.length) {
+      throw new Error('Invalid options: ids and quantities must be provided and of the same length');
+    }
+    const queryBuilder = AppDataSource.getRepository(ProductTbSku)
+      .createQueryBuilder('sku')
+      .where('sku.productId IN (:...ids)', { ids });
+
+    const result = {
+      id: 0,
+      shortCode: "",
+      originalUrl: "",
+      shortUrl: "",
+      qrCodeImageUrl: "",
+      expiresAt: new Date() 
+    }
+
+    const items = [] as string[]
+    const [records, total] = await queryBuilder.getManyAndCount()
+    if (total !== ids.length) {
+      result.originalUrl = "缺失部分或全部SKU信息，生成失败"
+      result.shortUrl = result.originalUrl
+    } else {
+      const productMap = records.reduce((map, sku) => {
+        map.set(sku.productId, sku);
+        return map;
+      }, new Map<number, ProductTbSku>());
+      for(let i = 0; i < ids.length; i++) {
+        const sku = productMap.get(ids[i])
+        if (!sku) throw Error("SKU信息不存在")
+        items.push(`${sku.tbItemId}_${sku.tbSkuId}_${quantities[i]}`)
+      }
+      result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${items.join(',')}&type=tb`
+    }
+
+    if (result.originalUrl.substring(0, 4) === "http") {
+      // 生成短码
+      const shortCode = nanoid(8);
+
+      // 计算过期时间（30天后）
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+      result.expiresAt = expiresAt
+
+      // 保存到数据库
+      const shortLink = this.shortLinkRepository.create({
+        shortCode,
+        originalUrl: result.originalUrl,
+        items: JSON.stringify(items),
+        shopId: null,
+        expiresAt,
+        accessCount: 0
+      });
+
+      await this.shortLinkRepository.save(shortLink);
+
+
+      // 构建短链接URL
+      result.shortUrl = `${process.env.BASE_URL || 'https://erp.dsbull.com'}/api/v1/s/${shortCode}`;
+      result.qrCodeImageUrl = `${process.env.BASE_URL || 'https://erp.dsbull.com'}/api/v1/s/qrcode/${shortCode}`;
+      logger.info(`生成短链接成功: ${shortCode}`);
+    }
+    
+
+    return result;
+  }
+
+  /**
+   * 解析短链接
+   * @param shortCode 短码
+   * @returns 原始URL和访问信息
+   */
+  async resolveShortLink(shortCode: string): Promise<{
+    originalUrl: string;
+    items: LinkItem[];
+    expiresAt: Date | null;
+    accessCount: number;
+  }> {
+    const shortLink = await this.shortLinkRepository.findOne({
+      where: { shortCode }
+    });
+
+    if (!shortLink) {
+      throw new Error('短链接不存在');
+    }
+
+    // 检查是否过期
+    if (shortLink.expiresAt && shortLink.expiresAt < new Date()) {
+      throw new Error('短链接已过期');
+    }
+
+    // 更新访问次数
+    shortLink.accessCount += 1;
+    shortLink.lastAccessedAt = new Date();
+    await this.shortLinkRepository.save(shortLink);
+
+    logger.info(`短链接访问: ${shortCode}, 访问次数: ${shortLink.accessCount}`);
+
+    return {
+      originalUrl: shortLink.originalUrl,
+      items: shortLink.items ? JSON.parse(shortLink.items) : "",
+      expiresAt: shortLink.expiresAt,
+      accessCount: shortLink.accessCount
+    };
+  }
+
+  /**
+   * 生成短链接的二维码
+   * @param shortCode 短码
+   * @param options 二维码选项
+   * @returns 二维码图片Buffer
+   */
+  async generateQRCode(
+    shortCode: string,
+    options: {
+      width?: number;
+      margin?: number;
+      color?: { dark: string; light: string };
+    } = {}
+  ): Promise<Buffer> {
+    const shortLink = await this.shortLinkRepository.findOne({
+      where: { shortCode }
+    });
+
+    if (!shortLink) {
+      throw new Error('短链接不存在');
+    }
+
+    const shortUrl = `${process.env.BASE_URL || 'http://localhost:5001'}/s/${shortCode}`;
+
+    const qrOptions = {
+      width: options.width || 300,
+      margin: options.margin || 2,
+      color: {
+        dark: options.color?.dark || '#000000',
+        light: options.color?.light || '#ffffff'
+      }
+    };
+
+    try {
+      const qrCodeBuffer = await QRCode.toBuffer(shortUrl, qrOptions);
+      logger.info(`生成二维码成功: ${shortCode}`);
+      return qrCodeBuffer;
+    } catch (error) {
+      logger.error(`生成二维码失败: ${shortCode}`, error);
+      throw new Error('生成二维码失败');
+    }
+  }
+
+  /**
+   * 生成短链接的二维码（Base64格式）
+   * @param shortCode 短码
+   * @param options 二维码选项
+   * @returns Base64格式的二维码图片
+   */
+  async generateQRCodeBase64(
+    shortCode: string,
+    options?: {
+      width?: number;
+      margin?: number;
+      color?: { dark: string; light: string };
+    }
+  ): Promise<string> {
+    const qrCodeBuffer = await this.generateQRCode(shortCode, options);
+    return `data:image/png;base64,${qrCodeBuffer.toString('base64')}`;
+  }
+
+  /**
+   * 获取短链接详情
+   * @param shortCode 短码
+   * @returns 短链接详细信息
+   */
+  async getShortLinkDetail(shortCode: string): Promise<{
+    id: number;
+    shortCode: string;
+    originalUrl: string;
+    shortUrl: string;
+    items: LinkItem[];
+    shopId: string | null;
+    expiresAt: Date | null;
+    accessCount: number;
+    lastAccessedAt: Date | null;
+    createdAt: Date;
+  } | null> {
+    const shortLink = await this.shortLinkRepository.findOne({
+      where: { shortCode }
+    });
+
+    if (!shortLink) {
+      return null;
+    }
+
+    return {
+      id: shortLink.id,
+      shortCode: shortLink.shortCode,
+      originalUrl: shortLink.originalUrl,
+      shortUrl: `${process.env.BASE_URL || 'http://localhost:5001'}/s/${shortLink.shortCode}`,
+      items: shortLink.items ? JSON.parse(shortLink.items) : "",
+      shopId: shortLink.shopId,
+      expiresAt: shortLink.expiresAt,
+      accessCount: shortLink.accessCount,
+      lastAccessedAt: shortLink.lastAccessedAt,
+      createdAt: shortLink.createdAt
+    };
+  }
+
+  /**
+   * 获取短链接列表
+   * @param page 页码
+   * @param size 每页数量
+   * @returns 短链接列表
+   */
+  async getShortLinkList(page: number = 1, size: number = 20): Promise<{
+    list: Array<{
+      id: number;
+      shortCode: string;
+      shortUrl: string;
+      items: LinkItem[];
+      accessCount: number;
+      expiresAt: Date | null;
+      createdAt: Date;
+    }>;
+    total: number;
+    page: number;
+    size: number;
+  }> {
+    const [list, total] = await this.shortLinkRepository.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * size,
+      take: size
+    });
+
+    return {
+      list: list.map(item => ({
+        id: item.id,
+        shortCode: item.shortCode,
+        shortUrl: `${process.env.BASE_URL || 'http://localhost:5001'}/s/${item.shortCode}`,
+        items: item.items ? JSON.parse(item.items) : "",
+        accessCount: item.accessCount,
+        expiresAt: item.expiresAt,
+        createdAt: item.createdAt
+      })),
+      total,
+      page,
+      size
+    };
+  }
+
+  /**
+   * 删除短链接
+   * @param shortCode 短码
+   * @returns 是否删除成功
+   */
+  async deleteShortLink(shortCode: string): Promise<boolean> {
+    const result = await this.shortLinkRepository.delete({ shortCode });
+    logger.info(`删除短链接: ${shortCode}, 影响行数: ${result.affected}`);
+    return (result.affected || 0) > 0;
+  }
+
+  /**
+   * 清理过期短链接
+   * @returns 清理的数量
+   */
+  async cleanExpiredLinks(): Promise<number> {
+    const result = await this.shortLinkRepository
+      .createQueryBuilder()
+      .delete()
+      .where('expiresAt < :now', { now: new Date() })
+      .execute();
+
+    logger.info(`清理过期短链接: ${result.affected} 条`);
+    return result.affected || 0;
+  }
+}
+
+// 导出单例
+export const shortLinkService = new ShortLinkService();
