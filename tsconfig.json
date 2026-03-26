@@ -10,8 +10,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "typeRoots": ["./node_modules/@types", "./src/@types"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "**/*.test.ts", "../../v3-admin-vite/**/*"]
+  "exclude": ["node_modules", "**/*.test.ts"]
 }

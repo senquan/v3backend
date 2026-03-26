@@ -15,8 +15,9 @@ import { RedisCacheService } from '../services/cache.service';
 
 // 获取缓存服务实例
 const cacheService = new RedisCacheService();
-
 const authController = require('../controllers/auth.controller');
+
+const DEFAULT_ROLE_ID = 2;
 
 export class UserController {
   // 用户登录
@@ -107,6 +108,7 @@ export class UserController {
       let queryBuilder = AppDataSource.getRepository(User)
         .createQueryBuilder('user')
         .leftJoin('user.company', 'company')
+        .leftJoin('user.roles', 'roles')
         .select([
             'user.id',
             'user.innerCode',
@@ -118,7 +120,8 @@ export class UserController {
             'user.createdAt',
             'user.lastLoginAt',
             'user.status',
-            'company'
+            'company',
+            'roles'
         ]);
         
       if (keyword) {
@@ -168,6 +171,18 @@ export class UserController {
       
       if (!user) return errorResponse(res, 404, '用户不存在', null);
       
+      const roleIds = user.roles?.map(role => role.id) || [];
+      const rolePermissions = roleIds.length > 0
+        ? await AppDataSource.getRepository(RolePermission)
+            .createQueryBuilder('rolePermission')
+            .innerJoinAndSelect('rolePermission.permission', 'permission')
+            .where('rolePermission.roleId IN (:...roleIds)', { roleIds })
+            .andWhere('permission.status = :status', { status: 1 })
+            .andWhere('permission.type = :type', { type: 2 })
+            .orderBy('permission.sort', 'ASC')
+            .getMany()
+        : [];
+
       // 返回用户信息
       return res.json({
         code: 0,
@@ -182,6 +197,7 @@ export class UserController {
           lastLoginIp: user.lastLoginIp,
           lastLoginAt: user.lastLoginAt,
           roles: user.getRoleCodes() || [],
+          permissions: rolePermissions.map(rolePermission => rolePermission.permission.code),
         }
       });
     } catch (error) {
@@ -307,6 +323,7 @@ export class UserController {
       const newUser = new User();
       newUser.username = username;
       await newUser.setPassword(password);
+      newUser.innerCode = this.generateInnerCode();
       newUser.name = '';
       newUser.email = '';
       newUser.avatar = '';
@@ -318,6 +335,13 @@ export class UserController {
       
       // 保存用户
       const savedUser = await userRepository.save(newUser);
+
+      const roleRepository = AppDataSource.getRepository(UserRole);
+      // 增加默认角色
+      const userRole = new UserRole();
+      userRole.userId = savedUser.id;
+      userRole.roleId = DEFAULT_ROLE_ID;
+      roleRepository.save(userRole);
       
       // 更新邀请码状态
       // invite.used = true;
@@ -326,11 +350,16 @@ export class UserController {
       // await inviteCodeRepository.save(invite);
       
       // 返回注册成功信息
-      return successResponse(res, null, '注册成功');
+      return successResponse(res, { username }, '注册成功');
     } catch (error) {
       logger.error('注册失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
+  }
+
+  // 生成临时的8位内部编号
+  private generateInnerCode(): string {
+    return Math.random().toString(36).substring(2, 10).toUpperCase();
   }
   
   // 生成邀请码
@@ -489,7 +518,6 @@ export class UserController {
   async getUserPermissions(req: Request, res: Response): Promise<Response> {
     try {
       const userId = (req as any).user.id;
-      const DEFAULT_ROLE_ID = 2;
       
       // 获取用户角色
       const userRoles = await AppDataSource
