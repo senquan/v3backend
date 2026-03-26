@@ -94,7 +94,7 @@ export class ShortLinkService {
 
 
       // 构建短链接URL
-      result.shortUrl = `${process.env.BASE_URL || 'https://erp.dsbull.com'}/api/v1/s/${shortCode}`;
+      result.shortUrl = `${process.env.SHORT_URL || 'https://url.dsbull.com/'}${shortCode}`;
       result.qrCodeImageUrl = `${process.env.BASE_URL || 'https://erp.dsbull.com'}/api/v1/s/qrcode/${shortCode}`;
       logger.info(`生成短链接成功: ${shortCode}`);
     }
@@ -164,7 +164,7 @@ export class ShortLinkService {
       throw new Error('短链接不存在');
     }
 
-    const shortUrl = `${process.env.BASE_URL || 'http://localhost:5001'}/s/${shortCode}`;
+    const shortUrl = `${process.env.SHORT_URL || 'https://url.dsbull.com/'}${shortCode}`;
 
     const qrOptions = {
       width: options.width || 300,
@@ -232,7 +232,7 @@ export class ShortLinkService {
       id: shortLink.id,
       shortCode: shortLink.shortCode,
       originalUrl: shortLink.originalUrl,
-      shortUrl: `${process.env.BASE_URL || 'http://localhost:5001'}/s/${shortLink.shortCode}`,
+      shortUrl: `${process.env.SHORT_URL || 'https://url.dsbull.com/'}${shortLink.shortCode}`,
       items: shortLink.items ? JSON.parse(shortLink.items) : "",
       shopId: shortLink.shopId,
       expiresAt: shortLink.expiresAt,
@@ -272,7 +272,7 @@ export class ShortLinkService {
       list: list.map(item => ({
         id: item.id,
         shortCode: item.shortCode,
-        shortUrl: `${process.env.BASE_URL || 'http://localhost:5001'}/s/${item.shortCode}`,
+        shortUrl: `${process.env.SHORT_URL || 'https://url.dsbull.com/'}${item.shortCode}`,
         items: item.items ? JSON.parse(item.items) : "",
         accessCount: item.accessCount,
         expiresAt: item.expiresAt,

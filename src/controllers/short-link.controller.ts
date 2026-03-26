@@ -33,13 +33,9 @@ export class ShortLinkController {
       return res.redirect(result.originalUrl);
     } catch (error: any) {
       logger.error('解析短链接失败:', error);
-
       if (error.message === '短链接不存在' || error.message === '短链接已过期') {
-        return res.status(404).render('error', {
-          message: error.message
-        });
+        return errorResponse(res, 404, error.message);
       }
-
       return errorResponse(res, 500, '服务器错误');
     }
   }
