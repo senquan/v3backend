@@ -22,6 +22,8 @@ import notificationRoutes  from './notification.routes';
 import galleryRoutes  from './gallery.routes';
 import wsRoutes from './ws.routes';
 import shortLinkRoutes from './short-link.routes';
+import expressRoutes from './express.routes';
+import wxworkCallbackRoutes from './wxwork-callback.routes';
 
 const router = Router();
 
@@ -49,6 +51,8 @@ router.use('/v1/notifications', notificationRoutes);
 router.use('/v1/gallery', galleryRoutes);
 router.use('/v1/ws', wsRoutes)
 router.use('/v1/s', shortLinkRoutes)
+router.use('/v1/express', expressRoutes)
+router.use('/v1/wxwork', wxworkCallbackRoutes)
 
 // 处理404情况 - 当没有匹配到路由时
 router.use('*', (req: Request, res: Response) => {

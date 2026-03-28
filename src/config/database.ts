@@ -43,6 +43,8 @@ import { User } from '../models/user.model';
 import { UserRole } from '../models/user-roles.model';
 import { Gallery } from '../models/gallery.model';
 import { ShortLink } from '../models/short-link.model';
+import { ExpressTracking } from '../models/express-tracking.model';
+import { ExpressCompany } from '../models/express-company.model';
 
 // 加载环境变量
 dotenv.config();
@@ -59,7 +61,7 @@ export const AppDataSource = new DataSource({
   logging: process.env.NODE_ENV !== 'production',
   entities: [Bulletin, Category, Coupon, CouponUser, Customer, Dict, Gallery, InviteCode, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag,
     ProductTag, ProductTbSku, Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, User,
-    UserRole, PromotionV3, PromotionRuleV3, ShortLink
+    UserRole, PromotionV3, PromotionRuleV3, ShortLink, ExpressTracking, ExpressCompany
   ],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
