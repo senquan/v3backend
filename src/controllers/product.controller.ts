@@ -1034,6 +1034,7 @@ export class ProductController {
           const newSku = new ProductTbSku();
           
           // 设置基本属性
+          newSku.materialCode = productData.materialId;
           newSku.tbItemId = productData.tbItemId || 0;
           newSku.tbSkuId = String(productData.tbSkuId || "");
           newSku.productId = product.id;
