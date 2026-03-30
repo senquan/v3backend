@@ -100,8 +100,8 @@ export class ExpressTrackingService {
     endDate?: Date;
   }): Promise<{ list: ExpressTracking[]; total: number }> {
     const { page = 1, size = 20, status, requestType, startDate, endDate } = params;
-
-    const queryBuilder = this.repository.createQueryBuilder('record');
+    const queryBuilder = this.repository.createQueryBuilder('record')
+      .leftJoinAndSelect('record.expressCompany', 'expressCompany');
 
     if (status) {
       queryBuilder.andWhere('record.status = :status', { status });
