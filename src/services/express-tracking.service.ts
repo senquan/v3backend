@@ -60,7 +60,8 @@ export class ExpressTrackingService {
       wechatMsgId: wechatMsgId || '',
       orderId: orderId || '',
       accessCount: 0,
-      expressCompany
+      expressCompany,
+      expressCompanyName: expressCompanyName || '',
     });
 
     await this.repository.save(record);

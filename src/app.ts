@@ -11,6 +11,7 @@ import http from 'http';
 import { RedisCacheService } from './services/cache.service';
 import { CacheQueryMiddleware } from './middlewares/cache-query.middleware';
 import { WebSocketService } from './utils/websocket';
+import { WeComAiBotService } from './bot/wecom-ai-bot.service';
 
 // 加载环境变量
 dotenv.config();
@@ -55,6 +56,10 @@ const server = http.createServer(app);
 // 初始化WebSocket服务
 const webSocketService = WebSocketService.getInstance();
 webSocketService.initialize(server);
+
+// 初始化AI机器人服务
+const aiBotService = WeComAiBotService.getInstance();
+aiBotService.initialize();
 
 // 启动服务器
 server.listen(PORT, () => {

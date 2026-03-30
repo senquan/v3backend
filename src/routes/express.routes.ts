@@ -13,11 +13,11 @@ const controller = expressTrackingController;
 // 所有路由都需要认证
 router.use(authMiddleware);
 
-// 创建快递拦截记录
-router.post('/create', controller.create);
-
 // 获取快递列表
 router.get('/', controller.getList);
+
+// 创建快递拦截记录
+router.post('/create', controller.create);
 
 // 获取统计数据
 router.get('/statistics', controller.getStatistics);
