@@ -15,18 +15,22 @@ export class PermissionService {
    * 获取所有权限
    */
   async findAll(): Promise<Permission[]> {
-    return this.permissionRepository.find();
+    return this.permissionRepository.find({
+      where: { status: 1 }
+    });
   }
 
   /**
    * 获取权限树
    */
   async getPermissionTree(): Promise<Permission[]> {
-    const permissions = await this.permissionRepository.find({
-      where: { parentId: IsNull() },
-      relations: ['children'],
-      order: { sort: 'ASC' },
-    });
+    const permissions = await this.permissionRepository.createQueryBuilder('permission')
+    .where('permission.parentId is null')
+    .andWhere('permission.status = 1')
+    .leftJoinAndSelect('permission.children', 'children', 'children.status = 1')
+    .orderBy('permission.sort', 'ASC')
+    .addOrderBy('children.sort', 'ASC')
+    .getMany();
     return this.buildPermissionTree(permissions);
   }
 
