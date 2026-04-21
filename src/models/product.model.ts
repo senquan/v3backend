@@ -60,11 +60,17 @@ export class Product {
   @Column({ type: 'varchar', length: 255, nullable: true })
   remark: string | null = null;
 
+  @Column({ type: 'int', default: 0 })
+  stock!: number;
+
   @CreateDateColumn({ name: 'create_at' })
   createAt!: Date;
 
   @UpdateDateColumn({ name: 'update_at' })
   updateAt!: Date;
+
+  @UpdateDateColumn({ name: 'stock_update_at' })
+  stockUpdateAt!: Date;
 
   @Column({ name: 'is_deleted', type: 'tinyint', default: 0 })
   isDeleted!: number;

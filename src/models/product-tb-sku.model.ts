@@ -6,6 +6,9 @@ export class ProductTbSku {
   @PrimaryGeneratedColumn()
   id!: number;
 
+  @Column({ name: 'platform_id' })
+  platformId!: number;
+
   @Column({ name: 'product_id' })
   productId!: number;
 

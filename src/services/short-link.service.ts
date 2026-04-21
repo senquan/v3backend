@@ -6,15 +6,21 @@ import QRCode from 'qrcode';
 import { logger } from '../utils/logger';
 
 interface GenerateLinkOptions {
-  ids?: number[];
-  quantities?: number[];
+  platformId: number;
+  ids: number[];
+  quantities: number[];
+  itemIds?: string[];  
 }
 
 interface LinkItem {
+  id: number;  
+  productName?: string;
   materialCode: string;
   quantity: number;
   itemId: string;
   skuId: string;
+  itemIds?: string[];
+  skuIds: string[];
 }
 
 /**
@@ -36,13 +42,21 @@ export class ShortLinkService {
     shortUrl: string;
     expiresAt?: Date;
   }> {
-    const { ids, quantities } = options;
+    const { ids, quantities, platformId, itemIds } = options;
     if (!ids || !quantities || ids.length !== quantities.length) {
       throw new Error('Invalid options: ids and quantities must be provided and of the same length');
     }
+
     const queryBuilder = AppDataSource.getRepository(ProductTbSku)
       .createQueryBuilder('sku')
-      .where('sku.productId IN (:...ids)', { ids });
+      .innerJoinAndSelect('sku.product', 'product')
+      .where('sku.platformId = :platformId', { platformId })
+      .andWhere('sku.productId IN (:...ids)', { ids });
+
+    const productQuantities = new Map<number, number>();
+    for(let i = 0; i < ids.length; i++) {
+      productQuantities.set(Number(ids[i]), quantities[i]);
+    }
 
     const result = {
       id: 0,
@@ -50,25 +64,56 @@ export class ShortLinkService {
       originalUrl: "",
       shortUrl: "",
       qrCodeImageUrl: "",
-      expiresAt: new Date() 
+      expiresAt: new Date(),
+      data: [] as LinkItem[],
     }
 
     const items = [] as string[]
-    const [records, total] = await queryBuilder.getManyAndCount()
-    if (total !== ids.length) {
+    const [records] = await queryBuilder.getManyAndCount()
+    const recordData = records.reduce((acc, cur) => {
+      if (acc[cur.productId]) {
+        acc[cur.productId].itemIds!.push(cur.tbItemId);
+        acc[cur.productId].skuIds!.push(cur.tbSkuId);
+      }
+      else {
+        acc[cur.productId] = {
+          id: cur.productId,
+          productName: cur.product?.name || '',
+          materialCode: cur.materialCode,
+          quantity: productQuantities.get(cur.productId) || 0,
+          itemId: cur.tbItemId,
+          skuId: cur.tbSkuId, 
+          itemIds: [cur.tbItemId] as string[],
+          skuIds: [cur.tbSkuId] as string[]         
+        };
+      }
+      return acc;
+    }, {} as Record<string, LinkItem>);
+
+    if (itemIds && itemIds.length > 0) {
+      for(let i = 0; i < itemIds.length; i++) {
+        const sku = recordData[ids[i]]
+        if (sku && sku.itemIds && sku.itemIds.length > 1) {
+          if (sku.itemIds.includes(itemIds[i])) {
+            sku.itemId = itemIds[i];
+            sku.skuId = sku.skuIds[sku.itemIds.indexOf(sku.itemId)];
+          }
+        }
+      }
+    }
+    
+
+    if (Object.keys(recordData).length !== ids.length) {
       result.originalUrl = "缺失部分或全部SKU信息，生成失败"
       result.shortUrl = result.originalUrl
     } else {
-      const productMap = records.reduce((map, sku) => {
-        map.set(sku.productId, sku);
-        return map;
-      }, new Map<number, ProductTbSku>());
       for(let i = 0; i < ids.length; i++) {
-        const sku = productMap.get(ids[i])
+        const sku = recordData[ids[i]]
         if (!sku) throw Error("SKU信息不存在")
-        items.push(`${sku.tbItemId}_${sku.tbSkuId}_${quantities[i]}`)
+        items.push(`${sku.itemId}_${sku.skuId}_${productQuantities.get(Number(ids[i]))}`)
       }
       result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${items.join(',')}&type=tb`
+      result.data = Object.values(recordData);
     }
 
     if (result.originalUrl.substring(0, 4) === "http") {
@@ -99,7 +144,6 @@ export class ShortLinkService {
       logger.info(`生成短链接成功: ${shortCode}`);
     }
     
-
     return result;
   }
 

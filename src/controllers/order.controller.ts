@@ -298,8 +298,8 @@ export class OrderController {
         .getManyAndCount();
 
       const dictQueryBuilder = AppDataSource.getRepository(Dict)
-      .createQueryBuilder('dict')
-      .where('dict.group = :group', { group: 1 });
+        .createQueryBuilder('dict')
+        .where('dict.group = :group', { group: 1 });
       const allPlatforms = await dictQueryBuilder.getMany();
       const platforms = isAdmin ? allPlatforms : allPlatforms.filter((item) => userPlatforms.includes(Number(item.value)));
 

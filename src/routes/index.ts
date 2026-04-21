@@ -24,6 +24,7 @@ import wsRoutes from './ws.routes';
 import shortLinkRoutes from './short-link.routes';
 import expressRoutes from './express.routes';
 import wxworkCallbackRoutes from './wxwork-callback.routes';
+import clawCallbackRoutes from './claw-callback.routes';
 import botRoutes from './bot.routes';
 
 const router = Router();
@@ -55,6 +56,7 @@ router.use('/v1/s', shortLinkRoutes)
 router.use('/v1/express', expressRoutes)
 router.use('/v1/wxwork', wxworkCallbackRoutes)
 router.use('/v1/wework', wxworkCallbackRoutes)
+router.use('/v1/claw', clawCallbackRoutes)
 router.use('/v1/bot', botRoutes)
 
 // 处理404情况 - 当没有匹配到路由时

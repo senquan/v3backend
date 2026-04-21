@@ -12,6 +12,10 @@ export class ShortLinkController {
    */
   async generate(req: Request, res: Response) {
     try {
+      const userRoles = (req as any).userRoles || [];
+      const userPlatforms = (req as any).accessPlatforms || [];
+      const isAdmin = userRoles.includes('ADMIN');
+      if (!isAdmin && !userPlatforms.includes(req.body.platformId)) throw new Error('无权限访问');
       const result = await shortLinkService.generateShortLink(req.body);
       return successResponse(res, result, '短链接生成成功');
     } catch (error: any) {

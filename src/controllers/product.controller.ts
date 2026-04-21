@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { In } from "typeorm";
 import { AppDataSource } from '../config/database';
+import { Dict } from '../models/dict.model';
 import { Product } from '../models/product.model';
 import { ProductModel } from '../models/product-model.model';
 import { ProductSeries } from '../models/product-series.model';
@@ -956,6 +957,7 @@ export class ProductController {
       }
       const productSkuRepository = AppDataSource.getRepository(ProductTbSku);
       const productRepository = AppDataSource.getRepository(Product);
+      const dictRepository = AppDataSource.getRepository(Dict);
 
       const existingProducts = await productRepository.find({
         where: { isDeleted: 0 }
@@ -965,11 +967,21 @@ export class ProductController {
         return map;
       }, new Map<string, Product>());
 
+      const dictQueryBuilder = AppDataSource.getRepository(Dict)
+        .createQueryBuilder('dict')
+        .where('dict.group = :group', { group: 1 });
+      const allPlatforms = await dictQueryBuilder.getMany();
+
+      const dictMap = allPlatforms.reduce((acc, cur) => {
+        acc[cur.name] = Number(cur.value);
+        return acc;
+      }, {} as Record<string, number>);
+
       const existingSkus = await productSkuRepository.find();
       const skuMap = existingSkus.reduce((map, sku) => {
-        map.set(sku.productId, sku);
+        map.set(sku.tbSkuId, sku);
         return map;
-      }, new Map<number, ProductTbSku>());
+      }, new Map<string, ProductTbSku>());
 
       const results = {
         success: 0,
@@ -983,9 +995,15 @@ export class ProductController {
         try {
 
           // 验证必填字段
-          if (!productData.materialId || !productData.tbItemId || productData.skuId) {
+          if (!productData.platform || !productData.materialId || !productData.tbItemId || productData.skuId) {
             results.error++;
             results.errorMessages.push(`必要字段缺失，跳过该商品`);
+            continue;
+          }
+
+          if (!dictMap[productData.platform]) {
+            results.error++;
+            results.errorMessages.push(`平台 ${productData.platform} 不存在，跳过该商品`);
             continue;
           }
 
@@ -1003,7 +1021,7 @@ export class ProductController {
           }
 
           // 检查物料编号是否已存在
-          const sku = skuMap.get(product.id)
+          const sku = skuMap.get(productData.tbSkuId)
           if (sku) {
             let isUpdated = false;
 
@@ -1013,11 +1031,19 @@ export class ProductController {
               isUpdated = true;
             }
 
-            // 检查并更新SKUID
-            if (productData.tbSkuId !== undefined && String(productData.tbSkuId) !== sku.tbSkuId) {
-              sku.tbSkuId = String(productData.tbSkuId);
+            // 检查并更新物料编号
+            if (productData.materialId !== undefined && String(productData.materialId) !== sku.materialCode) {
+              sku.materialCode = String(productData.materialId);
+              sku.productId = product.id;
               isUpdated = true;
             }
+
+            // 检查并更新平台
+            if (productData.platform !== undefined && dictMap[productData.platform] !== sku.platformId) {
+              sku.platformId = dictMap[productData.platform];
+              isUpdated = true;
+            }
+
             if (isUpdated) {
               await productSkuRepository.save(sku);
               results.updated++;
@@ -1034,6 +1060,7 @@ export class ProductController {
           const newSku = new ProductTbSku();
           
           // 设置基本属性
+          newSku.platformId = dictMap[productData.platform];
           newSku.materialCode = productData.materialId;
           newSku.tbItemId = productData.tbItemId || 0;
           newSku.tbSkuId = String(productData.tbSkuId || "");

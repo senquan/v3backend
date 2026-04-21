@@ -64,7 +64,6 @@ export async function startBot(_req: Request, res: Response) {
     // });
 
     wechatyBot = new WechatyBot({
-      name: "ExpressBot",
       puppetOptions: {
         uos: true
       }
