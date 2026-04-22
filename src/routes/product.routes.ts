@@ -56,7 +56,10 @@ router.post('/batch/delete', cacheClearMiddleware('/api/v1/product/list'), produ
 router.post('/import', cacheClearMiddleware('/api/v1/product/list'), productController.importProducts);
 
 // 批量导入商品SKU
-router.post('/import-skus', productController.importProductSkus);
+router.post('/import-skus', cacheClearMiddleware('/api/v1/product/list'), productController.importProductSkus);
+
+// 批量导入商品库存
+router.post('/import-stock', cacheClearMiddleware('/api/v1/product/list'), productController.importProductStock);
 
 // 创建系列
 router.post('/series/', productController.createSeries);

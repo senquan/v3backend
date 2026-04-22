@@ -21,7 +21,7 @@ export class ProductController {
   // 获取商品列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, mid, keyword, color, serie, status, model, limit, sort, platform, images, tags } = req.query;
+      const { page = 1, pageSize = 20, mid, keyword, color, serie, status, model, limit, sort, platform, images, tags, minStock, maxStock } = req.query;
       
       const userRoles = (req as any).userRoles || [];
       let accessTags = (req as any).accessTags || [];
@@ -110,6 +110,9 @@ export class ProductController {
       if (Number(limit) > 0) {
         queryBuilder.limit(Number(limit));
       }
+
+      if (minStock !== undefined && minStock !== '') queryBuilder.andWhere('product.stock >= :minStock', { minStock });
+      if (maxStock !== undefined && maxStock !== '') queryBuilder.andWhere('product.stock <= :maxStock', { maxStock });
 
       if (sort) {
         const order = String(sort).substring(0, 1);
@@ -648,6 +651,12 @@ export class ProductController {
         }
       }
 
+      // 库存更新
+      if (productData.stock !== undefined && productData.stock !== product.stock) {
+        product.stock = productData.stock;
+        product.stockUpdateAt = new Date();
+      }
+
       const { modelType, serie, tags, ...updateData } = productData;
       Object.assign(product, {
         ...updateData,
@@ -957,7 +966,6 @@ export class ProductController {
       }
       const productSkuRepository = AppDataSource.getRepository(ProductTbSku);
       const productRepository = AppDataSource.getRepository(Product);
-      const dictRepository = AppDataSource.getRepository(Dict);
 
       const existingProducts = await productRepository.find({
         where: { isDeleted: 0 }
@@ -1079,6 +1087,73 @@ export class ProductController {
       return successResponse(res, results, `批量导入完成，成功: ${results.success}，失败: ${results.error}`);
     } catch (error) {
       logger.error("批量导入商品SKU失败:", error);
+      return errorResponse(res, 500, "服务器内部错误", null);
+    }
+  }
+
+  async importProductStock(req: Request, res: Response): Promise<Response> {
+    try {
+      const products = req.body.products;
+      if (!Array.isArray(products) || products.length === 0) {
+        return errorResponse(res, 400, "请提供有效的商品数据", null);
+      }
+      const productRepository = AppDataSource.getRepository(Product);
+      const materialIds = products.map(product => product.materialId);
+      const existingProducts = await productRepository.find({
+        where: { materialId: In(materialIds) }
+      });
+
+      const productMap = existingProducts.reduce((map, product) => {
+        map.set(product.materialId, product);
+        return map;
+      }, new Map<string, Product>());
+
+      const results = {
+        success: 0,
+        ignored: 0,
+        updated: 0,
+        error: 0,
+        errorMessages: [] as string[]
+      };
+
+      for (const productData of products) {
+        try {
+          // 验证必填字段
+          if (!productData.stock || productData.stock <= 0) {
+            results.error++;
+            results.errorMessages.push(`必要字段缺失，跳过该商品`);
+            continue;
+          }
+          
+          const product = productMap.get(String(productData.materialId));
+          if (!product) {
+            results.error++;
+            results.errorMessages.push(`物料编号 ${productData.materialId} 不存在，跳过该商品`);
+            continue;
+          }
+
+          if (productData.stock !== product.stock) {
+            await productRepository.update(product.id, {
+              stock: productData.stock,
+              stockUpdateAt: new Date(),
+            });
+            results.updated++;
+            results.errorMessages.push(`物料编号 ${productData.materialId} 库存已更新`);
+          } else {
+            results.ignored++;
+            results.errorMessages.push(`物料编号 ${productData.materialId} 库存无变更，跳过该商品`);
+          }
+          results.success++;
+        } catch (error) {
+          results.error++;
+          const errorMessage = error instanceof Error ? error.message : "未知错误";
+          results.errorMessages.push(`处理物料编号 ${productData.materialId} 时出错: ${errorMessage}`);
+          logger.error(`导入商品库存失败 [${productData.materialId}]:`, error);
+        }
+      }
+      return successResponse(res, results, `批量导入完成，成功: ${results.success}，失败: ${results.error}`);
+    } catch (error) {
+      logger.error("批量导入商品库存失败:", error);
       return errorResponse(res, 500, "服务器内部错误", null);
     }
   }
