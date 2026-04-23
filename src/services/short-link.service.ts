@@ -62,6 +62,7 @@ export class ShortLinkService {
       id: 0,
       shortCode: "",
       originalUrl: "",
+      orderUrl: "",
       shortUrl: "",
       qrCodeImageUrl: "",
       expiresAt: new Date(),
@@ -69,6 +70,7 @@ export class ShortLinkService {
     }
 
     const items = [] as string[]
+    const orderItems = [] as string[]
     const [records] = await queryBuilder.getManyAndCount()
     const recordData = records.reduce((acc, cur) => {
       if (acc[cur.productId]) {
@@ -111,8 +113,10 @@ export class ShortLinkService {
         const sku = recordData[ids[i]]
         if (!sku) throw Error("SKU信息不存在")
         items.push(`${sku.itemId}_${sku.skuId}_${productQuantities.get(Number(ids[i]))}`)
+        orderItems.push(`${sku.itemId}_${productQuantities.get(Number(ids[i]))}_${sku.skuId}`)
       }
-      result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${items.join(',')}&back=https://main.m.taobao.com/cart/index.html&type=tb`
+      result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${encodeURIComponent(items.join('%2C'))}&back=https%3A%2F%2Fmain.m.taobao.com%2Fcart%2Findex.html&type=tb`
+      result.orderUrl = `https://h5.m.taobao.com/cart/order.html?buyParam=${encodeURIComponent(orderItems.join('%2C'))}`
       result.data = Object.values(recordData);
     }
 
