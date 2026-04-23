@@ -112,7 +112,7 @@ export class ShortLinkService {
         if (!sku) throw Error("SKU信息不存在")
         items.push(`${sku.itemId}_${sku.skuId}_${productQuantities.get(Number(ids[i]))}`)
       }
-      result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${items.join(',')}&type=tb`
+      result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${items.join(',')}&back=https://main.m.taobao.com/cart/index.html&type=tb`
       result.data = Object.values(recordData);
     }
 
