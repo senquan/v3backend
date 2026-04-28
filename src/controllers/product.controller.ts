@@ -1100,7 +1100,7 @@ export class ProductController {
       const productRepository = AppDataSource.getRepository(Product);
       const materialIds = products.map(product => product.materialId);
       const existingProducts = await productRepository.find({
-        where: { materialId: In(materialIds) }
+        where: { materialId: In(materialIds), isDeleted: 0 }
       });
 
       const productMap = existingProducts.reduce((map, product) => {
@@ -1119,7 +1119,8 @@ export class ProductController {
       for (const productData of products) {
         try {
           // 验证必填字段
-          if (!productData.stock || productData.stock <= 0) {
+          productData.stock = Number(productData.stock);
+          if (isNaN(productData.stock) || productData.stock < 0) {
             results.error++;
             results.errorMessages.push(`必要字段缺失，跳过该商品`);
             continue;
