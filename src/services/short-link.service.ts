@@ -115,8 +115,8 @@ export class ShortLinkService {
         items.push(`${sku.itemId}_${sku.skuId}_${productQuantities.get(Number(ids[i]))}`)
         orderItems.push(`${sku.itemId}_${productQuantities.get(Number(ids[i]))}_${sku.skuId}`)
       }
-      result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${encodeURIComponent(items.join('%2C'))}&back=https%3A%2F%2Fmain.m.taobao.com%2Fcart%2Findex.html&type=tb`
-      result.orderUrl = `https://h5.m.taobao.com/cart/order.html?buyParam=${encodeURIComponent(orderItems.join('%2C'))}`
+      result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${items.join('%2C')}&back=https%3A%2F%2Fmain.m.taobao.com%2Fcart%2Findex.html&type=tb`
+      result.orderUrl = `https://h5.m.taobao.com/cart/order.html?buyParam=${orderItems.join('%2C')}`
       result.data = Object.values(recordData);
     }
 
