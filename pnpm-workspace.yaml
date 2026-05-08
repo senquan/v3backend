@@ -1,0 +1,8 @@
+allowBuilds:
+  '@nestjs/core': true
+  '@swc/core': true
+  hiredis: true
+  leveldown: true
+  protobufjs: true
+  puppeteer: true
+  sharp: true
