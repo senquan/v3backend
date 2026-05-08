@@ -26,6 +26,7 @@ import expressRoutes from './express.routes';
 import wxworkCallbackRoutes from './wxwork-callback.routes';
 import clawCallbackRoutes from './claw-callback.routes';
 import botRoutes from './bot.routes';
+import logRoutes from './log.routes';
 
 const router = Router();
 
@@ -58,6 +59,7 @@ router.use('/v1/wxwork', wxworkCallbackRoutes)
 router.use('/v1/wework', wxworkCallbackRoutes)
 router.use('/v1/claw', clawCallbackRoutes)
 router.use('/v1/bot', botRoutes)
+router.use('/v1/logs', logRoutes)
 
 // 处理404情况 - 当没有匹配到路由时
 router.use('*', (req: Request, res: Response) => {
