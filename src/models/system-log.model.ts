@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   Index,
+  UpdateDateColumn,
 } from 'typeorm';
 
 export enum LogLevel {
@@ -116,10 +117,10 @@ export class LogChain {
   @Column({ type: 'int', default: 0 })
   sequence!: number;
 
-  @Column({ type: 'timestamp' })
+  @CreateDateColumn({ type: 'timestamp' })
   createdAt!: Date;
 
-  @Column({ type: 'timestamp' })
+  @UpdateDateColumn({ type: 'timestamp' })
   updatedAt!: Date;
 }
 
@@ -146,6 +147,6 @@ export class LogArchive {
   @Column({ type: 'varchar', length: 64 })
   checksum!: string;
 
-  @Column({ type: 'timestamp' })
+  @CreateDateColumn({ type: 'timestamp' })
   createdAt!: Date;
 }
