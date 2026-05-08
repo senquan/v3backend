@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { PromotionRuleV3 as PromotionRule } from './promotion-rule-v3.model';
-import { PromotionPlatforms } from './promotion-platforms.motel';
+import { PromotionPlatforms } from './promotion-platforms.model';
 
 export enum PromotionType {
   DAILY_DISCOUNT = 1,    // 日常折扣

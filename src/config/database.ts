@@ -22,7 +22,7 @@ import { ProductSeries } from '../models/product-series.model';
 import { ProductSeriesTag } from '../models/product-series-tag.model';
 import { Promotion } from '../models/promotion.model';
 import { PromotionV3 } from '../models/promotion-v3.model';
-import { PromotionPlatforms } from '../models/promotion-platforms.motel';
+import { PromotionPlatforms } from '../models/promotion-platforms.model';
 import { PromotionRule } from '../models/promotion-rule.model';
 import { PromotionRuleV3 } from '../models/promotion-rule-v3.model';
 import { ReturnOrder } from '../models/return-order.model';

@@ -6,7 +6,7 @@ import { Dict } from '../models/dict.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { LessThan, MoreThan } from 'typeorm';
-import { PromotionPlatforms } from '../models/promotion-platforms.motel';
+import { PromotionPlatforms } from '../models/promotion-platforms.model';
 
 interface FormulaConvertRequest {
   formula: string;
