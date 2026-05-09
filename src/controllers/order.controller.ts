@@ -158,7 +158,7 @@ export class OrderController {
       // 获取订单
       const order = await queryRunner.manager.findOne(Order, {
         where: { id: Number(id) },
-        relations: ['items']
+        relations: ['items', 'user']
       })
       if (!order) {
         return errorResponse(res, 404, '订单不存在', null);
