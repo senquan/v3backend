@@ -10,7 +10,8 @@ import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { Dict } from '../models/dict.model';
 import { OrderCalculationLog } from '../models/order-calculation-log.model';
-import { ProductTbSku } from '../models/product-tb-sku.model';
+import { logService } from '../app';
+import { LogCategory } from '../models/system-log.model';
 
 interface DiscountMatchLog {
   productId: number;
@@ -121,7 +122,9 @@ export class OrderController {
       }
       
       await queryRunner.commitTransaction();
-      return successResponse(res, savedOrder, '创建订单成功');
+      const message = `创建订单 ${savedOrder.id} 成功`;
+      logService.info(message, { userId }, LogCategory.PRODUCT);
+      return successResponse(res, savedOrder, message);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       logger.error('创建订单失败:', error);
@@ -234,7 +237,9 @@ export class OrderController {
         }
       }
       await queryRunner.commitTransaction();
-      return successResponse(res, order, '更新订单成功');
+      const message = `更新订单 ${order.id} 成功`;
+      logService.info(message, { userId }, LogCategory.PRODUCT);
+      return successResponse(res, order, message);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       logger.error('更新订单失败:', error);
@@ -394,8 +399,10 @@ export class OrderController {
         operation,
         remark
       )
-
-      return successResponse(res, null, '更新订单状态成功');
+      
+      const message = `更新订单 ${order.id} 状态成功: 从 ${oldStatus} 变更为 ${status}`;
+      logService.info(message, { userId }, LogCategory.PRODUCT);
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('更新订单状态失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -415,7 +422,9 @@ export class OrderController {
 
       if (order.type === changeType) return successResponse(res, changeType, '订单类型未改变');
       await orderRepository.update(order.id, { type: changeType });
-      return successResponse(res, changeType, '更新订单类型成功');
+      const message = `更新订单 ${order.id} 类型变更成功: 从 ${order.type} 变更为 ${changeType}`;
+      logService.info(message, { userId: (req as any).user.id }, LogCategory.PRODUCT);
+      return successResponse(res, changeType, message);
     } catch (error) {
       logger.error('更新订单类型失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -434,7 +443,9 @@ export class OrderController {
 
       if (order.priceVersion === version) return successResponse(res, version, '订单价格版本未改变');
       await orderRepository.update(order.id, { priceVersion: version });
-      return successResponse(res, version, '更新订单价格版本成功');
+      const message = `更新订单 ${order.id} 价格版本变更成功: 从 ${order.priceVersion} 变更为 ${version}`;
+      logService.info(message, { userId: (req as any).user.id }, LogCategory.PRODUCT);
+      return successResponse(res, version, message);
     } catch (error) {
       logger.error('更新订单价格版本失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -480,7 +491,9 @@ async changeOrderPlatform(req: Request, res: Response): Promise<Response> {
       return errorResponse(res, 400, '订单内包含不支持目标平台的产品，不可转换。', null);
     else {
       await orderRepository.update(order.id, { platformId });
-      return successResponse(res, platformId, '更新订单平台成功');
+      const message = `更新订单 ${order.id} 平台变更成功: 从 ${order.platformId} 变更为 ${platformId}`;
+      logService.info(message, { userId: (req as any).user.id }, LogCategory.PRODUCT);
+      return successResponse(res, platformId, message);
     }
       
   } catch (error) {
@@ -499,8 +512,9 @@ async changeOrderPlatform(req: Request, res: Response): Promise<Response> {
       if (result.affected === 0) {
         return errorResponse(res, 404, '订单不存在', null);
       }
-      
-      return successResponse(res, null, '订单已标记删除');
+      const message = `订单 ${id} 已标记删除`;
+      logService.warn(message, { userId: (req as any).user.id }, LogCategory.PRODUCT);
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('删除订单失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
