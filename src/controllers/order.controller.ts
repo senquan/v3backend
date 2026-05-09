@@ -142,16 +142,10 @@ export class OrderController {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    const user = (req as any).user;
-    console.log('[Order Update] user:', user);
-    console.log('[Order Update] user?.id:', user?.id);
-    const userId = user?.id;
-    console.log('[Order Update] userId value:', userId, typeof userId);
+    const userId = (req as any).user?.id;
     if (!userId) {
-      console.log('[Order Update] User not authenticated, returning 401');
       return errorResponse(res, 401, '用户未认证', null);
     }
-    console.log('[Order Update] Proceeding with userId:', userId);
     try {
       const { id } = req.params;
       const { name, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs, relatedId } = req.body;
@@ -174,7 +168,6 @@ export class OrderController {
       order.name = name;
       order.platformId = platformId;
       order.customerId = 0;
-      order.userId = userId;
       order.remark = remark;
 
       if (relatedId) {
@@ -252,11 +245,8 @@ export class OrderController {
       const message = `更新订单 ${order.id} 成功`;
       logService.info(message, { userId }, LogCategory.PRODUCT);
       return successResponse(res, order, message);
-    } catch (error: any) {
+    } catch (error) {
       await queryRunner.rollbackTransaction();
-      console.error('[Order Update] Full error:', error);
-      console.error('[Order Update] Error message:', error.message);
-      console.error('[Order Update] Error stack:', error.stack);
       logger.error('更新订单失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     } finally {
