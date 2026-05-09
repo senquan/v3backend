@@ -34,7 +34,10 @@ export class OrderController {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    const userId = (req as any).user.id;
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return errorResponse(res, 401, '用户未认证', null);
+    }
     try {
       // 修改请求参数解析
       const { name, type, priceVersion, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs, relatedId } = req.body;
@@ -139,7 +142,10 @@ export class OrderController {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    const userId = (req as any).user.id;
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return errorResponse(res, 401, '用户未认证', null);
+    }
     try {
       const { id } = req.params;
       const { name, status, platformId, originPrice, flashPrice, dailyPrice, promotionPrice, bonusUsed, products, remark, matchLogs, relatedId } = req.body;
@@ -370,7 +376,10 @@ export class OrderController {
       const { status, payStatus, reviewerId, remark } = req.body;
 
       const userId = (req as any).user?.id;
-
+      if (!userId) {
+        return errorResponse(res, 401, '用户未认证', null);
+      }
+      
       // 更新逻辑增加审核人
       const updateData: Record<string, any> = {};
       if (status !== undefined) updateData.status = status;
