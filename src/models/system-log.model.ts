@@ -3,9 +3,12 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
   Index,
   UpdateDateColumn,
 } from 'typeorm';
+import { User } from './user.model';
 
 export enum LogLevel {
   TRACE = 'trace',
@@ -27,6 +30,7 @@ export enum LogCategory {
   EXPRESS = 'express',
   USER = 'user',
   PAYMENT = 'payment',
+  PRODUCT = 'product',
 }
 
 @Entity('system_logs')
@@ -58,7 +62,7 @@ export class SystemLog {
   spanId?: string;
 
   @Column({ type: 'bigint', nullable: true })
-  userId?: string;
+  userId?: number;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   userName?: string;
@@ -101,6 +105,11 @@ export class SystemLog {
 
   @CreateDateColumn({ type: 'timestamp' })
   createdAt!: Date;
+
+  // 关联关系
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'userId' })
+  user!: User;
 }
 
 @Entity('log_chains')

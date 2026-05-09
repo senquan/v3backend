@@ -7,6 +7,8 @@ import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { LessThan, MoreThan } from 'typeorm';
 import { PromotionPlatforms } from '../models/promotion-platforms.model';
+import { logService } from '../app';
+import { LogLevel, LogCategory } from '../models/system-log.model';
 
 export class PromotionController {
   // 创建促销活动
@@ -106,8 +108,10 @@ export class PromotionController {
       }
 
       await queryRunner.commitTransaction();
-      return successResponse(res, savedPromotion, copyFrom ? '创建促销活动并复制规则成功' : '创建促销活动成功');
-
+      // 记录日志
+      const message = copyFrom ? '创建促销活动并复制规则成功' : '创建促销活动成功';
+      logService.log({ level: LogLevel.INFO, category: LogCategory.BUSINESS, message, context: { userId } });
+      return successResponse(res, savedPromotion, message);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       logger.error('创建促销活动失败:', error);
@@ -400,8 +404,10 @@ export class PromotionController {
       }
 
       await queryRunner.commitTransaction();
-      return successResponse(res, promotion, '更新促销活动成功');
-
+      // 记录日志
+      const message = '更新促销活动成功';
+      logService.log({ level: LogLevel.INFO, category: LogCategory.BUSINESS, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, promotion, message);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       logger.error('更新促销活动失败:', error);
@@ -422,8 +428,11 @@ export class PromotionController {
       if (result.affected === 0) {
         return errorResponse(res, 404, '促销活动不存在', null);
       }
-
-      return successResponse(res, null, '删除促销活动成功');
+      
+      // 记录日志
+      const message = '删除促销活动成功';
+      logService.log({ level: LogLevel.WARN, category: LogCategory.BUSINESS, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('删除促销活动失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -455,8 +464,11 @@ export class PromotionController {
       // } else {
       //   promotion.status = PromotionStatus.ENDED;
       // }
-
-      return successResponse(res, null, '更新活动状态成功');
+      
+      // 记录日志
+      const message = `更新活动 ${id} 的状态为 ${status} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.BUSINESS, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('更新活动状态失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -557,8 +569,11 @@ export class PromotionController {
       await ruleRepository.update(contentsObj.id, {
         contents: JSON.stringify(contentsObj),
       });
-
-      return successResponse(res, savedRule, '添加促销规则成功');
+      
+      // 记录日志
+      const message = `添加促销规则 ${name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.BUSINESS, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, savedRule, message);
     } catch (error) {
       logger.error('添加促销规则失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -643,7 +658,10 @@ export class PromotionController {
       // 保存更新
       const updatedRule = await AppDataSource.getRepository(PromotionRule).save(rule);
 
-      return successResponse(res, updatedRule, '更新促销规则成功');
+      // 记录日志
+      const message = `更新促销规则 ${name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.BUSINESS, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, updatedRule, message);
     } catch (error) {
       logger.error('更新促销规则失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -662,8 +680,11 @@ export class PromotionController {
       if (result.affected === 0) {
         return errorResponse(res, 404, '促销规则不存在', null);
       }
-
-      return successResponse(res, null, '删除促销规则成功');
+      
+      // 记录日志
+      const message = `删除促销规则 ${id} 成功`;
+      logService.log({ level: LogLevel.WARN, category: LogCategory.BUSINESS, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('删除促销规则失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);

@@ -12,6 +12,8 @@ import { RedisCacheService } from './services/cache.service';
 import { CacheQueryMiddleware } from './middlewares/cache-query.middleware';
 import { WebSocketService } from './utils/websocket';
 import { WeComAiBotService } from './bot/wecom-ai-bot.service';
+import { LogService } from './services/log.service';
+import { SystemLog, LogChain } from './models/system-log.model';
 
 // 加载环境变量
 dotenv.config();
@@ -35,10 +37,17 @@ app.use(cacheMiddleware);
 const uploadPath = process.env.UPLOAD_PATH || './uploads';
 app.use('/uploads', express.static(path.join(__dirname, '..', uploadPath)));
 
+const logRepository = AppDataSource.getRepository(SystemLog);
+const chainRepository = AppDataSource.getRepository(LogChain);
+export const logService = new LogService(logRepository, chainRepository);
+
 // 数据库连接
 AppDataSource.initialize()
-  .then(() => {
+  .then(async () => {
     logger.info('Database connection established');
+
+    await logService.onModuleInit();
+    logger.info('LogService timer started');
   })
   .catch((error) => {
     logger.error('Error connecting to database:', error);

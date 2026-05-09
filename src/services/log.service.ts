@@ -44,7 +44,7 @@ export class LogService implements OnModuleInit, OnModuleDestroy {
   private chainId: string = 'default';
   private sequence: number = 0;
   private readonly BUFFER_SIZE = 100;
-  private readonly FLUSH_INTERVAL = 2000;
+  private readonly FLUSH_INTERVAL = 5000;
   private readonly REDIS_CHAIN_KEY = 'log:chain:';
   private readonly REDIS_BUFFER_KEY = 'log:buffer:';
 
@@ -161,8 +161,8 @@ export class LogService implements OnModuleInit, OnModuleDestroy {
         log.context = entry.context ? JSON.stringify(entry.context) : undefined;
         log.traceId = entry.traceId;
         log.spanId = entry.spanId;
-        log.userId = entry.userId;
-        log.userName = entry.userName;
+        log.userId = entry.context?.userId || entry.userId;
+        log.userName = entry.context?.userName || entry.userName;
         log.ip = entry.ip;
         log.userAgent = entry.userAgent;
         log.action = entry.action;
@@ -211,7 +211,7 @@ export class LogService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async queryLogs(query: LogQuery): Promise<{ data: SystemLog[]; total: number }> {
+  async queryLogs(query: LogQuery): Promise<{ data: { list: SystemLog[]; total: number } }> {
     const page = query.page || 1;
     const pageSize = query.pageSize || 50;
 
@@ -241,13 +241,14 @@ export class LogService implements OnModuleInit, OnModuleDestroy {
     }
 
     const [data, total] = await this.logRepository.findAndCount({
+      relations: ['user', 'user.staff'],
       where: whereConditions,
       order: { createdAt: 'DESC', sequence: 'DESC' },
       skip: (page - 1) * pageSize,
       take: pageSize,
     });
 
-    return { data, total };
+    return { data: { list: data, total } };
   }
 
   async verifyIntegrity(startSequence?: number, endSequence?: number): Promise<{
@@ -366,7 +367,7 @@ export class LogService implements OnModuleInit, OnModuleDestroy {
 
   async exportLogs(query: LogQuery): Promise<SystemLog[]> {
     const result = await this.queryLogs({ ...query, page: 1, pageSize: 100000 });
-    return result.data;
+    return result.data.list;
   }
 
   async cleanOldLogs(daysToKeep: number = 30): Promise<number> {

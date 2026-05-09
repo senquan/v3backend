@@ -11,6 +11,8 @@ import * as jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { RedisCacheService } from '../services/cache.service';
+import { logService } from '../app';
+import { LogLevel, LogCategory } from '../models/system-log.model';
 
 // 获取缓存服务实例
 const cacheService = new RedisCacheService();
@@ -77,6 +79,10 @@ export class UserController {
       // 清空用户相关缓存
       await cacheService.clearCacheByPath(`*:u:${user.id}`);
       
+      // 记录登录日志
+      const message = `用户 ${user.username} 登录成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.SYSTEM, message, context: { userId: user.id } });
+
       // 返回用户信息和令牌
       return res.json({
         code: 0,
@@ -199,8 +205,10 @@ export class UserController {
         password: user.password,
         updated_at: new Date()
       });
-
-      return successResponse(res, null, '密码更新成功');
+      
+      const message = `更新用户 ${user.username} 密码成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.USER, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('更新用户密码失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -250,7 +258,9 @@ export class UserController {
       // await inviteCodeRepository.save(invite);
       
       // 返回注册成功信息
-      return successResponse(res, null, '注册成功');
+      const message = `注册用户 ${savedUser.username} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.USER, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('注册失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -353,7 +363,10 @@ export class UserController {
       }
 
       await userRepository.save(user);
-      return successResponse(res, null, '用户角色更新成功');
+      
+      const message = `更新用户 ${user.username} 角色成功: ${newRoles.join(',')}`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.USER, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('更新用户角色失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);

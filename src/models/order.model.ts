@@ -43,8 +43,8 @@ export class Order {
   @ManyToOne(() => Customer, customer => customer.orders)
   customer!: Customer;
 
-  @Column({ name: 'user_id' })
-  userId!: number;
+  @Column({ name: 'user_id', nullable: true })
+  userId: number | null = null;
 
   @Column({ name: 'reviewer_id', nullable: true })
   reviewerId?: number;
@@ -85,7 +85,7 @@ export class Order {
   // 关系
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
-  user!: User;
+  user: User | null = null;
 
   @OneToMany(() => OrderItem, item => item.order)
   items!: OrderItem[];

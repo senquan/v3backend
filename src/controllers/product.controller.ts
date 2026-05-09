@@ -16,6 +16,9 @@ import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { PlatformTags } from '../models/platform-tags.model';
 import { ProductTbSku } from '../models/product-tb-sku.model';
+import { logService } from '../app';
+import { LogLevel, LogCategory } from '../models/system-log.model';
+
 
 export class ProductController {
   // 获取商品列表
@@ -519,7 +522,9 @@ export class ProductController {
         savedProduct.tags = tagEntities;
       }
 
-      return successResponse(res, savedProduct, '创建商品成功');
+      const message = `创建商品 ${savedProduct.name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.PRODUCT, message, context: { userId } });
+      return successResponse(res, savedProduct, message);
     } catch (error) {
       logger.error('创建商品失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -693,7 +698,9 @@ export class ProductController {
       }
 
       await queryRunner.commitTransaction();
-      return successResponse(res, updatedProduct, '更新商品成功');
+      const message = `更新商品 ${updatedProduct.name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.PRODUCT, message, context: { userId } });
+      return successResponse(res, updatedProduct, message);
     } catch (error) {
       if (queryRunner.isTransactionActive) {
         await queryRunner.rollbackTransaction();
@@ -722,7 +729,9 @@ export class ProductController {
         isDeleted: 1,
         updateAt: new Date()
       });
-      return successResponse(res, null, '删除商品成功');
+      const message = `删除商品 ${product.name} 成功`;
+      logService.log({ level: LogLevel.WARN, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('删除商品失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -949,8 +958,10 @@ export class ProductController {
           logger.error(`导入商品失败 [${productData.materialId}]:`, error);
         }
       }
-      
-      return successResponse(res, results, `批量导入完成，成功: ${results.success}，失败: ${results.error}`);
+      // 记录日志
+      const message = `批量导入商品，成功: ${results.success}，失败: ${results.error}`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, results, message);
     } catch (error) {
       logger.error("批量导入商品失败:", error);
       return errorResponse(res, 500, "服务器内部错误", null);
@@ -1084,7 +1095,9 @@ export class ProductController {
           logger.error(`导入商品失败 [${productData.materialId}]:`, error);
         }
       }
-      return successResponse(res, results, `批量导入完成，成功: ${results.success}，失败: ${results.error}`);
+      const message = `批量导入SKU完成，成功: ${results.success}，失败: ${results.error}`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, results, message);
     } catch (error) {
       logger.error("批量导入商品SKU失败:", error);
       return errorResponse(res, 500, "服务器内部错误", null);
@@ -1152,7 +1165,9 @@ export class ProductController {
           logger.error(`导入商品库存失败 [${productData.materialId}]:`, error);
         }
       }
-      return successResponse(res, results, `批量导入完成，成功: ${results.success}，失败: ${results.error}`);
+      const message = `批量导入库存完成，成功: ${results.success}，失败: ${results.error}`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, results, message);
     } catch (error) {
       logger.error("批量导入商品库存失败:", error);
       return errorResponse(res, 500, "服务器内部错误", null);
@@ -1255,7 +1270,9 @@ export class ProductController {
           updateAt: new Date()
         })
       })      
-      return successResponse(res, null, '批量更新价格完成');
+      const message = `批量更新价格完成，共更新 ${products.length} 条商品`;
+      logService.log({ level: LogLevel.WARN, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('批量更新价格失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -1280,7 +1297,9 @@ export class ProductController {
         .andWhere('isDeleted = :isDeleted', { isDeleted: 0 })
         .execute();
       
-      return successResponse(res, null, '批量删除商品成功');
+      const message = `批量删除商品完成，共删除 ${ids.length} 条商品`;
+      logService.log({ level: LogLevel.WARN, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('批量删除商品失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -1358,7 +1377,9 @@ export class ProductController {
       // 提交事务
       await queryRunner.commitTransaction();
       
-      return successResponse(res, savedSeries, '创建系列成功');
+      const message = `创建系列 ${savedSeries.name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, savedSeries, message);
     } catch (error: any) {
       // 回滚事务
       if (queryRunner.isTransactionActive) {
@@ -1449,7 +1470,10 @@ export class ProductController {
       
       // 提交事务
       await queryRunner.commitTransaction();
-      return successResponse(res, updatedSeries, '更新系列成功');
+      
+      const message = `更新系列 ${updatedSeries.name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, updatedSeries, message);
     } catch (error) {
       if (queryRunner.isTransactionActive) {
         await queryRunner.rollbackTransaction();
@@ -1488,8 +1512,9 @@ export class ProductController {
       
       // 删除系列
       await seriesRepository.remove(series);
-      
-      return successResponse(res, null, '删除系列成功');
+      const message = `删除系列 ${series.name} 成功`;
+      logService.log({ level: LogLevel.WARN, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('删除系列失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -1524,7 +1549,9 @@ export class ProductController {
       });
       
       const savedModel = await modelRepository.save(model);
-      return successResponse(res, savedModel, '创建型号成功');
+      const message = `创建型号 ${savedModel.name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, savedModel, message);
     } catch (error) {
       logger.error('创建型号失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -1564,7 +1591,9 @@ export class ProductController {
       Object.assign(model, modelData);
       
       const updatedModel = await modelRepository.save(model);
-      return successResponse(res, updatedModel, '更新型号成功');
+      const message = `更新型号 ${updatedModel.name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, updatedModel, message);
     } catch (error) {
       logger.error('更新型号失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -1591,7 +1620,9 @@ export class ProductController {
       model.isDeleted = 1;
       
       await modelRepository.save(model);
-      return successResponse(res, null, '删除型号成功');
+      const message = `删除型号 ${model.name} 成功`;
+      logService.log({ level: LogLevel.WARN, category: LogCategory.PRODUCT, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('删除型号失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);

@@ -27,7 +27,10 @@ router.get('/query', async (req: Request, res: Response) => {
     };
 
     const result = await logService.queryLogs(query);
-    res.json({ code: 0, data: result.data, total: result.total });
+    res.json({ code: 0, data: {
+      list: result.data.list,
+      total: result.data.total,
+    }});
   } catch (error: any) {
     res.status(500).json({ code: -1, message: error.message });
   }

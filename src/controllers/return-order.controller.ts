@@ -7,6 +7,8 @@ import { Order } from '../models/order.model';
 import { OrderStatusLogService } from '../services/order-status-log.service';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
+import { logService } from '../app';
+import { LogLevel, LogCategory } from '../models/system-log.model';
 
 export class ReturnOrderController {
 
@@ -135,8 +137,9 @@ export class ReturnOrderController {
       )
       
       await queryRunner.commitTransaction();
-      return successResponse(res, savedReturnOrder, '创建退货订单成功');
-
+      const message = `创建退货订单 ${savedReturnOrder.name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.BUSINESS, message, context: { userId } });
+      return successResponse(res, savedReturnOrder, message);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       logger.error('创建退货订单失败:', error);
@@ -269,8 +272,10 @@ export class ReturnOrderController {
       if (result.affected === 0) {
         return errorResponse(res, 404, '退货订单不存在', null);
       }
-
-      return successResponse(res, null, '更新退货订单状态成功');
+      
+      const message = `更新退货订单 ${id} 状态成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.BUSINESS, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('更新退货订单状态失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -288,8 +293,10 @@ export class ReturnOrderController {
       if (result.affected === 0) {
         return errorResponse(res, 404, '退货订单不存在', null);
       }
-
-      return successResponse(res, null, '删除退货订单成功');
+      
+      const message = `删除退货订单 ${id} 成功`;
+      logService.log({ level: LogLevel.WARN, category: LogCategory.BUSINESS, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('删除退货订单失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);

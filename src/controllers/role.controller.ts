@@ -11,6 +11,8 @@ import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { PermissionService } from '../services/permission.service';
 import { Dict } from '../models/dict.model';
+import { logService } from '../app';
+import { LogLevel, LogCategory } from '../models/system-log.model';
 
 export class RoleController {
   
@@ -44,8 +46,10 @@ export class RoleController {
       // 保存角色
       const savedRole = await AppDataSource.getRepository(Role).save(role);
       
-      return successResponse(res, savedRole, '创建角色成功');
-
+      // 记录日志
+      const message = `创建角色 ${savedRole.name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.USER, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, savedRole, message);
     } catch (error) {
       logger.error('创建角色失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -133,7 +137,10 @@ export class RoleController {
       // 保存角色更新
       const updatedRole = await AppDataSource.getRepository(Role).save(role);
       
-      return successResponse(res, updatedRole, '更新角色成功');
+      // 记录日志
+      const message = `更新角色 ${updatedRole.name} 成功`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.USER, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, updatedRole, message);
 
     } catch (error) {
       logger.error('更新角色失败:', error);
@@ -159,7 +166,11 @@ export class RoleController {
       role.updatedAt = new Date();
       
       await roleRepository.save(role);
-      return successResponse(res, null, '删除角色成功');
+      
+      // 记录日志
+      const message = `删除角色 ${role.name} 成功`;
+      logService.log({ level: LogLevel.WARN, category: LogCategory.USER, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('删除角色失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -183,8 +194,11 @@ export class RoleController {
       if (result.affected === 0) {
         return errorResponse(res, 404, '角色不存在', null);
       }
-
-      return successResponse(res, null, '更新角色状态成功');
+      
+      // 记录日志
+      const message = `更新角色状态 ${id} 为 ${status}`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.USER, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('更新角色状态失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -299,7 +313,11 @@ export class RoleController {
       }
 
       await roleRepository.save(role);
-      return successResponse(res, null, '角色标签更新成功');
+      
+      // 记录日志
+      const message = `更新角色标签 ${id} 成功: ${JSON.stringify(newTags)}`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.USER, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('更新角色标签失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -378,12 +396,10 @@ export class RoleController {
           // 批量插入新的关联关系
           await rolePermissionsRepository.insert(permissionRelations);
         }
-        
-        // 记录日志
-        logger.info(`角色 ${role.name}(${role.id}) 的权限已更新，权限ID: ${newPermissionIds.join(',')}`);
       }
-
-      return successResponse(res, null, '角色权限更新成功');
+      const message = `更新角色 ${role.name}(${role.id}) 的权限, 权限ID: ${newPermissionIds.join(',')}`;
+      logService.log({ level: LogLevel.INFO, category: LogCategory.USER, message, context: { userId: (req as any).user?.id } });
+      return successResponse(res, null, message);
     } catch (error) {
       logger.error('更新角色权限失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
