@@ -20,8 +20,8 @@ export class QueryLogDto {
   endDate?: Date;
 
   @IsOptional()
-  @IsString()
-  userId?: string;
+  @IsInt()
+  userId?: number | undefined;
 
   @IsOptional()
   @IsString()

@@ -15,7 +15,7 @@ export interface LogEntry {
   context?: Record<string, any>;
   traceId?: string;
   spanId?: string;
-  userId?: string;
+  userId?: number;
   userName?: string;
   ip?: string;
   userAgent?: string;
@@ -33,7 +33,7 @@ export interface LogQuery {
   category?: LogCategory;
   startDate?: Date;
   endDate?: Date;
-  userId?: string;
+  userId?: number;
   traceId?: string;
   keyword?: string;
   page?: number;

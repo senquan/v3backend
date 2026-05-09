@@ -19,7 +19,7 @@ router.get('/query', async (req: Request, res: Response) => {
       category: category as LogCategory,
       startDate: startDate ? new Date(startDate as string) : undefined,
       endDate: endDate ? new Date(endDate as string) : undefined,
-      userId: userId as string,
+      userId: Number(userId || 0) || undefined,
       traceId: traceId as string,
       keyword: keyword as string,
       page: page ? parseInt(page as string, 10) : 1,
@@ -71,7 +71,7 @@ router.get('/export', async (req: Request, res: Response) => {
       category: category as LogCategory,
       startDate: startDate ? new Date(startDate as string) : undefined,
       endDate: endDate ? new Date(endDate as string) : undefined,
-      userId: userId as string,
+      userId: Number(userId || 0) || undefined,
       traceId: traceId as string,
       keyword: keyword as string,
     };

@@ -12,7 +12,7 @@ export interface LogEntry {
   context?: Record<string, any>;
   traceId?: string;
   spanId?: string;
-  userId?: string;
+  userId?: number;
   userName?: string;
   ip?: string;
   userAgent?: string;
@@ -30,7 +30,7 @@ export interface LogQuery {
   category?: LogCategory;
   startDate?: Date;
   endDate?: Date;
-  userId?: string;
+  userId?: number | undefined;
   traceId?: string;
   keyword?: string;
   page?: number;
@@ -161,7 +161,7 @@ export class LogService implements OnModuleInit, OnModuleDestroy {
         log.context = entry.context ? JSON.stringify(entry.context) : undefined;
         log.traceId = entry.traceId;
         log.spanId = entry.spanId;
-        log.userId = entry.context?.userId || entry.userId;
+        log.userId = Number(entry.context?.userId || 0) || entry.userId;
         log.userName = entry.context?.userName || entry.userName;
         log.ip = entry.ip;
         log.userAgent = entry.userAgent;
