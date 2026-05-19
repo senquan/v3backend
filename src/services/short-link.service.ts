@@ -95,8 +95,6 @@ export class ShortLinkService {
       return acc;
     }, {} as Record<string, LinkItem>);
 
-    console.log('recordData', recordData)
-
     if (itemIds && itemIds.length > 0) {
       for(let i = 0; i < itemIds.length; i++) {
         const parts = itemIds[i].split('_')
