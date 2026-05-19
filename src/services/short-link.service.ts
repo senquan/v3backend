@@ -1,5 +1,6 @@
 import { AppDataSource } from '../config/database';
 import { ShortLink } from '../models/short-link.model';
+import { Product } from '../models/product.model';
 import { ProductTbSku } from '../models/product-tb-sku.model';
 import { nanoid } from 'nanoid';
 import QRCode from 'qrcode';
@@ -47,8 +48,9 @@ export class ShortLinkService {
       throw new Error('Invalid options: ids and quantities must be provided and of the same length');
     }
 
-    const queryBuilder = AppDataSource.getRepository(ProductTbSku)
-      .createQueryBuilder('sku')
+    const productRepository = AppDataSource.getRepository(Product);
+    const productSkuRepository = AppDataSource.getRepository(ProductTbSku);
+    const queryBuilder = productSkuRepository.createQueryBuilder('sku')
       .innerJoinAndSelect('sku.product', 'product')
       .where('sku.platformId = :platformId', { platformId })
       .andWhere('sku.productId IN (:...ids)', { ids });
@@ -60,6 +62,7 @@ export class ShortLinkService {
 
     const result = {
       id: 0,
+      success: false,
       shortCode: "",
       originalUrl: "",
       orderUrl: "",
@@ -92,13 +95,48 @@ export class ShortLinkService {
       return acc;
     }, {} as Record<string, LinkItem>);
 
+    console.log('recordData', recordData)
+
     if (itemIds && itemIds.length > 0) {
       for(let i = 0; i < itemIds.length; i++) {
-        const sku = recordData[ids[i]]
-        if (sku && sku.itemIds && sku.itemIds.length > 1) {
-          if (sku.itemIds.includes(itemIds[i])) {
-            sku.itemId = itemIds[i];
-            sku.skuId = sku.skuIds[sku.itemIds.indexOf(sku.itemId)];
+        const parts = itemIds[i].split('_')
+        if (parts[0] === 'n' && parts.length === 4) {
+          // 插入sku记录
+          const productId = Number(parts[1])
+          const existingProduct = await productRepository.findOne({
+            where: { id: productId, isDeleted: 0 }
+          });
+
+          if (existingProduct) {
+            const newSku = new ProductTbSku();
+
+            newSku.platformId = platformId;
+            newSku.materialCode = existingProduct.materialId;
+            newSku.tbItemId = parts[2];
+            newSku.tbSkuId = parts[3];
+            newSku.product = existingProduct;
+
+            // 保存SKU
+            await productSkuRepository.save(newSku);
+            recordData[productId] = {
+              id: productId,
+              productName: existingProduct.name,
+              materialCode: existingProduct.materialId,
+              quantity: productQuantities.get(productId) || 0,
+              itemId: parts[2],
+              skuId: parts[3],
+              itemIds: [parts[2]],
+              skuIds: [parts[3]]
+            }
+          }
+        }
+        else {
+          const sku = recordData[parts[0]]
+          if (sku && sku.itemIds && sku.itemIds.length > 1) {
+            if (sku.itemIds.includes(parts[1])) {
+              sku.itemId = parts[1];
+              sku.skuId = sku.skuIds[sku.itemIds.indexOf(sku.itemId)];
+            }
           }
         }
       }
@@ -117,8 +155,9 @@ export class ShortLinkService {
       }
       result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${items.join('%2C')}&back=https%3A%2F%2Fmain.m.taobao.com%2Fcart%2Findex.html&type=tb`
       result.orderUrl = `https://h5.m.taobao.com/cart/order.html?buyParam=${orderItems.join('%2C')}`
-      result.data = Object.values(recordData);
+      result.success = true
     }
+    result.data = Object.values(recordData);
 
     if (result.originalUrl.substring(0, 4) === "http") {
       // 生成短码

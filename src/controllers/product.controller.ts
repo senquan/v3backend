@@ -662,7 +662,7 @@ export class ProductController {
         product.stockUpdateAt = new Date();
       }
 
-      const { modelType, serie, tags, ...updateData } = productData;
+      const { _modelType, _serie, _tags, ...updateData } = productData;
       Object.assign(product, {
         ...updateData,
         updateAt: new Date()
@@ -842,7 +842,7 @@ export class ProductController {
             }
 
             // 检查并更新名称
-            console.log(`更新商品名称: ${existingProduct.name} -> ${productData.name}`);
+            // console.log(`更新商品名称: ${existingProduct.name} -> ${productData.name}`);
             if (productData.name !== undefined && productData.name !== existingProduct.name) {
               existingProduct.name = productData.name;
               isUpdated = true;
@@ -996,9 +996,12 @@ export class ProductController {
         return acc;
       }, {} as Record<string, number>);
 
-      const existingSkus = await productSkuRepository.find();
+      // itemid + meterialid 唯一
+      const existingSkus = await productSkuRepository.find(
+        { relations: ['product'] }
+      );
       const skuMap = existingSkus.reduce((map, sku) => {
-        map.set(sku.tbSkuId, sku);
+        map.set(`${sku.tbItemId}-${sku.materialCode}`, sku);
         return map;
       }, new Map<string, ProductTbSku>());
 
@@ -1014,7 +1017,7 @@ export class ProductController {
         try {
 
           // 验证必填字段
-          if (!productData.platform || !productData.materialId || !productData.tbItemId || productData.skuId) {
+          if (!productData.platform || !productData.materialId || !productData.tbItemId || !productData.tbSkuId) {
             results.error++;
             results.errorMessages.push(`必要字段缺失，跳过该商品`);
             continue;
@@ -1040,20 +1043,13 @@ export class ProductController {
           }
 
           // 检查物料编号是否已存在
-          const sku = skuMap.get(productData.tbSkuId)
+          const sku = skuMap.get(`${productData.tbItemId}-${productData.materialId}`)
           if (sku) {
             let isUpdated = false;
 
-            // 检查并更新商品ID
-            if (productData.tbItemId !== undefined && String(productData.tbItemId) !== sku.tbItemId) {
-              sku.tbItemId = String(productData.tbItemId);
-              isUpdated = true;
-            }
-
-            // 检查并更新物料编号
-            if (productData.materialId !== undefined && String(productData.materialId) !== sku.materialCode) {
-              sku.materialCode = String(productData.materialId);
-              sku.productId = product.id;
+            // 检查并更新SKU
+            if (productData.tbSkuId !== undefined && String(productData.tbSkuId) !== sku.tbSkuId) {
+              sku.tbSkuId = String(productData.tbSkuId);
               isUpdated = true;
             }
 
@@ -1083,7 +1079,7 @@ export class ProductController {
           newSku.materialCode = productData.materialId;
           newSku.tbItemId = productData.tbItemId || 0;
           newSku.tbSkuId = String(productData.tbSkuId || "");
-          newSku.productId = product.id;
+          newSku.product = product;
 
           // 保存SKU
           await productSkuRepository.save(newSku);
