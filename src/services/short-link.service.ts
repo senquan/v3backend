@@ -55,11 +55,6 @@ export class ShortLinkService {
       .where('sku.platformId = :platformId', { platformId })
       .andWhere('sku.productId IN (:...ids)', { ids });
 
-    const productQuantities = new Map<number, number>();
-    for(let i = 0; i < ids.length; i++) {
-      productQuantities.set(Number(ids[i]), quantities[i]);
-    }
-
     const result = {
       id: 0,
       success: false,
@@ -75,7 +70,7 @@ export class ShortLinkService {
     const items = [] as string[]
     const orderItems = [] as string[]
     const [records] = await queryBuilder.getManyAndCount()
-    const recordData = records.reduce((acc, cur) => {
+    const productData = records.reduce((acc, cur) => {
       if (acc[cur.productId]) {
         acc[cur.productId].itemIds!.push(cur.tbItemId);
         acc[cur.productId].skuIds!.push(cur.tbSkuId);
@@ -85,7 +80,7 @@ export class ShortLinkService {
           id: cur.productId,
           productName: cur.product?.name || '',
           materialCode: cur.materialCode,
-          quantity: productQuantities.get(cur.productId) || 0,
+          quantity: 0,
           itemId: cur.tbItemId,
           skuId: cur.tbSkuId, 
           itemIds: [cur.tbItemId] as string[],
@@ -94,6 +89,18 @@ export class ShortLinkService {
       }
       return acc;
     }, {} as Record<string, LinkItem>);
+
+    const recordData = ids.map((id, index) => {
+      if (!productData[id]) {
+        return {
+          id
+        }
+      }
+      else return {
+        ...productData[id],
+        quantity: quantities[index] || 0
+      };
+    }) as any[];
 
     if (itemIds && itemIds.length > 0) {
       for(let i = 0; i < itemIds.length; i++) {
@@ -116,11 +123,11 @@ export class ShortLinkService {
 
             // 保存SKU
             await productSkuRepository.save(newSku);
-            recordData[productId] = {
+            recordData[i] = {
               id: productId,
               productName: existingProduct.name,
               materialCode: existingProduct.materialId,
-              quantity: productQuantities.get(productId) || 0,
+              quantity: quantities[i] || 0,
               itemId: parts[2],
               skuId: parts[3],
               itemIds: [parts[2]],
@@ -129,7 +136,7 @@ export class ShortLinkService {
           }
         }
         else {
-          const sku = recordData[parts[0]]
+          const sku = recordData[i]
           if (sku && sku.itemIds && sku.itemIds.length > 1) {
             if (sku.itemIds.includes(parts[1])) {
               sku.itemId = parts[1];
@@ -139,17 +146,17 @@ export class ShortLinkService {
         }
       }
     }
-    
 
-    if (Object.keys(recordData).length !== ids.length) {
+    const allMatched = recordData.every(sku => sku.itemId);
+    if (!allMatched) {
       result.originalUrl = "缺失部分或全部SKU信息，生成失败"
       result.shortUrl = result.originalUrl
     } else {
       for(let i = 0; i < ids.length; i++) {
-        const sku = recordData[ids[i]]
+        const sku = recordData[i]
         if (!sku) throw Error("SKU信息不存在")
-        items.push(`${sku.itemId}_${sku.skuId}_${productQuantities.get(Number(ids[i]))}`)
-        orderItems.push(`${sku.itemId}_${productQuantities.get(Number(ids[i]))}_${sku.skuId}`)
+        items.push(`${sku.itemId}_${sku.skuId}_${quantities[i]}`)
+        orderItems.push(`${sku.itemId}_${quantities[i]}_${sku.skuId}`)
       }
       result.originalUrl = `https://h5.m.taobao.com/smart-interaction/cloud-shelf.html?itemIds=${items.join('%2C')}&back=https%3A%2F%2Fmain.m.taobao.com%2Fcart%2Findex.html&type=tb`
       result.orderUrl = `https://h5.m.taobao.com/cart/order.html?buyParam=${orderItems.join('%2C')}`
@@ -177,7 +184,6 @@ export class ShortLinkService {
       });
 
       await this.shortLinkRepository.save(shortLink);
-
 
       // 构建短链接URL
       result.shortUrl = `${process.env.SHORT_URL || 'https://url.dsbull.com/'}${shortCode}`;
