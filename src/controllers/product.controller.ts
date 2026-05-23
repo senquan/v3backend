@@ -601,7 +601,9 @@ export class ProductController {
       }
 
       const serieId = Number(productData.serie);
+      console.log('serieId1', serieId, product.serieId);
       if (serieId !== product.serieId) {
+        console.log('serieId2', serieId);
         if (serieId > 0) {
           const serie = await queryRunner.manager.findOne(ProductSeries, {
             where: { id: serieId, isDeleted: 0 }
@@ -610,6 +612,7 @@ export class ProductController {
             throw new Error("指定的系列不存在");
           }
           product.serie = serie;
+          console.log('serie', serie);
         } else {
           const defaultSeries = await queryRunner.manager.findOne(ProductSeries, {
             where: { id: 1 }
@@ -662,7 +665,7 @@ export class ProductController {
         product.stockUpdateAt = new Date();
       }
 
-      const { _modelType, _serie, _tags, ...updateData } = productData;
+      const { modelType: _modelType, serie: _serie, tags: _tags, ...updateData } = productData;
       Object.assign(product, {
         ...updateData,
         updateAt: new Date()
