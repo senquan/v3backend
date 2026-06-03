@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn} from 'typeorm';
 import { Product } from './product.model';
 
 @Entity('product_tb_sku')
@@ -25,4 +25,10 @@ export class ProductTbSku {
   @ManyToOne(() => Product)
   @JoinColumn({ name: 'product_id' })
   product!: Product;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt!: Date;
+  
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt!: Date;
 }
