@@ -62,7 +62,7 @@ export class ProductTbSkuController {
   // 获取SKU列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, keyword, platformId } = req.query;
+      const { page = 1, pageSize = 20, keyword, platformId, serie } = req.query;
 
       const queryBuilder = AppDataSource.getRepository(ProductTbSku)
         .createQueryBuilder('sku')
@@ -81,6 +81,10 @@ export class ProductTbSkuController {
           '(sku.materialCode LIKE :keyword OR sku.tbItemId LIKE :keyword OR sku.tbSkuId LIKE :keyword OR product.name LIKE :keyword)',
           { keyword: `%${keyword}%` }
         );
+      }
+
+      if (serie) {
+        queryBuilder.andWhere('series.id = :serie', { serie: Number(serie) });
       }
 
       const pageNum = Number(page);
