@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { In } from 'typeorm';
 import { AppDataSource } from '../config/database';
-import { Tag } from '../models/tag.model';
+import { Tag, TagType } from '../models/tag.model';
 import { Product } from '../models/product.model';
 import { ProductTag } from '../models/product-tag.model';
 import { PlatformTags } from '../models/platform-tags.model';
@@ -13,7 +13,7 @@ export class TagsController {
   // 获取标签列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { keyword, page = 1, pageSize = 20 } = req.query;
+      const { keyword, type, page = 1, pageSize = 20 } = req.query;
       
       // 构建查询条件
       const queryBuilder = AppDataSource.getRepository(Tag)
@@ -23,6 +23,11 @@ export class TagsController {
       // 添加关键字搜索
       if (keyword) {
         queryBuilder.andWhere('tag.name LIKE :keyword', { keyword: `%${keyword}%` });
+      }
+      
+      // 添加类型筛选
+      if (type && Object.values(TagType).includes(type as TagType)) {
+        queryBuilder.andWhere('tag.type = :type', { type });
       }
       
       // 计算分页
@@ -72,25 +77,32 @@ export class TagsController {
   // 创建标签
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { name, color } = req.body;
+      const { name, color, type } = req.body;
       
       if (!name) {
         return errorResponse(res, 400, '标签名称不能为空', null);
       }
       
-      // 检查标签名是否已存在
+      // 检查标签名是否已存在（同类型下不允许重复）
+      const whereCondition: any = { name, isDeleted: 0 };
+      if (type && Object.values(TagType).includes(type as TagType)) {
+        whereCondition.type = type;
+      }
       const existingTag = await AppDataSource.getRepository(Tag).findOne({
-        where: { name, isDeleted: 0 }
+        where: whereCondition
       });
       
       if (existingTag) {
-        return errorResponse(res, 400, '标签名称已存在', null);
+        return errorResponse(res, 400, '该类型下标签名称已存在', null);
       }
       
       // 创建新标签
       const tag = new Tag();
       tag.name = name;
       if (color) tag.color = color;
+      if (type && Object.values(TagType).includes(type as TagType)) {
+        tag.type = type as TagType;
+      }
       
       const savedTag = await AppDataSource.getRepository(Tag).save(tag);
 
@@ -107,7 +119,7 @@ export class TagsController {
   async update(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
-      const { name, color } = req.body;
+      const { name, color, type } = req.body;
       
       if (!name) {
         return errorResponse(res, 400, '标签名称不能为空', null);
@@ -122,20 +134,22 @@ export class TagsController {
         return errorResponse(res, 404, '标签不存在', null);
       }
       
-      // 检查新名称是否与其他标签重复
-      if (name !== tag.name) {
+      // 检查新名称是否与其他标签重复（同类型下）
+      const newType = (type && Object.values(TagType).includes(type as TagType)) ? type as TagType : tag.type;
+      if (name !== tag.name || newType !== tag.type) {
         const existingTag = await AppDataSource.getRepository(Tag).findOne({
-          where: { name, isDeleted: 0 }
+          where: { name, type: newType, isDeleted: 0 }
         });
         
         if (existingTag) {
-          return errorResponse(res, 400, '标签名称已存在', null);
+          return errorResponse(res, 400, '该类型下标签名称已存在', null);
         }
       }
       
       // 更新标签
       tag.name = name;
       if (color) tag.color = color;
+      tag.type = newType;
       
       const updatedTag = await AppDataSource.getRepository(Tag).save(tag);
 
