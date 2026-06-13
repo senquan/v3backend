@@ -4,10 +4,21 @@ import { ProductSeries } from "./product-series.model";
 import { Role } from './role.model';
 import { Gallery } from './gallery.model';
 
+export enum TagType {
+  PRODUCT = "product",
+  SERIES = "series",
+  ROLE = "role",
+  GALLERY = "gallery",
+  BUSINESS = "business",
+}
+
 @Entity("tags")
 export class Tag {
   @PrimaryGeneratedColumn()
   id!: number;
+
+  @Column({ type: "enum", enum: TagType, default: TagType.PRODUCT })
+  type!: TagType;
 
   @Column({ length: 50 })
   name!: string;

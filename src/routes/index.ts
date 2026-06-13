@@ -28,6 +28,8 @@ import clawCallbackRoutes from './claw-callback.routes';
 import botRoutes from './bot.routes';
 import logRoutes from './log.routes';
 import skuRoutes from './product-tb-sku.routes';
+import knowledgeBaseRoutes from './knowledge-base.routes';
+import faqRoutes from './faq.routes';
 
 const router = Router();
 
@@ -62,6 +64,8 @@ router.use('/v1/claw', clawCallbackRoutes)
 router.use('/v1/bot', botRoutes)
 router.use('/v1/logs', logRoutes)
 router.use('/v1/sku', skuRoutes)
+router.use('/v1/knowledge', knowledgeBaseRoutes)
+router.use('/v1/faq', faqRoutes)
 
 // 处理404情况 - 当没有匹配到路由时
 router.use('*', (req: Request, res: Response) => {
