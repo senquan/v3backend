@@ -8,8 +8,8 @@ export class Department {
   @Column({ type: 'varchar', length: 100, comment: '部门名称' })
   name!: string;
 
-  @Column({ name: 'parent_id', type: 'int', default: 0, comment: '上级部门ID，0为顶级' })
-  parentId!: number;
+  @Column({ name: 'parent_id', type: 'int', nullable: true, comment: '上级部门ID，null为顶级' })
+  parentId: number | null = null;
 
   @ManyToOne(() => Department, dept => dept.children, { nullable: true })
   @JoinColumn({ name: 'parent_id' })

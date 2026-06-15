@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { IsNull } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Department } from '../models/department.model';
 import { Staff } from '../models/staff.model';
@@ -18,7 +19,7 @@ export class DepartmentController {
         .getMany();
 
       // 递归构建树形结构（只取顶级部门，子部门通过 relations 自动加载）
-      const topLevel = departments.filter(d => d.parentId === 0);
+      const topLevel = departments.filter(d => d.parentId === null);
 
       // 统计每个部门的成员数
       const memberCounts = await AppDataSource.getRepository(Staff)
@@ -74,7 +75,7 @@ export class DepartmentController {
   // 创建部门
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { name, parentId = 0, sort = 0 } = req.body;
+      const { name, parentId = null, sort = 0 } = req.body;
 
       if (!name) {
         return errorResponse(res, 400, '部门名称不能为空', null);
@@ -82,7 +83,7 @@ export class DepartmentController {
 
       // 检查同级下是否有同名部门
       const existing = await AppDataSource.getRepository(Department).findOne({
-        where: { name, parentId: Number(parentId), isDeleted: 0 }
+        where: { name, parentId: parentId ? Number(parentId) : IsNull(), isDeleted: 0 }
       });
 
       if (existing) {
@@ -90,7 +91,7 @@ export class DepartmentController {
       }
 
       // 如果指定了父部门，检查是否存在
-      if (parentId > 0) {
+      if (parentId) {
         const parent = await AppDataSource.getRepository(Department).findOne({
           where: { id: Number(parentId), isDeleted: 0 }
         });
@@ -101,7 +102,7 @@ export class DepartmentController {
 
       const dept = new Department();
       dept.name = name;
-      dept.parentId = Number(parentId);
+      dept.parentId = parentId ? Number(parentId) : null;
       dept.sort = Number(sort);
       dept.isActive = 1;
 

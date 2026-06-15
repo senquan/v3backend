@@ -71,7 +71,7 @@ async function migrate() {
       if (!dept) {
         dept = new Department();
         dept.name = deptName;
-        dept.parentId = 0;
+        dept.parentId = null;
         dept.sort = oldVal;
         dept.isActive = 1;
         dept = await deptRepo.save(dept);
