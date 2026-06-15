@@ -7,6 +7,7 @@ import { DatabaseModule } from './modules/database.module';
 import { RedisModule } from './modules/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { LogModule } from './modules/log/log.module';
+import { FollowUpModule } from './modules/follow-up/follow-up.module';
 import { join } from 'path';
 
 @Module({
@@ -26,6 +27,7 @@ import { join } from 'path';
     RedisModule,
     AuthModule,
     LogModule,
+    FollowUpModule,
   ],
   controllers: [],
   providers: [],

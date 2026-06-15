@@ -43,6 +43,9 @@ import { Tag } from '../models/tag.model';
 import { Ticket } from '../models/ticket.model';
 import { TicketAttachment } from '../models/ticket-attachment.model';
 import { TicketComment } from '../models/ticket-comment.model';
+import { TicketFollowUpConfig } from '../models/ticket-follow-up-config.model';
+import { TicketFollowUpStage } from '../models/ticket-follow-up-stage.model';
+import { TicketFollowUpRecord } from '../models/ticket-follow-up-record.model';
 import { User } from '../models/user.model';
 import { UserRole } from '../models/user-roles.model';
 import { Gallery } from '../models/gallery.model';
@@ -65,7 +68,7 @@ export const AppDataSource = new DataSource({
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
   entities: [Bulletin, Category, Coupon, CouponUser, Customer, Dict, Gallery, InviteCode, KnowledgeBase, KbDocument, QaPair, QaPairTag, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag,
-    ProductTag, ProductTbSku, Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, User,
+    ProductTag, ProductTbSku, Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, TicketFollowUpConfig, TicketFollowUpStage, TicketFollowUpRecord, User,
     UserRole, PromotionV3, PromotionRuleV3, ShortLink, ExpressTracking, ExpressCompany,
     SystemLog, LogChain, LogArchive
   ],

@@ -17,7 +17,7 @@ export class Ticket {
   content!: string;
 
   @Column({ name: "ticket_type" })
-  ticketType!: number; // 工单类型：1-咨询，2-投诉，3-售后，4-建议
+  ticketType!: number; // 工单类型：1-订单缺货 2-订单售后 3-产品售后 4-物流售后 5-知识更新 6-仓库缺货 7-咨询 8-投诉 9-建议 10-跟单提醒
 
   @Column({ name: "priority", default: 2 })
   priority!: number; // 优先级：1-日常，2-一般，3-紧急，4-加急，5-特急

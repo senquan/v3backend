@@ -29,7 +29,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = process.env.PORT || 5001;
+  const port = process.env.NEST_PORT || 5052;
   await app.listen(port);
 
   logger.log(`NestJS Application running on http://localhost:${port}`);
