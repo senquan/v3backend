@@ -31,6 +31,7 @@ import skuRoutes from './product-tb-sku.routes';
 import knowledgeBaseRoutes from './knowledge-base.routes';
 import faqRoutes from './faq.routes';
 import followUpRoutes from './follow-up.routes';
+import departmentRoutes from './department.routes';
 
 const router = Router();
 
@@ -68,6 +69,7 @@ router.use('/v1/sku', skuRoutes)
 router.use('/v1/knowledge', knowledgeBaseRoutes)
 router.use('/v1/faq', faqRoutes)
 router.use('/v1/follow-up', followUpRoutes)
+router.use('/v1/department', departmentRoutes)
 
 // 处理404情况 - 当没有匹配到路由时
 router.use('*', (req: Request, res: Response) => {

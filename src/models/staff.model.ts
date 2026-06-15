@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany, OneToOne } from 'typeorm';
 import { Customer } from './customer.model';
+import { Department } from './department.model';
 import { User } from './user.model';
 
 export enum StaffStatus {
@@ -46,8 +47,12 @@ export class Staff {
   @Column({ type: 'varchar', length: 100, nullable: true, comment: '职位名称' })
   position: string | null = null;
 
-  @Column({ type: 'smallint', default: 0, comment: '所属部门' })
-  department!: number;
+  @Column({ name: 'department_id', type: 'int', nullable: true, comment: '所属部门ID' })
+  departmentId: number | null = null;
+
+  @ManyToOne(() => Department, { nullable: true })
+  @JoinColumn({ name: 'department_id' })
+  dept: Department | null = null;
 
   @Column({ name: 'manager_id', nullable: true, comment: '直属上级ID' })
   managerId: number | null = null;

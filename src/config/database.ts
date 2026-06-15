@@ -5,6 +5,7 @@ import { Category } from '../models/category.model';
 import { Coupon } from '../models/coupon.model';
 import { CouponUser } from '../models/coupon-user.model';
 import { Customer } from '../models/customer.model';
+import { Department } from '../models/department.model';
 import { Dict } from '../models/dict.model';
 import { InviteCode } from '../models/invite-code.model';
 import { KnowledgeBase } from '../models/knowledge-base.model';
@@ -67,7 +68,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'cardbug',
   synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
   logging: process.env.NODE_ENV !== 'production',
-  entities: [Bulletin, Category, Coupon, CouponUser, Customer, Dict, Gallery, InviteCode, KnowledgeBase, KbDocument, QaPair, QaPairTag, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag,
+  entities: [Bulletin, Category, Coupon, CouponUser, Customer, Department, Dict, Gallery, InviteCode, KnowledgeBase, KbDocument, QaPair, QaPairTag, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag,
     ProductTag, ProductTbSku, Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, TicketFollowUpConfig, TicketFollowUpStage, TicketFollowUpRecord, User,
     UserRole, PromotionV3, PromotionRuleV3, ShortLink, ExpressTracking, ExpressCompany,
     SystemLog, LogChain, LogArchive

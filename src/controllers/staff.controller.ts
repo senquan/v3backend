@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
+import { Department } from '../models/department.model';
 import { Staff, StaffStatus } from '../models/staff.model';
 import { Role } from '../models/role.model';
 import { User } from '../models/user.model';
@@ -18,7 +19,7 @@ export class StaffController {
         email,
         userId,
         position,
-        department,
+        departmentId,
         hireDate,
         gender,
         remark
@@ -68,7 +69,7 @@ export class StaffController {
       staff.phone = phone || null;
       staff.email = email || null;
       staff.position = position || null;
-      staff.department = department || null;
+      staff.departmentId = departmentId || null;
       staff.managerId = null;
       staff.baseSalary =null;
       staff.address = null;
@@ -120,7 +121,7 @@ export class StaffController {
         pageSize = 20, 
         role,
         status,
-        department,
+        departmentId,
         keyword,
         managerId
       } = req.query;
@@ -129,6 +130,7 @@ export class StaffController {
         .createQueryBuilder('staff')
         .leftJoinAndSelect('staff.manager', 'manager')
         .leftJoinAndSelect('staff.user', 'user')
+        .leftJoinAndSelect('staff.dept', 'dept')
         .where('staff.isDeleted = :isDeleted', { isDeleted: 0 });
 
       // 添加查询条件
@@ -140,8 +142,8 @@ export class StaffController {
         queryBuilder.andWhere('staff.status = :status', { status });
       }
       
-      if (department) {
-        queryBuilder.andWhere('staff.department = :department', { department });
+      if (departmentId) {
+        queryBuilder.andWhere('staff.departmentId = :departmentId', { departmentId });
       }
       
       if (managerId !== undefined) {
@@ -217,7 +219,7 @@ export class StaffController {
         email,
         userId,
         position,
-        department,
+        departmentId,
         hireDate,
         resignDate,
         address,
@@ -265,7 +267,7 @@ export class StaffController {
       if (phone !== undefined) staff.phone = phone;
       if (email !== undefined) staff.email = email;
       if (position !== undefined) staff.position = position;
-      if (department !== undefined) staff.department = department;
+      if (departmentId !== undefined) staff.departmentId = departmentId;
       if (address !== undefined) staff.address = address;
       if (remark !== undefined) staff.remark = remark;
       if (status) staff.status = status;
@@ -377,17 +379,16 @@ export class StaffController {
     }
   }
 
-  // 获取部门列表
+  // 获取部门列表（从独立部门表查询）
   async getDepartments(req: Request, res: Response): Promise<Response> {
     try {
-      const departments = await AppDataSource.getRepository(Staff)
-        .createQueryBuilder('staff')
-        .select('DISTINCT staff.department', 'department')
-        .where('staff.isDeleted = :isDeleted', { isDeleted: 0 })
-        .andWhere('staff.department IS NOT NULL')
-        .getRawMany();
+      const departments = await AppDataSource.getRepository(Department)
+        .find({
+          where: { isDeleted: 0, isActive: 1 },
+          order: { sort: 'ASC', id: 'ASC' }
+        });
 
-      return successResponse(res, departments.map(item => item.department), '获取部门列表成功');
+      return successResponse(res, departments, '获取部门列表成功');
     } catch (error) {
       logger.error('获取部门列表失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
@@ -422,11 +423,13 @@ export class StaffController {
       // 按部门统计员工数量
       const departmentStats = await AppDataSource.getRepository(Staff)
         .createQueryBuilder('staff')
-        .select('staff.department', 'department')
+        .leftJoin('staff.dept', 'dept')
+        .select('dept.name', 'department')
         .addSelect('COUNT(staff.id)', 'count')
         .where('staff.isDeleted = :isDeleted', { isDeleted: 0 })
-        .andWhere('staff.department IS NOT NULL')
-        .groupBy('staff.department')
+        .andWhere('staff.departmentId IS NOT NULL')
+        .groupBy('staff.departmentId')
+        .addGroupBy('dept.name')
         .getRawMany();
 
       // 获取最近入职的员工

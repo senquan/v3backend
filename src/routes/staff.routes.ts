@@ -8,6 +8,9 @@ const staffController = new StaffController();
 // 应用认证中间件
 router.use(authMiddleware);
 
+// 获取部门列表
+router.get('/departments', staffController.getDepartments);
+
 // 获取员工列表
 router.get('/list', staffController.getList);
 
