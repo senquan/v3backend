@@ -17,6 +17,9 @@ router.get('/:id', skuController.getDetail);
 // 创建SKU
 router.post('/', skuController.create);
 
+// 批量删除SKU
+router.post('/batch/delete', skuController.batchDelete.bind(skuController));
+
 // 更新SKU
 router.put('/:id', skuController.update);
 

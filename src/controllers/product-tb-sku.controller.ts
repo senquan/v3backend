@@ -222,4 +222,28 @@ export class ProductTbSkuController {
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
+
+  // 批量删除SKU（硬删除）
+  async batchDelete(req: Request, res: Response): Promise<Response> {
+    try {
+      const { ids } = req.body;
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return errorResponse(res, 400, '请选择要删除的SKU', null);
+      }
+
+      const result = await AppDataSource.getRepository(ProductTbSku)
+        .createQueryBuilder()
+        .delete()
+        .from(ProductTbSku)
+        .whereInIds(ids)
+        .execute();
+
+      const deletedCount = result.affected ?? 0;
+      return successResponse(res, null, `批量删除完成，共删除 ${deletedCount} 条SKU`);
+    } catch (error) {
+      logger.error('批量删除SKU失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
 }
