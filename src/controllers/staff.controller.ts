@@ -159,7 +159,8 @@ export class StaffController {
 
       // 分页查询
       const [staffs, total] = await queryBuilder
-        .orderBy('staff.createAt', 'DESC')
+        .orderBy('staff.status', 'ASC')
+        .addOrderBy('staff.createAt', 'DESC')
         .skip((Number(page) - 1) * Number(pageSize))
         .take(Number(pageSize))
         .getManyAndCount();
