@@ -17,14 +17,17 @@ router.get('/options', kbController.getOptions);
 // 获取指定知识库的文档列表
 router.get('/:kbId/docs', kbController.getDocList);
 
-// 创建文档
+// 创建文档（自动触发向量化）
 router.post('/:kbId/docs', kbController.createDoc.bind(kbController));
+
+// 重新处理文档（重新切片 + 向量化）
+router.post('/docs/:id/reprocess', kbController.reprocessDoc.bind(kbController));
 
 // 查看文档详情
 router.get('/docs/:id', kbController.getDocDetail);
 
-// 删除文档
-router.delete('/docs/:id', kbController.deleteDoc);
+// 删除文档（同时清理向量）
+router.delete('/docs/:id', kbController.deleteDoc.bind(kbController));
 
 // 创建知识库
 router.post('/', kbController.create.bind(kbController));

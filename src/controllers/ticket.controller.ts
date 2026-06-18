@@ -14,7 +14,7 @@ export class TicketController {
   // 创建工单
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { title, content, ticketType, priority, productId, orderId, storeName, trackId, assigneeId } = req.body;
+      const { title, content, ticketType, priority, productId, orderId, storeName, trackId, assigneeId, departmentId } = req.body;
       const userId = (req as any).user?.id;
 
       if (!title || !content || !ticketType) {
@@ -40,6 +40,7 @@ export class TicketController {
       ticket.status = 1; // 待处理
       ticket.creatorId = userId;
       if (assigneeId) ticket.assigneeId = assigneeId;
+      if (departmentId) ticket.departmentId = Number(departmentId);
       
       if (productId) ticket.productId = productId;
       if (orderId) ticket.orderId = orderId;
@@ -121,7 +122,7 @@ export class TicketController {
       
       // 更新工单类型
       if (ticketType !== undefined) {
-        const validTypes = [1, 2, 3, 4]; // 1-咨询，2-投诉，3-售后，4-建议
+        const validTypes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
         if (!validTypes.includes(Number(ticketType))) {
           return errorResponse(res, 400, '无效的工单类型', null);
         }
@@ -234,7 +235,7 @@ export class TicketController {
   // 获取工单列表
   async getList(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = 1, pageSize = 20, status, ticketType, priority, keyword } = req.query;
+      const { page = 1, pageSize = 20, status, ticketType, priority, keyword, departmentId } = req.query;
       const userId = (req as any).user?.id;
       const userRoles = (req as any).userRoles || [];
       
@@ -243,6 +244,7 @@ export class TicketController {
         .leftJoinAndSelect('ticket.creator', 'creator')
         .leftJoinAndSelect('ticket.assignee', 'assignee')
         .leftJoinAndSelect('ticket.order', 'order')
+        .leftJoinAndSelect('ticket.department', 'department')
         .where('ticket.isDeleted = :isDeleted', { isDeleted: 0 });
       
       // 非管理员只能看到自己创建的或分配给自己的工单
@@ -266,6 +268,10 @@ export class TicketController {
       if (keyword) {
         queryBuilder.andWhere('(ticket.title LIKE :keyword OR ticket.content LIKE :keyword)', 
           { keyword: `%${keyword}%` });
+      }
+
+      if (departmentId) {
+        queryBuilder.andWhere('ticket.departmentId = :departmentId', { departmentId });
       }
       
       // 计算总数
@@ -867,6 +873,104 @@ export class TicketController {
       return successResponse(res, savedAttachment, '附件上传成功');
     } catch (error) {
       logger.error('上传附件失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 收到确认（内部工单）
+  async receipt(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+
+      const ticketRepository = AppDataSource.getRepository(Ticket);
+      const ticket = await ticketRepository.findOne({
+        where: { id: Number(id), isDeleted: 0 }
+      });
+
+      if (!ticket) {
+        return errorResponse(res, 404, '工单不存在', null);
+      }
+
+      if (ticket.status !== 1) {
+        return errorResponse(res, 400, '只有待处理状态的工单可以确认收到', null);
+      }
+
+      // 内部工单类型检查
+      const internalTypes = [11, 12, 13, 14];
+      if (!internalTypes.includes(ticket.ticketType)) {
+        return errorResponse(res, 400, '只有内部工单可以确认收到', null);
+      }
+
+      ticket.status = 2; // 处理中
+      ticket.receiptAt = new Date();
+      ticket.receiptBy = userId;
+      await ticketRepository.save(ticket);
+
+      // 创建系统评论
+      const comment = new TicketComment();
+      comment.ticketId = Number(id);
+      comment.userId = userId;
+      comment.content = '已确认收到工单';
+      await AppDataSource.getRepository(TicketComment).save(comment);
+
+      return successResponse(res, ticket, '已确认收到');
+    } catch (error) {
+      logger.error('确认收到工单失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 回复工单（内部工单）
+  async reply(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const { content } = req.body;
+      const userId = (req as any).user?.id;
+
+      if (!content) {
+        return errorResponse(res, 400, '回复内容不能为空', null);
+      }
+
+      const ticketRepository = AppDataSource.getRepository(Ticket);
+      const ticket = await ticketRepository.findOne({
+        where: { id: Number(id), isDeleted: 0 }
+      });
+
+      if (!ticket) {
+        return errorResponse(res, 404, '工单不存在', null);
+      }
+
+      if (ticket.status === 4 || ticket.status === 5) {
+        return errorResponse(res, 400, '工单已关闭或取消，不能回复', null);
+      }
+
+      // 添加回复评论
+      const comment = new TicketComment();
+      comment.ticketId = Number(id);
+      comment.userId = userId;
+      comment.content = content;
+      comment.isInternal = false;
+      await AppDataSource.getRepository(TicketComment).save(comment);
+
+      // 如果是待处理状态，自动转为处理中
+      if (ticket.status === 1) {
+        ticket.status = 2;
+        ticket.receiptAt = ticket.receiptAt || new Date();
+        ticket.receiptBy = ticket.receiptBy || userId;
+      }
+
+      // 如果当前是处理中，回复后转为待确认
+      if (ticket.status === 2) {
+        ticket.status = 3;
+        ticket.processedAt = new Date();
+      }
+
+      await ticketRepository.save(ticket);
+
+      return successResponse(res, comment, '回复成功');
+    } catch (error) {
+      logger.error('回复工单失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }

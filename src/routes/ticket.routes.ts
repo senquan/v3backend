@@ -25,6 +25,10 @@ router.put('/:id/cancel', ticketController.cancel);
 // 工单评论
 router.post('/:id/comments', ticketController.addComment);
 
+// 内部工单：收到确认 + 回复
+router.put('/:id/receipt', ticketController.receipt);
+router.post('/:id/reply', ticketController.reply);
+
 // 工单附件
 //router.post('/:id/attachments', uploadMiddleware.single('file'), ticketController.uploadAttachment);
 

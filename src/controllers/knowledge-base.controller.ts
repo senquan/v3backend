@@ -1,9 +1,12 @@
 import { Request, Response } from 'express';
+import axios from 'axios';
 import { AppDataSource } from '../config/database';
 import { KnowledgeBase } from '../models/knowledge-base.model';
 import { KbDocument, DocStatus } from '../models/kb-document.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
+
+const AI_GATEWAY_URL = process.env.AI_GATEWAY_URL || 'http://localhost:8000';
 
 export class KnowledgeBaseController {
   // 获取知识库列表
@@ -15,7 +18,6 @@ export class KnowledgeBaseController {
         .createQueryBuilder('kb')
         .where('kb.isDeleted = :isDeleted', { isDeleted: 0 });
 
-      // 关键词搜索（名称或描述）
       if (keyword) {
         queryBuilder.andWhere(
           '(kb.name LIKE :keyword OR kb.description LIKE :keyword)',
@@ -23,7 +25,6 @@ export class KnowledgeBaseController {
         );
       }
 
-      // 状态筛选
       if (status !== undefined && status !== '') {
         queryBuilder.andWhere('kb.status = :status', { status: Number(status) });
       }
@@ -38,7 +39,6 @@ export class KnowledgeBaseController {
         .take(pageSizeNum)
         .getManyAndCount();
 
-      // 通过子查询统计每个知识库的文档数
       const docCounts = await AppDataSource.getRepository(KbDocument)
         .createQueryBuilder('doc')
         .select('doc.knowledge_base_id', 'kbId')
@@ -92,7 +92,6 @@ export class KnowledgeBaseController {
         return errorResponse(res, 400, '知识库名称不能为空', null);
       }
 
-      // 检查名称是否重复
       const existing = await AppDataSource.getRepository(KnowledgeBase).findOne({
         where: { name, isDeleted: 0 }
       });
@@ -132,7 +131,6 @@ export class KnowledgeBaseController {
         return errorResponse(res, 404, '知识库不存在', null);
       }
 
-      // 检查新名称是否与其他知识库重复
       if (name !== kb.name) {
         const existing = await AppDataSource.getRepository(KnowledgeBase).findOne({
           where: { name, isDeleted: 0 }
@@ -215,7 +213,7 @@ export class KnowledgeBaseController {
     }
   }
 
-  // 创建文档
+  // 创建文档 + 自动触发 ai-gateway 处理
   async createDoc(req: Request, res: Response): Promise<Response> {
     try {
       const { kbId } = req.params;
@@ -228,7 +226,6 @@ export class KnowledgeBaseController {
         return errorResponse(res, 400, '文档内容不能为空', null);
       }
 
-      // 校验知识库是否存在
       const kb = await AppDataSource.getRepository(KnowledgeBase).findOne({
         where: { id: Number(kbId), isDeleted: 0 }
       });
@@ -241,13 +238,45 @@ export class KnowledgeBaseController {
       doc.title = title;
       doc.content = content;
       doc.charCount = content.length;
-      doc.status = DocStatus.PARSED; // 纯文本直接标记为已解析
+      doc.status = DocStatus.PROCESSING;
 
       const saved = await AppDataSource.getRepository(KbDocument).save(doc);
 
-      return successResponse(res, saved, '创建文档成功');
+      // 异步调用 ai-gateway 进行切片 + 向量化
+      this._processDocument(Number(kbId), saved).catch(err => {
+        logger.error(`文档处理失败 doc_id=${saved.id}:`, err.message);
+      });
+
+      return successResponse(res, saved, '创建文档成功，正在处理中');
     } catch (error) {
       logger.error('创建文档失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 重新处理文档（重新切片 + 向量化）
+  async reprocessDoc(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+
+      const doc = await AppDataSource.getRepository(KbDocument).findOne({
+        where: { id: Number(id), isDeleted: 0 }
+      });
+      if (!doc) {
+        return errorResponse(res, 404, '文档不存在', null);
+      }
+
+      doc.status = DocStatus.PROCESSING;
+      await AppDataSource.getRepository(KbDocument).save(doc);
+
+      // 先清理旧向量，再重新处理
+      this._reprocessDocument(doc.knowledgeBaseId, doc).catch(err => {
+        logger.error(`文档重新处理失败 doc_id=${doc.id}:`, err.message);
+      });
+
+      return successResponse(res, null, '文档重新处理中');
+    } catch (error) {
+      logger.error('重新处理文档失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }
@@ -271,7 +300,7 @@ export class KnowledgeBaseController {
     }
   }
 
-  // 删除文档（软删除）
+  // 删除文档（软删除）+ 清理向量
   async deleteDoc(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
@@ -286,10 +315,79 @@ export class KnowledgeBaseController {
       doc.isDeleted = 1;
       await AppDataSource.getRepository(KbDocument).save(doc);
 
+      // 异步清理 ai-gateway 中的向量
+      this._removeDocumentVectors(doc.knowledgeBaseId, doc.id).catch(err => {
+        logger.error(`清理文档向量失败 doc_id=${doc.id}:`, err.message);
+      });
+
       return successResponse(res, null, '删除文档成功');
     } catch (error) {
       logger.error('删除文档失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // ========== 内部方法：ai-gateway 文档处理 ==========
+
+  private async _processDocument(kbId: number, doc: KbDocument): Promise<void> {
+    try {
+      const resp = await axios.post(`${AI_GATEWAY_URL}/knowledge/ingest`, {
+        kb_id: String(kbId),
+        doc_id: doc.id,
+        title: doc.title,
+        content: doc.content,
+      }, { timeout: 120000 });
+
+      if (resp.data?.status === 'ok') {
+        doc.status = DocStatus.PARSED;
+        await AppDataSource.getRepository(KbDocument).save(doc);
+        logger.info(`文档处理完成 doc_id=${doc.id}, chunks=${resp.data.chunks}`);
+      } else {
+        throw new Error(resp.data?.detail || 'ai-gateway 返回异常');
+      }
+    } catch (error: any) {
+      doc.status = DocStatus.ERROR;
+      await AppDataSource.getRepository(KbDocument).save(doc);
+      logger.error(`文档向量化失败 doc_id=${doc.id}:`, error.message);
+    }
+  }
+
+  private async _reprocessDocument(kbId: number, doc: KbDocument): Promise<void> {
+    try {
+      // 先清理旧向量
+      await this._removeDocumentVectors(kbId, doc.id);
+
+      // 重新摄入
+      const resp = await axios.post(`${AI_GATEWAY_URL}/knowledge/ingest`, {
+        kb_id: String(kbId),
+        doc_id: doc.id,
+        title: doc.title,
+        content: doc.content,
+      }, { timeout: 120000 });
+
+      if (resp.data?.status === 'ok') {
+        doc.status = DocStatus.PARSED;
+        await AppDataSource.getRepository(KbDocument).save(doc);
+        logger.info(`文档重新处理完成 doc_id=${doc.id}, chunks=${resp.data.chunks}`);
+      } else {
+        throw new Error(resp.data?.detail || 'ai-gateway 返回异常');
+      }
+    } catch (error: any) {
+      doc.status = DocStatus.ERROR;
+      await AppDataSource.getRepository(KbDocument).save(doc);
+      logger.error(`文档重新处理失败 doc_id=${doc.id}:`, error.message);
+    }
+  }
+
+  private async _removeDocumentVectors(kbId: number, docId: number): Promise<void> {
+    try {
+      await axios.post(`${AI_GATEWAY_URL}/knowledge/remove-doc`, {
+        kb_id: String(kbId),
+        doc_id: docId,
+      }, { timeout: 30000 });
+      logger.info(`文档向量已清理 kb=${kbId}, doc_id=${docId}`);
+    } catch (error: any) {
+      logger.warn(`清理向量失败(可忽略) kb=${kbId}, doc_id=${docId}: ${error.message}`);
     }
   }
 }

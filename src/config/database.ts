@@ -4,6 +4,7 @@ import { Bulletin } from '../models/bulletin.model';
 import { Category } from '../models/category.model';
 import { Coupon } from '../models/coupon.model';
 import { CouponUser } from '../models/coupon-user.model';
+import { CsConfig } from '../models/cs-config.model';
 import { Customer } from '../models/customer.model';
 import { Department } from '../models/department.model';
 import { Dict } from '../models/dict.model';
@@ -66,9 +67,9 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'root',
   password: process.env.DB_PASS || 'password',
   database: process.env.DB_NAME || 'cardbug',
-  synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
+  synchronize: process.env.NODE_ENV !== 'production',
   logging: process.env.NODE_ENV !== 'production',
-  entities: [Bulletin, Category, Coupon, CouponUser, Customer, Department, Dict, Gallery, InviteCode, KnowledgeBase, KbDocument, QaPair, QaPairTag, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag,
+  entities: [Bulletin, Category, Coupon, CouponUser, CsConfig, Customer, Department, Dict, Gallery, InviteCode, KnowledgeBase, KbDocument, QaPair, QaPairTag, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag,
     ProductTag, ProductTbSku, Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, TicketFollowUpConfig, TicketFollowUpStage, TicketFollowUpRecord, User,
     UserRole, PromotionV3, PromotionRuleV3, ShortLink, ExpressTracking, ExpressCompany,
     SystemLog, LogChain, LogArchive
