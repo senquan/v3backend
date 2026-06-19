@@ -31,7 +31,7 @@ export class CsController {
 
   async chat(req: Request, res: Response): Promise<Response> {
     try {
-      const { message, knowledgeBaseId, mode } = req.body;
+      const { message, knowledgeBaseId, mode, customerId } = req.body;
 
       if (!message) {
         return errorResponse(res, 400, '消息内容不能为空', null);
@@ -52,6 +52,12 @@ export class CsController {
       // 知识库 ID：指定知识库或搜索全部
       payload.kb_id = knowledgeBaseId ? String(knowledgeBaseId) : 'all';
 
+      // 客户上下文：传入 customerId 让 ai-gateway 回调查询业务数据
+      if (customerId) {
+        payload.customer_id = Number(customerId);
+        payload.backend_url = `http://localhost:${process.env.PORT || 5002}`;
+      }
+
       // 调用 ai-gateway /cs/chat
       const resp = await axios.post(`${AI_GATEWAY_URL}/cs/chat`, payload, {
         timeout: 120000,
@@ -62,6 +68,8 @@ export class CsController {
         reply: data.reply || '',
         sources: data.sources || [],
         latency: data.latency || 0,
+        businessData: data.business_data || null,
+        sessionId: data.session_id || null,
       }, 'AI 回复成功');
     } catch (error: any) {
       const detail = error.response?.data?.detail || error.message;

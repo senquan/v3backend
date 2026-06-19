@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { CsController } from '../controllers/cs.controller';
+import { CsInternalController } from '../controllers/cs-internal.controller';
 
 const router = Router();
 const csController = new CsController();
+const csInternalController = new CsInternalController();
 
-// 应用认证中间件
+// 内部 API（ai-gateway 回调，用 X-Internal-Token 校验，不走 authMiddleware）
+router.get('/internal/customer-orders', csInternalController.getCustomerOrders.bind(csInternalController));
+router.post('/internal/conversations', csInternalController.saveConversation.bind(csInternalController));
+
+// 应用认证中间件（以下路由需登录）
 router.use(authMiddleware);
 
 // AI 客服聊天
@@ -19,5 +25,8 @@ router.post('/config', csController.saveConfig.bind(csController));
 
 // 获取知识库选项（沙箱用）
 router.get('/kb-options', csController.getKbOptions.bind(csController));
+
+// 获取客户选项（沙箱用）
+router.get('/customer-options', csInternalController.getCustomerOptions.bind(csInternalController));
 
 export default router;

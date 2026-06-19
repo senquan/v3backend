@@ -55,6 +55,7 @@ import { ShortLink } from '../models/short-link.model';
 import { ExpressTracking } from '../models/express-tracking.model';
 import { ExpressCompany } from '../models/express-company.model';
 import { SystemLog, LogChain, LogArchive } from '../models/system-log.model';
+import { CsConversation } from '../models/cs-conversation.model';
 
 // 加载环境变量
 dotenv.config();
@@ -72,7 +73,7 @@ export const AppDataSource = new DataSource({
   entities: [Bulletin, Category, Coupon, CouponUser, CsConfig, Customer, Department, Dict, Gallery, InviteCode, KnowledgeBase, KbDocument, QaPair, QaPairTag, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag,
     ProductTag, ProductTbSku, Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, TicketFollowUpConfig, TicketFollowUpStage, TicketFollowUpRecord, User,
     UserRole, PromotionV3, PromotionRuleV3, ShortLink, ExpressTracking, ExpressCompany,
-    SystemLog, LogChain, LogArchive
+    SystemLog, LogChain, LogArchive, CsConversation
   ],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
