@@ -286,7 +286,7 @@ export class UserController {
   // 更新用户信息
   async updateUser(req: Request, res: Response): Promise<Response> {
     try {
-      const { id, name, companyId, status, notes } = req.body;
+      const { id, name, companyId, email, phone, innerCode, status, notes } = req.body;
 
       const userRepository = AppDataSource.getRepository(User);
       const user = await userRepository.findOne({
@@ -299,6 +299,9 @@ export class UserController {
       await userRepository.update(user.id, {
         name: name || user.name,
         companyId: companyId || user.companyId,
+        email: email || user.email,
+        phone: phone || user.phone,
+        innerCode: innerCode || user.innerCode,
         status: status || 0,
         notes: notes || user.notes,
         updatedAt: new Date()
