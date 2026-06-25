@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { In, Like } from "typeorm";
+import { Like } from "typeorm";
 import { AppDataSource } from '../config/database';
 import { CompanyInfo } from '../models/company-info.entity';
 import { User } from '../models/user.entity';
@@ -483,15 +483,6 @@ export class UserController {
       // 只有当标签发生变化时才更新
       if (JSON.stringify([...oldRoles].sort()) !== JSON.stringify([...newRoles].sort())) {
 
-        const roleRepository = AppDataSource.getRepository(Role);
-        const roleEntities = await roleRepository.find({
-          where: {
-            id: In(newRoles)
-          }
-        })
-        
-        user.roles = roleEntities
-        
         // 删除旧的关联关系
         const userRoleRepository = AppDataSource.getRepository(UserRole);
         await userRoleRepository.delete({
@@ -508,8 +499,6 @@ export class UserController {
           await userRoleRepository.insert(roleRelations)
         }
       }
-
-      await userRepository.save(user);
       return successResponse(res, null, '用户角色更新成功');
     } catch (error) {
       logger.error('更新用户角色失败:', error);
