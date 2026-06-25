@@ -1,0 +1,4 @@
+allowBuilds:
+  '@nestjs/core': true
+  hiredis: true
+  sharp: true

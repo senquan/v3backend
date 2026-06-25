@@ -9,6 +9,9 @@ const userController = new UserController();
 // 获取用户信息
 router.get('/me', authMiddleware, (req: Request, res: Response) => userController.getProfile(req, res));
 
+// 创建用户（管理员）
+router.post('/', authMiddleware, (req: Request, res: Response) => userController.createUser(req, res));
+
 // 更新用户个人信息
 router.put('/profile', authMiddleware, (req: Request, res: Response) => userController.updateProfile(req, res));
 

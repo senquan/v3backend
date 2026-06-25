@@ -235,6 +235,54 @@ export class UserController {
     }
   }
 
+  // 创建用户（管理员）
+  async createUser(req: Request, res: Response): Promise<Response> {
+    try {
+      const { username, password, name, email, phone, companyId, notes, status, innerCode } = req.body;
+
+      // 验证必填字段
+      if (!username || !password) {
+        return errorResponse(res, 400, '用户名和密码不能为空', null);
+      }
+
+      // 检查用户名是否已存在
+      const userRepository = AppDataSource.getRepository(User);
+      const existingUser = await userRepository.findOne({ where: { username } });
+      if (existingUser) {
+        return errorResponse(res, 400, '用户名已存在', null);
+      }
+
+      // 创建新用户
+      const newUser = new User();
+      newUser.username = username;
+      await newUser.setPassword(password);
+      newUser.innerCode = innerCode || this.generateInnerCode();
+      newUser.name = name || '';
+      newUser.email = email || '';
+      newUser.phone = phone || '';
+      newUser.companyId = companyId || null;
+      newUser.status = status !== undefined ? status : 0;
+      newUser.notes = notes || null;
+      newUser.createdAt = new Date();
+      newUser.updatedAt = new Date();
+
+      await userRepository.save(newUser);
+
+      // 分配默认角色
+      const userRoleRepository = AppDataSource.getRepository(UserRole);
+      const userRole = new UserRole();
+      userRole.userId = newUser.id;
+      userRole.roleId = DEFAULT_ROLE_ID;
+      await userRoleRepository.save(userRole);
+
+      logger.info(`管理员创建用户: ${username}`);
+      return successResponse(res, { id: newUser.id, username }, '用户创建成功');
+    } catch (error) {
+      logger.error('创建用户失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
   // 更新用户信息
   async updateUser(req: Request, res: Response): Promise<Response> {
     try {
