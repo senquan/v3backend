@@ -9,7 +9,7 @@ import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { Like, MoreThan } from 'typeorm';
 
-const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || 'ai-gateway-secret-2026';
+const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || '';
 
 const CUSTOMER_LEVEL_MAP: Record<number, string> = {
   [CustomerLevel.REGULAR]: '普通客户',
@@ -30,10 +30,14 @@ const ORDER_STATUS_MAP: Record<number, string> = {
 };
 
 /**
- * 校验内部调用 Token
+ * 校验内部调用 Token（禁止空 Token，生产环境必须配置 INTERNAL_TOKEN）
  */
 function verifyInternalToken(req: Request): boolean {
   const token = req.headers['x-internal-token'] as string;
+  if (!INTERNAL_TOKEN) {
+    logger.warn('INTERNAL_TOKEN 未配置，拒绝所有内部 API 调用');
+    return false;
+  }
   return token === INTERNAL_TOKEN;
 }
 
@@ -149,7 +153,47 @@ export class CsInternalController {
     }
   }
 
-  // ========== 会话记录写入（供 ai-gateway 回调） ==========
+  // ========== 会话记录批量写入（供 ai-gateway 回调） ==========
+
+  async saveConversationsBatch(req: Request, res: Response): Promise<Response> {
+    try {
+      if (!verifyInternalToken(req)) {
+        return errorResponse(res, 403, '内部 Token 校验失败', null);
+      }
+
+      const { sessionId, customerId, customerName, knowledgeBaseId, relatedOrderIds, messages } = req.body;
+
+      if (!sessionId || !messages || !Array.isArray(messages) || messages.length === 0) {
+        return errorResponse(res, 400, '缺少必要参数 (sessionId, messages[])', null);
+      }
+
+      const repo = AppDataSource.getRepository(CsConversation);
+
+      // 在单个事务中批量插入
+      const entities = messages.map((msg: any) => {
+        const conv = new CsConversation();
+        conv.sessionId = sessionId;
+        conv.customerId = customerId || null;
+        conv.customerName = customerName || null;
+        conv.role = msg.role;
+        conv.content = msg.content;
+        conv.knowledgeBaseId = knowledgeBaseId || null;
+        conv.relatedOrderIds = relatedOrderIds || null;
+        conv.ragSources = msg.ragSources || null;
+        conv.latencyMs = msg.latencyMs || null;
+        return conv;
+      });
+
+      const saved = await repo.save(entities);
+
+      return successResponse(res, { ids: saved.map(s => s.id) }, `批量保存 ${saved.length} 条会话成功`);
+    } catch (error: any) {
+      logger.error('批量保存会话失败:', error);
+      return errorResponse(res, 500, `批量保存失败: ${error.message}`, null);
+    }
+  }
+
+  // ========== 会话记录写入（供 ai-gateway 回调，保留单条接口兼容） ==========
 
   async saveConversation(req: Request, res: Response): Promise<Response> {
     try {

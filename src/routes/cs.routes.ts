@@ -10,6 +10,7 @@ const csInternalController = new CsInternalController();
 // 内部 API（ai-gateway 回调，用 X-Internal-Token 校验，不走 authMiddleware）
 router.get('/internal/customer-orders', csInternalController.getCustomerOrders.bind(csInternalController));
 router.post('/internal/conversations', csInternalController.saveConversation.bind(csInternalController));
+router.post('/internal/conversations/batch', csInternalController.saveConversationsBatch.bind(csInternalController));
 
 // 应用认证中间件（以下路由需登录）
 router.use(authMiddleware);
