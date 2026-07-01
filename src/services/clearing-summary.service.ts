@@ -129,7 +129,7 @@ export class ClearingSummaryService {
       where: { companyId, status: 2 }
     });
 
-    if (!advanceExpense) return;
+    if (!advanceExpense || advanceExpense.length === 0) return;
 
     // 2. 按类型汇总
     const advanceExpenseTotal = advanceExpense.reduce((acc, item) => {

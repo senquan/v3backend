@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
+import { Like } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { User } from '../models/user.entity';
+import { CompanyInfo } from '../models/company-info.entity';
 import { logger } from '../utils/logger';
 import { errorResponse } from '../utils/response';
 
@@ -54,8 +56,14 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
       // 如果 JWT 中没有角色和平台信息，则从用户对象中获取
       (req as any).userRoles = user.getRoleCodes();
     }
-    if (decoded.accessableCompanyIds) {
-      (req as any).query.accessableCompanyIds = decoded.accessableCompanyIds;
+    // 动态计算用户可访问的单位ID列表（不从JWT取，确保新增单位立即可见）
+    if (user.company) {
+      const companyRepository = AppDataSource.getRepository(CompanyInfo);
+      const companies = await companyRepository.find({
+        where: { pathCode: Like(`${user.company.pathCode}%`) },
+        select: ['id']
+      });
+      (req as any).query.accessableCompanyIds = companies.map(c => c.id);
     }
     next();
   } catch (error) {

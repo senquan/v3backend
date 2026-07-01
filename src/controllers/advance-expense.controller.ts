@@ -155,7 +155,7 @@ export class AdvanceExpenseController {
       const updated = await this.advanceExpenseRepository.save(record);
 
       if (oldAmount !== parseFloat(amount)) {
-        summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, record.companyId);
+        summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, updated.companyId);
       }
 
       return successResponse(res, updated, '更新成功');
@@ -280,8 +280,8 @@ export class AdvanceExpenseController {
       }
       for (const record of records) {
         record.status = 3;
-        await this.advanceExpenseRepository.save(record);
-        summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, record.companyId);
+        const saved = await this.advanceExpenseRepository.save(record);
+        summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, saved.companyId);
       }
 
       summaryEventEmitter.emit(SummaryEvents.LOG_OPERATIONS, {
