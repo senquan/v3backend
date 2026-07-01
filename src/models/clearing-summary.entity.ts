@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { CompanyInfo } from './company-info.entity';
 
 @Entity('clearing_summary')
@@ -50,5 +50,6 @@ export class ClearingSummary {
 
   // 关系映射
   @ManyToOne(() => CompanyInfo)
+  @JoinColumn({ name: 'companyId' })
   company: CompanyInfo | null = null;
 }

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { calculateSum } from '../utils';
 import { CompanyInfo } from './company-info.entity';
 
@@ -47,6 +47,7 @@ export class DepositLoanSummary {
   lastStatDate!: Date;
 
   @ManyToOne(() => CompanyInfo)
+  @JoinColumn({ name: 'companyId' })
   company: CompanyInfo | null = null;
 
   // 活期余额

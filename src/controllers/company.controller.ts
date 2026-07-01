@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { CompanyInfo } from '../models/company-info.entity';
+import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { RedisCacheService } from '../services/cache.service';
 import { CompanyService } from '../services/company-management.service';
 import { errorResponse, successResponse } from '../utils/response';
@@ -99,6 +100,24 @@ export class CompanyController {
         status: status || 1,
         initCurrentBalance: initCurrentBalance || 0
       }, userId);
+
+      // 插入初始化的存贷款汇总记录
+      const depositLoanSummaryRepository = AppDataSource.getRepository(DepositLoanSummary);
+      const summary = new DepositLoanSummary();
+      summary.companyId = company.id;
+      summary.loanBalance = 0;
+      summary.loanInterest = 0;
+      summary.depositIncoming = 0;
+      summary.depositTransferUp = 0;
+      summary.depositFromFixed = 0;
+      summary.depositTransferDown = 0;
+      summary.depositToFixed = 0;
+      summary.depositFixed = null;
+      summary.depositCurrentInterest = 0;
+      summary.depositFixedInterest = 0;
+      summary.sort = 0;
+      summary.lastStatDate = new Date();
+      await depositLoanSummaryRepository.save(summary);
 
       return res.json({
         code: 0,

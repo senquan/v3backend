@@ -7,6 +7,15 @@ import { successResponse, errorResponse } from '../utils/response';
 import { In } from 'typeorm';
 import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
 
+/** 安全解析日期，失败返回 null */
+function toSafeDate(value: any): Date | null {
+  if (!value && value !== 0) return null
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return null
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
 export class FundTransferController {
   private fundTransferRepository = AppDataSource.getRepository(FundTransfer);
 
@@ -271,17 +280,23 @@ export class FundTransferController {
           return errorResponse(res, 400, `第${i + 1}行：转账日期不能为空`);
         }
 
+        const transferDate = toSafeDate(item.transferDate);
+        if (!transferDate) {
+          await queryRunner.rollbackTransaction();
+          return errorResponse(res, 400, `第${i + 1}行：转账日期格式无效："${item.transferDate}"`);
+        }
+
         const transfer = new FundTransfer();
         transfer.batchNo = currentBatchNo;
         transfer.transferCode = item.transferCode || this.generateTransferCode();
         transfer.companyId = companyNameToId.get(item.companyName) || 0;
         transfer.transferAmount = parseFloat(item.transferAmount);
         transfer.transferType = type;
-        transfer.transferDate = new Date(item.transferDate);
+        transfer.transferDate = transferDate;
         transfer.transferStatus = 1;
         transfer.bankAccount = item.bankAccount || null;
         transfer.isLoan = item.isLoan === "是" ? 1 : 0;
-        transfer.dueDate = item.dueDate ? new Date(item.dueDate) : null;
+        transfer.dueDate = toSafeDate(item.dueDate);
         transfer.remark = item.remark || null;
         transfer.createdBy = userId;
         transfer.updatedBy = userId;
