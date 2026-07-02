@@ -335,6 +335,26 @@ export class UserController {
       const isPasswordValid = await user.validatePassword(oldPassword, user.password);
       if (!isPasswordValid) return errorResponse(res, 400, '旧密码错误', null);
 
+
+      // 验证新密码强度
+      if (newPassword.length < 6 || newPassword.length > 50) {
+        return errorResponse(res, 400, '新密码长度必须在6-50个字符之间', null);
+      }
+      if (!/[A-Z]/.test(newPassword)) {
+        return errorResponse(res, 400, '新密码必须包含至少一个大写字母', null);
+      }
+      if (!/[a-z]/.test(newPassword)) {
+        return errorResponse(res, 400, '新密码必须包含至少一个小写字母', null);
+      }
+      if (!/\d/.test(newPassword)) {
+        return errorResponse(res, 400, '新密码必须包含至少一个数字', null);
+      }
+
+      // 新密码不能与旧密码相同
+      const isSamePassword = await user.validatePassword(newPassword, user.password);
+      if (isSamePassword) {
+        return errorResponse(res, 400, '新密码不能与旧密码相同', null);
+      }
       // 更新密码
       await user.setPassword(newPassword);
       
@@ -362,6 +382,20 @@ export class UserController {
       const userRepository = AppDataSource.getRepository(User);
       const existingUser = await userRepository.findOne({ where: { username } }); 
       if (existingUser) return errorResponse(res, 400, '用户名已存在', null);
+
+      // 验证密码强度
+      if (password.length < 6 || password.length > 50) {
+        return errorResponse(res, 400, '密码长度必须在6-50个字符之间', null);
+      }
+      if (!/[A-Z]/.test(password)) {
+        return errorResponse(res, 400, '密码必须包含至少一个大写字母', null);
+      }
+      if (!/[a-z]/.test(password)) {
+        return errorResponse(res, 400, '密码必须包含至少一个小写字母', null);
+      }
+      if (!/\d/.test(password)) {
+        return errorResponse(res, 400, '密码必须包含至少一个数字', null);
+      }
 
       // 验证邀请码
       // const inviteCodeRepository = AppDataSource.getRepository(InviteCode);
