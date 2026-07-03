@@ -1,161 +1,196 @@
 /**
+ * 内部函数：无符号加法（两个正数字符串相加）
+ */
+function _addUnsigned(a: string, b: string, scale: number): string {
+  const [aInt, aFrac = ""] = a.split(".");
+  const [bInt, bFrac = ""] = b.split(".");
+  const maxFracLength = Math.max(aFrac.length, bFrac.length);
+  let fracSumStr = "";
+  let carry = 0;
+  if (maxFracLength > 0) {
+    const aFracPadded = aFrac.padEnd(maxFracLength, "0");
+    const bFracPadded = bFrac.padEnd(maxFracLength, "0");
+    const fracSum = BigInt(aFracPadded) + BigInt(bFracPadded);
+    fracSumStr = fracSum.toString().padStart(maxFracLength, "0");
+    if (fracSumStr.length > maxFracLength) { carry = 1; fracSumStr = fracSumStr.substring(1); }
+  }
+  const intSum = BigInt(aInt) + BigInt(bInt) + BigInt(carry);
+  let result = intSum.toString();
+  if (maxFracLength > 0 || scale > 0) result += "." + fracSumStr;
+  if (scale >= 0) {
+    const parts = result.split(".");
+    if (parts.length === 1) { if (scale > 0) result += "." + "0".repeat(scale); }
+    else {
+      let fracPart = parts[1];
+      if (fracPart.length > scale) fracPart = fracPart.substring(0, scale);
+      else if (fracPart.length < scale) fracPart = fracPart.padEnd(scale, "0");
+      result = scale === 0 ? parts[0] : parts[0] + "." + fracPart;
+    }
+  }
+  return result;
+}
+
+/**
+ * 内部函数：无符号减法（a >= b，均为正数字符串，结果非负）
+ */
+function _subUnsigned(a: string, b: string, scale: number): string {
+  const [aInt, aFrac = ""] = a.split(".");
+  const [bInt, bFrac = ""] = b.split(".");
+  const maxFracLength = Math.max(aFrac.length, bFrac.length);
+  let fracStr = "";
+  let borrow = 0;
+  if (maxFracLength > 0) {
+    const aFracPadded = aFrac.padEnd(maxFracLength, "0");
+    const bFracPadded = bFrac.padEnd(maxFracLength, "0");
+    let aFracBig = BigInt(aFracPadded);
+    let bFracBig = BigInt(bFracPadded);
+    if (aFracBig < bFracBig) { aFracBig += BigInt(10 ** maxFracLength); borrow = 1; }
+    const fracDiff = aFracBig - bFracBig;
+    fracStr = fracDiff.toString().padStart(maxFracLength, "0");
+  }
+  const intDiff = BigInt(aInt) - BigInt(bInt) - BigInt(borrow);
+  let result = intDiff.toString();
+  if (maxFracLength > 0 || scale > 0) result += "." + fracStr;
+  if (scale >= 0) {
+    const parts = result.split(".");
+    if (parts.length === 1) { if (scale > 0) result += "." + "0".repeat(scale); }
+    else {
+      let fracPart = parts[1];
+      if (fracPart.length > scale) fracPart = fracPart.substring(0, scale);
+      else if (fracPart.length < scale) fracPart = fracPart.padEnd(scale, "0");
+      result = scale === 0 ? parts[0] : parts[0] + "." + fracPart;
+    }
+  }
+  return result;
+}
+
+/**
+ * 比较两个正数字符串大小
+ */
+function _compareUnsigned(a: string, b: string): number {
+  const [aInt, aFrac = ""] = a.split(".");
+  const [bInt, bFrac = ""] = b.split(".");
+  const maxFrac = Math.max(aFrac.length, bFrac.length);
+  if (BigInt(aInt) > BigInt(bInt)) return 1;
+  if (BigInt(aInt) < BigInt(bInt)) return -1;
+  if (maxFrac > 0) {
+    const aFracPadded = aFrac.padEnd(maxFrac, "0");
+    const bFracPadded = bFrac.padEnd(maxFrac, "0");
+    if (BigInt(aFracPadded) > BigInt(bFracPadded)) return 1;
+    if (BigInt(aFracPadded) < BigInt(bFracPadded)) return -1;
+  }
+  return 0;
+}
+
+/**
  * 高精度加法函数，类似PHP的bcadd
- * 
+ * 支持正数和负数运算
+ *
  * @param leftOperand 第一个操作数
  * @param rightOperand 第二个操作数
  * @param scale 结果保留的小数位数，默认为0
  * @returns 两个操作数相加的结果，以字符串形式返回
  */
 export function bcadd(leftOperand: string | number, rightOperand: string | number, scale: number = 0): string {
-  // 将输入转换为字符串
-  const left = typeof leftOperand === 'number' ? leftOperand.toString() : leftOperand;
-  const right = typeof rightOperand === 'number' ? rightOperand.toString() : rightOperand;
-
-  // 分离整数部分和小数部分
-  const [leftInt, leftFrac = ''] = left.split('.');
-  const [rightInt, rightFrac = ''] = right.split('.');
-
-  // 计算小数部分
-  const maxFracLength = Math.max(leftFrac.length, rightFrac.length);
-  const leftFracPadded = leftFrac.padEnd(maxFracLength, '0');
-  const rightFracPadded = rightFrac.padEnd(maxFracLength, '0');
-
-  // 将小数部分转换为整数进行计算
-  const fracSum = BigInt(leftFracPadded) + BigInt(rightFracPadded);
-  let fracSumStr = fracSum.toString().padStart(maxFracLength, '0');
-
-  // 处理小数部分的进位
-  let carry = 0;
-  if (fracSumStr.length > maxFracLength) {
-    carry = 1;
-    fracSumStr = fracSumStr.substring(1);
+  const left = typeof leftOperand === "number" ? leftOperand.toString() : leftOperand;
+  const right = typeof rightOperand === "number" ? rightOperand.toString() : rightOperand;
+  const leftNeg = left.startsWith("-");
+  const rightNeg = right.startsWith("-");
+  const leftAbs = leftNeg ? left.substring(1) : left;
+  const rightAbs = rightNeg ? right.substring(1) : right;
+  // 同号：绝对值相加，结果取相同符号
+  if (leftNeg === rightNeg) {
+    const result = _addUnsigned(leftAbs, rightAbs, scale);
+    return leftNeg ? "-" + result : result;
   }
-
-  // 计算整数部分
-  const intSum = BigInt(leftInt) + BigInt(rightInt) + BigInt(carry);
-  
-  // 组合结果
-  let result = intSum.toString();
-  if (maxFracLength > 0 || scale > 0) {
-    // 如果需要小数部分
-    result += '.' + fracSumStr;
+  // 异号：绝对值相减，符号跟随绝对值较大的操作数
+  const cmp = _compareUnsigned(leftAbs, rightAbs);
+  if (cmp === 0) return scale > 0 ? "0." + "0".repeat(scale) : "0";
+  if (cmp > 0) {
+    const result = _subUnsigned(leftAbs, rightAbs, scale);
+    return leftNeg ? "-" + result : result;
+  } else {
+    const result = _subUnsigned(rightAbs, leftAbs, scale);
+    return rightNeg ? "-" + result : result;
   }
-
-  // 处理精度
-  if (scale >= 0) {
-    const parts = result.split('.');
-    if (parts.length === 1) {
-      // 如果结果没有小数部分但需要精度
-      if (scale > 0) {
-        result += '.' + '0'.repeat(scale);
-      }
-    } else {
-      // 调整小数部分的长度
-      const intPart = parts[0];
-      let fracPart = parts[1];
-      
-      if (fracPart.length > scale) {
-        // 截断
-        fracPart = fracPart.substring(0, scale);
-      } else if (fracPart.length < scale) {
-        // 补零
-        fracPart = fracPart.padEnd(scale, '0');
-      }
-      
-      result = scale === 0 ? intPart : `${intPart}.${fracPart}`;
-    }
-  }
-
-  return result;
 }
 
 /**
  * 高精度减法函数，类似PHP的bcsub
- * 
+ * 支持正数和负数运算
+ *
  * @param leftOperand 第一个操作数
  * @param rightOperand 第二个操作数
  * @param scale 结果保留的小数位数，默认为0
  * @returns 两个操作数相减的结果，以字符串形式返回
  */
 export function bcsub(leftOperand: string | number, rightOperand: string | number, scale: number = 0): string {
-  // 将第二个操作数变为负数，然后调用bcadd
-  const right = typeof rightOperand === 'number' 
-    ? -rightOperand 
-    : rightOperand.startsWith('-') 
-      ? rightOperand.substring(1) 
-      : `-${rightOperand}`;
-  
-  return bcadd(leftOperand, right, scale);
+  const left = typeof leftOperand === "number" ? leftOperand.toString() : leftOperand;
+  const right = typeof rightOperand === "number" ? rightOperand.toString() : rightOperand;
+  const leftNeg = left.startsWith("-");
+  const rightNeg = right.startsWith("-");
+  const leftAbs = leftNeg ? left.substring(1) : left;
+  const rightAbs = rightNeg ? right.substring(1) : right;
+  // 同号：绝对值相减
+  if (leftNeg === rightNeg) {
+    const cmp = _compareUnsigned(leftAbs, rightAbs);
+    if (cmp === 0) return scale > 0 ? "0." + "0".repeat(scale) : "0";
+    if (cmp >= 0) {
+      const result = _subUnsigned(leftAbs, rightAbs, scale);
+      return leftNeg ? "-" + result : result;
+    } else {
+      const result = _subUnsigned(rightAbs, leftAbs, scale);
+      return rightNeg ? result : "-" + result;
+    }
+  }
+  // 异号：绝对值相加，符号跟随第一个操作数
+  const result = _addUnsigned(leftAbs, rightAbs, scale);
+  return leftNeg ? "-" + result : result;
 }
 
 /**
  * 高精度乘法函数，类似PHP的bcmul
- * 
+ *
  * @param leftOperand 第一个操作数
  * @param rightOperand 第二个操作数
  * @param scale 结果保留的小数位数，默认为0
  * @returns 两个操作数相乘的结果，以字符串形式返回
  */
 export function bcmul(leftOperand: string | number, rightOperand: string | number, scale: number = 0): string {
-  // 将输入转换为字符串
-  const left = typeof leftOperand === 'number' ? leftOperand.toString() : leftOperand;
-  const right = typeof rightOperand === 'number' ? rightOperand.toString() : rightOperand;
-
-  // 计算小数点位置
-  const leftDecimalPos = left.indexOf('.');
-  const rightDecimalPos = right.indexOf('.');
-  
+  const left = typeof leftOperand === "number" ? leftOperand.toString() : leftOperand;
+  const right = typeof rightOperand === "number" ? rightOperand.toString() : rightOperand;
+  const leftNeg = left.startsWith("-");
+  const rightNeg = right.startsWith("-");
+  const leftAbs = leftNeg ? left.substring(1) : left;
+  const rightAbs = rightNeg ? right.substring(1) : right;
   // 计算小数位数
-  const leftScale = leftDecimalPos === -1 ? 0 : left.length - leftDecimalPos - 1;
-  const rightScale = rightDecimalPos === -1 ? 0 : right.length - rightDecimalPos - 1;
-  
-  // 移除小数点，转换为整数计算
-  const leftInt = left.replace('.', '');
-  const rightInt = right.replace('.', '');
-  
-  // 计算结果
-  const resultInt = BigInt(leftInt) * BigInt(rightInt);
-  
-  // 计算结果的小数位数
+  const leftDecimalPos = leftAbs.indexOf(".");
+  const rightDecimalPos = rightAbs.indexOf(".");
+  const leftScale = leftDecimalPos === -1 ? 0 : leftAbs.length - leftDecimalPos - 1;
+  const rightScale = rightDecimalPos === -1 ? 0 : rightAbs.length - rightDecimalPos - 1;
+  // 移除小数点后整数相乘
+  const leftInt = leftAbs.replace(".", "");
+  const rightInt = rightAbs.replace(".", "");
+  const resultInt = BigInt(leftInt || "0") * BigInt(rightInt || "0");
   const resultScale = leftScale + rightScale;
-  
-  // 转换为字符串
   let resultStr = resultInt.toString();
-  
-  // 插入小数点
   if (resultScale > 0) {
-    if (resultStr.length <= resultScale) {
-      // 需要在前面补0
-      resultStr = '0'.repeat(resultScale - resultStr.length + 1) + resultStr;
-    }
-    
-    resultStr = resultStr.slice(0, -resultScale) + '.' + resultStr.slice(-resultScale);
+    if (resultStr.length <= resultScale) resultStr = "0".repeat(resultScale - resultStr.length + 1) + resultStr;
+    resultStr = resultStr.slice(0, -resultScale) + "." + resultStr.slice(-resultScale);
   }
-  
-  // 处理精度
   if (scale >= 0) {
-    const parts = resultStr.split('.');
-    if (parts.length === 1) {
-      // 如果结果没有小数部分但需要精度
-      if (scale > 0) {
-        resultStr += '.' + '0'.repeat(scale);
-      }
-    } else {
-      // 调整小数部分的长度
-      const intPart = parts[0];
+    const parts = resultStr.split(".");
+    if (parts.length === 1) { if (scale > 0) resultStr += "." + "0".repeat(scale); }
+    else {
       let fracPart = parts[1];
-      
-      if (fracPart.length > scale) {
-        // 截断
-        fracPart = fracPart.substring(0, scale);
-      } else if (fracPart.length < scale) {
-        // 补零
-        fracPart = fracPart.padEnd(scale, '0');
-      }
-      
-      resultStr = scale === 0 ? intPart : `${intPart}.${fracPart}`;
+      if (fracPart.length > scale) fracPart = fracPart.substring(0, scale);
+      else if (fracPart.length < scale) fracPart = fracPart.padEnd(scale, "0");
+      resultStr = scale === 0 ? parts[0] : parts[0] + "." + fracPart;
     }
   }
-  
+  // 负负得正
+  const isNegative = leftNeg !== rightNeg;
+  const isZero = resultInt === BigInt(0);
+  if (isNegative && !isZero) resultStr = "-" + resultStr;
   return resultStr;
 }
