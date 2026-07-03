@@ -1,6 +1,6 @@
+﻿import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
-
 import { AdvanceExpense } from '../models/advance-expense.entity';
 import { AdvanceExpenseDetail } from '../models/advance-expense-detail.entity';
 import { AdvanceExpenseType } from '../models/advance-expense-type.entity';
@@ -30,6 +30,7 @@ import { FixedDepositLog } from '../models/fixed-deposit-log.entity';
 import { ProfitPaymentLog } from '../models/profit-payment-log.entity';
 import { ClearingSnapshot } from '../models/clearing-snapshot.entity';
 import { ClearingSnapshotData } from '../models/clearing-snapshot-data.entity';
+import { SnapshotDetailLink } from '../models/clearing-snapshot-detail-link.entity';
 
 // 加载环境变量
 dotenv.config();
@@ -43,12 +44,12 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASS || 'password',
   database: process.env.DB_NAME || 'training',
   schema: process.env.DB_SCHEMA || 'fms',
-  synchronize: process.env.NODE_ENV !== 'production', // 开发环境自动同步数据库结构
+  synchronize: process.env.NODE_ENV !== 'production',
   logging: process.env.NODE_ENV !== 'production',
   entities: [BatchFile, ClearingSummary, CompanyInfo, DailyCurrentInterestDetail, DailyFixedInterestDetail, FixedToCurrentInterestDetail, DepositLoanSummary, Dict,
     FundTransfer, InviteCode, Permission, Role, RolePermission, User, UserRole,
     InterestRate, InternalDeposit, AdvanceExpense, AdvanceExpenseDetail, AdvanceExpenseType, ProfitPayment, FixedDeposit, Settings, PaymentReceive, OperationLog,
-    FixedDepositLog, ProfitPaymentLog, ClearingSnapshot, ClearingSnapshotData],
+    FixedDepositLog, ProfitPaymentLog, ClearingSnapshot, ClearingSnapshotData, SnapshotDetailLink],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],
 });
