@@ -1,4 +1,4 @@
-import { Response } from 'express';
+﻿import { Response } from 'express';
 import { AdvanceExpense } from '../models/advance-expense.entity';
 import { AdvanceExpenseType } from '../models/advance-expense-type.entity';
 import { AdvanceExpenseDetail } from '../models/advance-expense-detail.entity';
@@ -16,6 +16,8 @@ export class AdvanceExpenseController {
   private advanceExpenseTypeRepository = AppDataSource.getRepository(AdvanceExpenseType);
   private dictRepository = AppDataSource.getRepository(Dict);
   private dictService = new DictService(this.dictRepository, new RedisCacheService());
+
+  private DICT_GROUP_EXPENSE_TYPE = 2;
 
   async createExpense(req: any, res: Response) {
     const queryRunner = AppDataSource.createQueryRunner();
@@ -398,13 +400,19 @@ export class AdvanceExpenseController {
 
         let expenseTypeId = typeNameToId.get(item.expenseType);
         if (!expenseTypeId) {
+          const maxValue = await this.dictRepository.createQueryBuilder('dict')
+            .select('MAX(value)', 'maxValue')
+            .where('"group" = :group', { group: this.DICT_GROUP_EXPENSE_TYPE })
+            .getRawOne();
+          const maxValueValue = maxValue?.maxValue || 0;
+          const nextValue = maxValueValue ? Number(maxValueValue) + 1 : 1;
           const newDict = await this.dictService.create({
             name: item.expenseType,
-            value: item.expenseType,
-            group: 2,
+            value: nextValue.toString(),
+            group: this.DICT_GROUP_EXPENSE_TYPE,
             remark: `${batchNo} 批量导入创建`
           });
-          expenseTypeId = newDict.id;
+          expenseTypeId = Number(newDict.value);
           typeNameToId.set(item.expenseType, expenseTypeId);
         }
 
