@@ -30,6 +30,9 @@ export class CompanyInfo {
   @Column({ type: 'smallint', default: 1, comment: '状态：1-启用，0-停用' })
   status!: number;
 
+  @Column({ type: 'smallint', default: 0, comment: '排序' })
+  sort!: number;
+
   @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, comment: '活期存款期初额' })
   initCurrentBalance!: number;
 

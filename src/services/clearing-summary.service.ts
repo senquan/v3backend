@@ -238,7 +238,7 @@ export class ClearingSummaryService {
     if (query.accessableCompanyIds) {
       queryBuilder.andWhere('summary.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
     }
-    queryBuilder.orderBy('summary.sort', 'ASC').addOrderBy('summary.lastStatDate', 'DESC').skip(skip).take(pageSize);
+    queryBuilder.orderBy('summary.sort', 'DESC').addOrderBy('summary.lastStatDate', 'DESC').skip(skip).take(pageSize);
     const [records, total] = await queryBuilder.getManyAndCount();
     return { records, total, page: pageNum, size: pageSize };
   }
