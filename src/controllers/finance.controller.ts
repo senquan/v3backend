@@ -721,9 +721,6 @@ export class ProfitPaymentController {
         dueProfit2: dueProfit2 ? parseFloat(dueProfit2) : 0,
         businessYear: parseInt(businessYear)
       }, userId);
-
-      summaryEventEmitter.emit(SummaryEvents.PROFIT_PAYMENT_CHANGED, parseInt(companyId));
-
       return successResponse(res, record, '创建成功');
     } catch (error: any) {
       return errorResponse(res, 400, error.message || '创建失败');

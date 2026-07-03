@@ -105,11 +105,7 @@ export class AdvanceExpenseController {
           return errorResponse(res, 400, `费用明细金额之和与总金额不一致${sum} / ${expense.amount}`);
         }
       }
-
       await queryRunner.commitTransaction();
-
-      summaryEventEmitter.emit(SummaryEvents.ADVANCE_EXPENSE_CHANGED, saved.companyId);
-
       return successResponse(res, saved, '创建成功');
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
