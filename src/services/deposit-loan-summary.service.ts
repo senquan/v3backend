@@ -34,7 +34,7 @@ export class DepositLoanSummaryService {
       queryBuilder.andWhere('summary.companyId IN (:...ids)', { ids: query.accessableCompanyIds });
     }
 
-    queryBuilder.orderBy('summary.sort', 'ASC')
+    queryBuilder.orderBy('summary.sort', 'DESC')
       .addOrderBy('summary.lastStatDate', 'DESC')
       .skip(skip)
       .take(pageSize);

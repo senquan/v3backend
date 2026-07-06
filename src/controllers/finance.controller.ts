@@ -302,10 +302,12 @@ export class ImportDepositController {
         return errorResponse(res, 400, '必填项不能为空');
       }
 
+      const depositPeriodMonth = this._getDepositPeriodMonth(parseInt(depositPeriod));
+
       // 计算到期日
       const start = new Date(startDate);
       const end = new Date(startDate);
-      end.setMonth(end.getMonth() + parseInt(depositPeriod));
+      end.setMonth(end.getMonth() + depositPeriodMonth);
 
       const fixedDeposit = new FixedDeposit();
       fixedDeposit.depositCode = depositCode;
@@ -652,6 +654,14 @@ export class ImportDepositController {
       return nextDate
     }
     return null
+  }
+
+  // 获取存款周期的实际月数
+  // 2：3个月
+  // 3：6个月
+  // 4：12个月
+  _getDepositPeriodMonth(period: number) {
+    return period === 2 ? 3 : period === 3 ? 6 : 12;
   }
 }
 
