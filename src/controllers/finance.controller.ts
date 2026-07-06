@@ -366,7 +366,7 @@ export class ImportDepositController {
         queryBuilder = queryBuilder.andWhere('deposit.depositType = :type', { type: parseInt(type as string) });
       }
       if (keyword) {
-        queryBuilder = queryBuilder.andWhere('(company.companyName LIKE :keyword OR deposit.batchNo LIKE :keyword)', { keyword: `%${keyword}%` });
+        queryBuilder = queryBuilder.andWhere('(deposit.depositCode LIKE :keyword OR company.companyName LIKE :keyword OR deposit.batchNo LIKE :keyword)', { keyword: `%${keyword}%` });
       }
       if (status && status > 0) {
         queryBuilder = queryBuilder.andWhere('deposit.status = :status', { status: parseInt(status as string) });
