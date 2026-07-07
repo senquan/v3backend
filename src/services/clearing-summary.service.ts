@@ -1,4 +1,4 @@
-﻿import { Repository, LessThanOrEqual, In } from 'typeorm';
+import { Repository, LessThanOrEqual, In } from 'typeorm';
 import { AdvanceExpense } from '../models/advance-expense.entity';
 import { ClearingSummary } from '../models/clearing-summary.entity';
 import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
@@ -240,6 +240,18 @@ export class ClearingSummaryService {
     }
     queryBuilder.orderBy('summary.sort', 'DESC').addOrderBy('summary.lastStatDate', 'DESC').skip(skip).take(pageSize);
     const [records, total] = await queryBuilder.getManyAndCount();
+
+    // 实时计算 internalDepositBalance
+    for (const record of records) {
+      const depositSummary = await this.depositLoanSummaryRepository.findOne({
+        relations: ['company'],
+        where: { companyId: record.companyId }
+      });
+      if (depositSummary) {
+        record.internalDepositBalance = depositSummary.getInternalDepositBalance();
+      }
+    }
+
     return { records, total, page: pageNum, size: pageSize };
   }
 

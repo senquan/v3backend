@@ -8,6 +8,7 @@ import { DailyFixedInterestDetail } from '../models/fixed-interest-detail.entity
 import { FixedToCurrentInterestDetail } from '../models/f2c-interest-detail.entity';
 import { InterestRate } from '../models/interest-rate.entity';
 import { LessThanOrEqual } from 'typeorm';
+import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
 
 export class InterestCalculationTask {
   private fixedDepositRepository = AppDataSource.getRepository(FixedDeposit);
@@ -30,6 +31,7 @@ export class InterestCalculationTask {
       await this.calculateCurrentInterest(today, tomorrow);
       await this.calculateFixedToCurrentInterest(today);
       await this.calculateFixedInterest(today);
+      await this.syncClearingSummary();
       console.log('利息计算任务执行完成');
       process.exit(0);
     } catch (error) {
@@ -262,6 +264,18 @@ export class InterestCalculationTask {
       }
     }
     console.log('定期利息计算完成');
+  }
+
+  /**
+   * 计息完成后同步清算台账
+   */
+  private async syncClearingSummary() {
+    console.log('开始同步清算台账...');
+    const summaries = await this.depositLoanSummaryRepository.find();
+    for (const summary of summaries) {
+      summaryEventEmitter.emit(SummaryEvents.DEPOSIT_LOAN_CHANGED, summary.companyId);
+    }
+    console.log('清算台账同步完成');
   }
 }
 
