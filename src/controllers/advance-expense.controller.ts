@@ -38,9 +38,9 @@ export class AdvanceExpenseController {
         await queryRunner.rollbackTransaction();
         return errorResponse(res, 400, '单位编号不能为空');
       }
-      if (!amount || parseFloat(amount) <= 0) {
+      if (!amount || parseFloat(amount) === 0) {
         await queryRunner.rollbackTransaction();
-        return errorResponse(res, 400, '金额必须大于0');
+        return errorResponse(res, 400, '金额不能为0');
       }
       if (!expenseType) {
         await queryRunner.rollbackTransaction();
