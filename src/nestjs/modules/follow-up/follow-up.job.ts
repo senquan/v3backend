@@ -179,7 +179,7 @@ export class FollowUpReminderJob {
 
         // 创建跟单工单（ticketType=10）
         const ticket = new Ticket();
-        ticket.title = `[跟单提醒] 订单${order.name} - 第${record.stageOrder}轮`;
+        ticket.title = `订单${order.name} - 第${record.stageOrder}轮`;
         ticket.content = this.buildTicketContent(order, record);
         ticket.ticketType = 10; // 跟单提醒
         ticket.priority = Math.min(2 + record.stageOrder, 5); // 随阶段递增

@@ -42,6 +42,10 @@ export class Ticket {
   @JoinColumn({ name: "assignee_id" })
   assignee?: Staff;
 
+  // 指派类型：'user' - 指派给用户，'department' - 指派给部门
+  @Column({ name: "assignee_type", type: "varchar", length: 20, nullable: true })
+  assigneeType?: string;
+
   @Column({ name: "product_id", nullable: true })
   productId?: number;
 
@@ -84,6 +88,13 @@ export class Ticket {
 
   @UpdateDateColumn({ name: "updated_at" })
   updatedAt!: Date;
+
+  // 确认进度（用于部门工单）
+  @Column({ name: "confirmed_count", default: 0 })
+  confirmedCount: number = 0;
+
+  @Column({ name: "total_confirmations", default: 0 })
+  totalConfirmations: number = 0;
 
   @Column({ name: "is_deleted", type: "tinyint", default: 0 })
   isDeleted!: number;
