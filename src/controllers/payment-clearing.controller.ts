@@ -187,6 +187,13 @@ export class PaymentClearingController {
         return errorResponse(res, 400, '必填项不能为空');
       }
 
+      if (receiveType === 1 && (!accountAmount || parseFloat(accountAmount) <= 0)) {
+        return errorResponse(res, 400, '银行到款金额必须大于0');
+      }
+      if (receiveType === 2 && (!billAmount || parseFloat(billAmount) <= 0)) {
+        return errorResponse(res, 400, '票据金额必须大于0');
+      }
+
       const payment = new PaymentReceive();
       payment.receiveType = parseInt(receiveType);
       payment.receiveDate = new Date(receiveDate);

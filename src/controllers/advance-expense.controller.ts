@@ -100,9 +100,9 @@ export class AdvanceExpenseController {
             sum += detail.amount;
             await queryRunner.manager.save(AdvanceExpenseDetail, detail);
         }
-        if (sum !== Number(expense.amount)) {
+        if (Math.abs(sum - Number(expense.amount)) > 0.01) {
           await queryRunner.rollbackTransaction();
-          return errorResponse(res, 400, `费用明细金额之和与总金额不一致${sum} / ${expense.amount}`);
+          return errorResponse(res, 400, `费用明细金额之和与总金额不一致${sum.toFixed(2)} / ${expense.amount}`);
         }
       }
       await queryRunner.commitTransaction();
@@ -454,7 +454,7 @@ export class AdvanceExpenseController {
             }
           }
           const sumFixed = parseFloat(sum.toFixed(2));
-          if (sumFixed !== Number(expense.amount)) {
+          if (Math.abs(sumFixed - Number(expense.amount)) > 0.01) {
             await queryRunner.rollbackTransaction();
             return errorResponse(res, 400, `第${i + 1}行：明细金额之和与总金额不一致 ${sumFixed} ${expense.amount}`);
           }
