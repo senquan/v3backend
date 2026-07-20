@@ -51,6 +51,7 @@ import { TicketFollowUpRecord } from '../models/ticket-follow-up-record.model';
 import { User } from '../models/user.model';
 import { UserRole } from '../models/user-roles.model';
 import { Gallery } from '../models/gallery.model';
+import { GalleryLog } from '../models/gallery-log.model';
 import { ShortLink } from '../models/short-link.model';
 import { ExpressTracking } from '../models/express-tracking.model';
 import { ExpressCompany } from '../models/express-company.model';
@@ -75,7 +76,7 @@ export const AppDataSource = new DataSource({
   entities: [Bulletin, Category, Coupon, CouponUser, CsConfig, Customer, Department, Dict, Gallery, InviteCode, KnowledgeBase, KbDocument, QaPair, QaPairTag, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag,
     ProductTag, ProductTbSku, Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, TicketFollowUpConfig, TicketFollowUpStage, TicketFollowUpRecord, User,
     UserRole, PromotionV3, PromotionRuleV3, ShortLink, ExpressTracking, ExpressCompany,
-    SystemLog, LogChain, LogArchive, CsConversation, TicketConfirmation, TicketDepartment,
+    SystemLog, LogChain, LogArchive, CsConversation, TicketConfirmation, TicketDepartment, GalleryLog,
   ],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],

@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
-import { In, Like } from "typeorm";
+import { In } from "typeorm";
 import { AppDataSource } from "../config/database";
 import { Gallery } from "../models/gallery.model";
+import { GalleryLog } from "../models/gallery-log.model";
+import { Dict } from "../models/dict.model";
+import { User } from "../models/user.model";
 import { Tag } from "../models/tag.model";
 import { logger } from "../utils/logger";
 import { errorResponse, successResponse } from "../utils/response";
@@ -189,7 +192,6 @@ export class GalleryController {
       await queryRunner.startTransaction();
 
       const userId = (req as any).user?.id;
-      let successCount = 0;
       const galleryRepository = queryRunner.manager.getRepository(Gallery);
 
       // 处理标签
@@ -226,7 +228,6 @@ export class GalleryController {
         }
         
         await galleryRepository.save(gallery);
-        successCount++;
       });
       await Promise.all(files);
       await queryRunner.commitTransaction();
@@ -345,7 +346,7 @@ export class GalleryController {
             fs.unlinkSync(gallery.filePath);
           }
           if (gallery.thumbnailUrl) {
-            const thumbnailPath = path.join(process.cwd(), gallery.thumbnailUrl.replace(/^https?:\/\/[^\/]+/, ""));
+            const thumbnailPath = path.join(process.cwd(), gallery.thumbnailUrl.replace(/^https?:\/\/[^/]+/, ""));
             if (fs.existsSync(thumbnailPath)) {
               fs.unlinkSync(thumbnailPath);
             }
@@ -394,7 +395,7 @@ export class GalleryController {
               fs.unlinkSync(gallery.filePath);
             }
             if (gallery.thumbnailUrl) {
-              const thumbnailPath = path.join(process.cwd(), gallery.thumbnailUrl.replace(/^https?:\/\/[^\/]+/, ""));
+              const thumbnailPath = path.join(process.cwd(), gallery.thumbnailUrl.replace(/^https?:\/\/[^/]+/, ""));
               if (fs.existsSync(thumbnailPath)) {
                 fs.unlinkSync(thumbnailPath);
               }
@@ -413,7 +414,7 @@ export class GalleryController {
   }
 
   // 获取图片分类统计
-  async getCategoryStats(req: Request, res: Response): Promise<Response> {
+  async getCategoryStats(_req: Request, res: Response): Promise<Response> {
     try {
       const stats = await AppDataSource.getRepository(Gallery)
         .createQueryBuilder("gallery")
@@ -431,7 +432,7 @@ export class GalleryController {
   }
 
   // 获取标签统计
-  async getTagStats(req: Request, res: Response): Promise<Response> {
+  async getTagStats(_req: Request, res: Response): Promise<Response> {
     try {
       const stats = await AppDataSource.getRepository(Tag)
         .createQueryBuilder("tag")
@@ -471,6 +472,88 @@ export class GalleryController {
     } catch (error) {
       logger.error("更新下载次数失败:", error);
       return errorResponse(res, 500, "更新下载次数失败", null);
+    }
+  }
+
+  // 记录下载日志（categoryId=7 的图片下载前必须调用，返回成功才允许下载）
+  async logDownload(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const { platformId, channel } = req.body || {};
+
+      const gallery = await AppDataSource.getRepository(Gallery).findOne({
+        where: { id: Number(id), isDeleted: 0 }
+      });
+
+      if (!gallery) {
+        return errorResponse(res, 404, "图片不存在", null);
+      }
+
+      if (!platformId || !channel) {
+        return errorResponse(res, 400, "请选择平台并填写使用渠道", null);
+      }
+
+      const userId = (req as any).user?.id || (req as any).user?.userId || null;
+      const log = new GalleryLog();
+      log.galleryId = Number(id);
+      log.platformId = Number(platformId);
+      log.channel = String(channel).trim();
+      log.userId = userId ? Number(userId) : null;
+      await AppDataSource.getRepository(GalleryLog).save(log);
+
+      return successResponse(res, { id: log.id }, "记录成功");
+    } catch (error) {
+      logger.error("记录下载日志失败:", error);
+      return errorResponse(res, 500, "记录下载日志失败", null);
+    }
+  }
+
+  // 获取图片的使用记录（gallery_log）
+  async getLogs(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const logs = await AppDataSource.getRepository(GalleryLog).find({
+        where: { galleryId: Number(id) },
+        order: { createAt: "DESC" }
+      });
+
+      if (logs.length === 0) {
+        return successResponse(res, { logs: [] }, "success");
+      }
+
+      const platformIds = Array.from(
+        new Set(logs.map((l) => l.platformId).filter((v): v is number => v !== null))
+      );
+      const userIds = Array.from(
+        new Set(logs.map((l) => l.userId).filter((v): v is number => v !== null))
+      );
+
+      const platforms = platformIds.length
+        ? await AppDataSource.getRepository(Dict).find({
+            where: { group: 1, value: In(platformIds.map(String)) }
+          })
+        : [];
+      const users = userIds.length
+        ? await AppDataSource.getRepository(User).find({
+            where: { id: In(userIds) }
+          })
+        : [];
+
+      const platformMap = new Map(platforms.map((p) => [p.value, p.name]));
+      const userMap = new Map(users.map((u) => [u.id, u.name || u.username]));
+
+      const data = logs.map((l) => ({
+        id: l.id,
+        platformName: l.platformId !== null ? platformMap.get(String(l.platformId)) || "" : "",
+        channel: l.channel || "",
+        userName: l.userId !== null ? userMap.get(l.userId) || "" : "",
+        createAt: l.createAt
+      }));
+
+      return successResponse(res, { logs: data }, "success");
+    } catch (error) {
+      logger.error("获取使用记录失败:", error);
+      return errorResponse(res, 500, "获取使用记录失败", null);
     }
   }
 

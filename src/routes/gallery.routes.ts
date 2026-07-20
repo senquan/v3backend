@@ -137,4 +137,27 @@ router.post(
   galleryController.incrementDownload
 );
 
+// 记录下载日志（categoryId=7 的图片下载前必须调用）
+router.post(
+  "/:id/log-download",
+  authMiddleware,
+  [
+    param("id").isInt({ min: 1 }).withMessage("图片ID必须是大于0的整数"),
+    body("platformId").isInt({ min: 1 }).withMessage("请选择平台"),
+    body("channel").notEmpty().withMessage("请填写使用渠道").isString().withMessage("使用渠道必须是字符串")
+  ],
+  validateRequest,
+  galleryController.logDownload
+);
+
+// 获取图片使用记录（gallery_log）
+router.get(
+  "/:id/logs",
+  [
+    param("id").isInt({ min: 1 }).withMessage("图片ID必须是大于0的整数")
+  ],
+  validateRequest,
+  galleryController.getLogs
+);
+
 export default router;

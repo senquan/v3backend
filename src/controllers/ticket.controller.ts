@@ -70,6 +70,7 @@ export class TicketController {
             .createQueryBuilder('staff')
             .where('staff.departmentId = :deptId', { deptId })
             .andWhere('staff.isDeleted = 0')
+            .andWhere('staff.status < 4')
             .getMany();
           
           for (const staff of staffs) {
