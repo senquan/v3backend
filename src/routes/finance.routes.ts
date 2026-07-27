@@ -65,6 +65,8 @@ router.post('/import-transfer', (req, res: Response) => fundTransferController.b
 
 router.post('/transfer/confirm', (req, res: Response) => fundTransferController.confirmTransfer(req, res));
 
+router.get('/transfer/balance/:companyId', (req, res: Response) => fundTransferController.getCompanyBalance(req, res));
+
 // 代垫费用管理
 router.post('/advance-expense', (req, res: Response) => advanceExpenseController.createExpense(req, res));
 

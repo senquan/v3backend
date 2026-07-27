@@ -339,6 +339,34 @@ export class FundTransferController {
 
       const numIds = ids.map((id: string | number) => parseInt(id as string));
 
+      // 下拨时（扣减）校验活期余额：按单位合计确认金额，不能超过活期余额
+      if (type !== 1) {
+        const confirmRecords = await queryRunner.manager.find(FundTransfer, {
+          where: { id: In(numIds), transferStatus: 1, transferType: type },
+        });
+
+        const companyAmounts: Record<number, number> = {};
+        for (const record of confirmRecords) {
+          companyAmounts[record.companyId] = (companyAmounts[record.companyId] || 0) + Number(record.transferAmount);
+        }
+
+        for (const [cid, totalAmount] of Object.entries(companyAmounts)) {
+          const companyId = parseInt(cid);
+          const summary = await queryRunner.manager.findOne(DepositLoanSummary, {
+            relations: ['company'],
+            where: { companyId },
+          });
+          if (!summary) continue;
+          const currentBalance = summary.getDepositCurrent();
+          if (totalAmount > currentBalance) {
+            await queryRunner.rollbackTransaction();
+            const label = type === 1 ? '上划' : '下拨';
+            return errorResponse(res, 400,
+              `单位"${summary.company?.companyName || companyId}"当前活期余额 ${currentBalance.toFixed(2)} 元，不足以${label}合计金额 ${totalAmount.toFixed(2)} 元`);
+          }
+        }
+      }
+
       const result = await queryRunner.manager.update(
         FundTransfer,
         { id: In(numIds), transferStatus: 1, transferType: type },
@@ -376,6 +404,30 @@ export class FundTransferController {
       return errorResponse(res, 500, `确认失败: ${error.message || error}`);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async getCompanyBalance(req: any, res: Response) {
+    try {
+      const companyId = parseInt(req.params.companyId);
+      if (!companyId) {
+        return errorResponse(res, 400, '请指定单位ID');
+      }
+
+      const summaryRepo = AppDataSource.getRepository(DepositLoanSummary);
+      const summary = await summaryRepo.findOne({
+        relations: ['company'],
+        where: { companyId },
+      });
+
+      const balance = summary ? summary.getDepositCurrent() : 0;
+      return successResponse(res, {
+        companyId,
+        balance,
+        companyName: summary?.company?.companyName || '',
+      }, '获取成功');
+    } catch (error) {
+      return errorResponse(res, 500, `获取活期余额失败: ${error}`);
     }
   }
 
