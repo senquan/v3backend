@@ -515,6 +515,22 @@ export class ImportDepositController {
         return errorResponse(res, 400, '记录已确认或状态不正确');
       }
 
+      // 活期转定期：校验活期余额
+      if (record.depositType === 2) {
+        const summary = await queryRunner.manager.findOne(DepositLoanSummary, {
+          relations: ['company'],
+          where: { companyId: record.companyId },
+        });
+        if (summary) {
+          const currentBalance = summary.getDepositCurrent();
+          if (Number(record.amount) > currentBalance) {
+            await queryRunner.rollbackTransaction();
+            return errorResponse(res, 400,
+              `单位"${summary.company?.companyName || record.companyId}"当前活期余额 ${currentBalance.toFixed(2)} 元，不足以转定期 ${Number(record.amount).toFixed(2)} 元`);
+          }
+        }
+      }
+
       record.status = 2;
       record.updatedBy = userId;
       const updated = await queryRunner.manager.save(FixedDeposit, record);
@@ -555,6 +571,31 @@ export class ImportDepositController {
       }
 
       const numIds = ids.map((id: string | number) => parseInt(id as string));
+
+      // 活期转定期：按单位合计金额校验活期余额
+      const toFixedRecords = await queryRunner.manager.find(FixedDeposit, {
+        where: { id: In(numIds), status: 1, depositType: 2 },
+      });
+      if (toFixedRecords.length > 0) {
+        const companyAmounts: Record<number, number> = {};
+        for (const record of toFixedRecords) {
+          companyAmounts[record.companyId] = (companyAmounts[record.companyId] || 0) + Number(record.amount);
+        }
+        for (const [cid, totalAmount] of Object.entries(companyAmounts)) {
+          const companyId = parseInt(cid);
+          const summary = await queryRunner.manager.findOne(DepositLoanSummary, {
+            relations: ['company'],
+            where: { companyId },
+          });
+          if (!summary) continue;
+          const currentBalance = summary.getDepositCurrent();
+          if (totalAmount > currentBalance) {
+            await queryRunner.rollbackTransaction();
+            return errorResponse(res, 400,
+              `单位"${summary.company?.companyName || companyId}"当前活期余额 ${currentBalance.toFixed(2)} 元，不足以转定期合计金额 ${totalAmount.toFixed(2)} 元`);
+          }
+        }
+      }
 
       // 1. 更新状态为已确认（status: 2）
       const result = await queryRunner.manager.update(
