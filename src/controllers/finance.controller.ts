@@ -8,7 +8,9 @@ import { PaymentReceive } from '../models/payment-receive.entity';
 import { AppDataSource } from '../config/database';
 import { successResponse, errorResponse } from '../utils/response';
 import { FixedDepositLog } from '../models/fixed-deposit-log.entity';
+import { FixedToCurrentInterestDetail } from '../models/f2c-interest-detail.entity';
 import { ProfitPaymentLog } from '../models/profit-payment-log.entity';
+import { InterestRate } from '../models/interest-rate.entity';
 import { RedisCacheService } from '../services/cache.service';
 import { ProfitPaymentService } from '../services/profit-payment.service';
 import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
@@ -155,6 +157,8 @@ export class ImportDepositController {
   private fixedDepositRepository = AppDataSource.getRepository(FixedDeposit);
   private dictRepository = AppDataSource.getRepository(Dict);
   private companyRepository = AppDataSource.getRepository(CompanyInfo);
+  private fixedToCurrentInterestRepository = AppDataSource.getRepository(FixedToCurrentInterestDetail);
+  private interestRateRepository = AppDataSource.getRepository(InterestRate);
 
   async importDeposit(req: any, res: Response) {
     try {
@@ -461,6 +465,10 @@ export class ImportDepositController {
         return errorResponse(res, 400, '记录状态不正确');
       }
 
+      if (Number(releaseAmount) > Number(record.remainingAmount)) {
+        return errorResponse(res, 400, '释放金额不能大于剩余金额');
+      }
+
       record.earlyRelease = 1;
       record.releaseDate = new Date(releaseDate);
       record.interestDays = interestDays;
@@ -479,6 +487,42 @@ export class ImportDepositController {
       fundLog.createdBy = userId;
       fundLog.createdAt = new Date();
       await queryRunner.manager.save(fundLog);
+
+      // 即刻入账：按活期利率计算上一次计息日到释放日的利息
+      // const today = new Date();
+      // const rate = await this.interestRateRepository.findOne({
+      //   where: { rateType: 1, status: 1 },
+      //   order: { createdAt: 'DESC' }
+      // });
+
+      // if (rate && Number(releaseAmount) > 0) {
+      //   const dailyRate = Number(rate.rateValue) / 100 / 360;
+      //   const interestStartDate = record.lastInterestDate
+      //     ? new Date(record.lastInterestDate)
+      //     : new Date(record.startDate);
+      //   const interestDaysCalc = Math.floor(
+      //     (new Date(releaseDate).getTime() - interestStartDate.getTime()) / (1000 * 60 * 60 * 24)
+      //   );
+
+      //   if (interestDaysCalc > 0) {
+      //     const interestAmount = Number(releaseAmount) * dailyRate * interestDaysCalc;
+
+      //     const detail = new FixedToCurrentInterestDetail();
+      //     detail.depositCode = record.depositCode;
+      //     detail.companyId = record.companyId;
+      //     detail.interestStartDate = interestStartDate;
+      //     detail.interestReleaseDate = new Date(releaseDate);
+      //     detail.releaseAmount = Number(releaseAmount);
+      //     detail.dailyRate = dailyRate;
+      //     detail.depositPeriod = record.depositPeriod;
+      //     detail.interestAmount = interestAmount;
+      //     detail.createdAt = today;
+      //     await queryRunner.manager.save(detail);
+
+      //     record.lastInterestDate = today;
+      //     await queryRunner.manager.save(record);
+      //   }
+      // }
 
       await queryRunner.commitTransaction();
 

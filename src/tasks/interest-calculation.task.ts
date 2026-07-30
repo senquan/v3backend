@@ -98,13 +98,21 @@ export class InterestCalculationTask {
         console.log(`新增单位 ${summary.company.companyName} 活期利息: 余额=${totalBalance}, 利息=${dailyInterest}`);
       }
 
-      const totalCurrentInterest = await this.dailyCurrentInterestRepository
+      const dailyInterestTotal = await this.dailyCurrentInterestRepository
         .createQueryBuilder('detail')
         .select('SUM(detail.dailyInterest)', 'total')
         .where('detail.companyId = :companyId', { companyId: summary.company.id })
         .getRawOne();
 
-      const totalInterestAmount = Number(totalCurrentInterest?.total || 0);
+      // 定期提前释放活期利息，合并入活期利息
+      const f2cInterestTotal = await this.fixedToCurrentInterestRepository
+        .createQueryBuilder('detail')
+        .select('SUM(detail.interestAmount)', 'total')
+        .where('detail.companyId = :companyId', { companyId: summary.company.id })
+        .getRawOne();
+
+      const totalInterestAmount =
+        (parseFloat(dailyInterestTotal?.total) || 0) + (parseFloat(f2cInterestTotal?.total) || 0);
       
       await this.depositLoanSummaryRepository.update(summary.id, {
         depositCurrentInterest: totalInterestAmount
@@ -135,10 +143,13 @@ export class InterestCalculationTask {
     const dailyRate = rate ? Number(rate.rateValue) / 100 / 360 : 0;
 
     for (const deposit of fixedDeposits) {
+      if (!deposit.releaseDate) continue;
+
+      // 以 releaseDate 作为唯一键去重，确保同一条释放记录只计息一次
       const existing = await this.fixedToCurrentInterestRepository.findOne({
         where: {
           depositCode: deposit.depositCode,
-          interestStartDate: deposit.startDate
+          interestReleaseDate: deposit.releaseDate
         }
       });
 
@@ -146,16 +157,22 @@ export class InterestCalculationTask {
         continue;
       }
 
-      const startDate = new Date(deposit.startDate);
-      const releaseDate = new Date(deposit.releaseDate!);
-      const interestDays = Math.floor((releaseDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const interestStartDate = new Date(deposit.startDate);
+      const releaseDate = new Date(deposit.releaseDate);
+      const interestDays = Math.floor(
+        (releaseDate.getTime() - interestStartDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (interestDays <= 0) {
+        continue;
+      }
 
       const interestAmount = Number(deposit.releaseAmount) * dailyRate * interestDays;
 
       await this.fixedToCurrentInterestRepository.save({
         depositCode: deposit.depositCode,
         companyId: deposit.companyId,
-        interestStartDate: deposit.startDate,
+        interestStartDate: interestStartDate,
         interestReleaseDate: deposit.releaseDate || today,
         releaseAmount: deposit.releaseAmount,
         dailyRate: dailyRate,

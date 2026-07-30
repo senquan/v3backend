@@ -4,6 +4,7 @@ import { ClearingSummary } from '../models/clearing-summary.entity';
 import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { ProfitPayment } from '../models/profit-payment.entity';
 import { FixedDeposit } from '../models/fixed-deposit.entity';
+import { FixedToCurrentInterestDetail } from '../models/f2c-interest-detail.entity';
 import { FundTransfer } from '../models/fund-transfer.entity';
 import { PaymentReceive } from '../models/payment-receive.entity';
 import { ClearingSnapshot } from '../models/clearing-snapshot.entity';
@@ -26,6 +27,8 @@ export class ClearingSummaryService {
   private fundTransferRepository = AppDataSource.getRepository(FundTransfer);
   private paymentReceiveRepository = AppDataSource.getRepository(PaymentReceive);
   private fixedDepositRepository = AppDataSource.getRepository(FixedDeposit);
+  private dailyCurrentInterestRepository = AppDataSource.getRepository(DailyCurrentInterestDetail);
+  private fixedToCurrentInterestRepository = AppDataSource.getRepository(FixedToCurrentInterestDetail);
 
   constructor(
     private clearingSummaryRepository: Repository<ClearingSummary>,
@@ -217,6 +220,21 @@ export class ClearingSummaryService {
     summary.depositToFixed = depositToFixed;
     summary.depositFromFixed = depositFromFixed;
     summary.depositFixed = depositFixedObj;
+
+    // 活期利息 = 每日活期利息 + 定期提前释放活期利息（合并列项）
+    const dailyResult = await this.dailyCurrentInterestRepository
+      .createQueryBuilder('detail')
+      .select('SUM(detail.dailyInterest)', 'total')
+      .where('detail.companyId = :companyId', { companyId })
+      .getRawOne();
+    const f2cResult = await this.fixedToCurrentInterestRepository
+      .createQueryBuilder('detail')
+      .select('SUM(detail.interestAmount)', 'total')
+      .where('detail.companyId = :companyId', { companyId })
+      .getRawOne();
+    summary.depositCurrentInterest =
+      (parseFloat(dailyResult?.total) || 0) + (parseFloat(f2cResult?.total) || 0);
+
     summary.lastStatDate = new Date();
     await this.depositLoanSummaryRepository.save(summary);
     await this.syncInternalDepositBalance(companyId);
@@ -412,6 +430,19 @@ async createSnapshot(name: string, cutoffDate: Date, userId: number) {
         .getRawMany();
       for (const r of currentInterestIds) saveLink('daily_current_interest_detail', Number(r.id), companyId, 'internalDepositBalance');
 
+      // 定期提前释放活期利息（合并入活期利息，下穿明细体现）
+      const f2cInterestSum = await queryRunner.manager.createQueryBuilder(FixedToCurrentInterestDetail, 'detail')
+        .select('SUM(detail.interestAmount)', 'total')
+        .where('detail.companyId = :companyId', { companyId })
+        .andWhere('detail.interestReleaseDate <= :cutoffDate', { cutoffDate })
+        .getRawOne();
+      const f2cInterestIds = await queryRunner.manager.createQueryBuilder(FixedToCurrentInterestDetail, 'd')
+        .select('d.id')
+        .where('d.companyId = :companyId', { companyId })
+        .andWhere('d.interestReleaseDate <= :cutoffDate', { cutoffDate })
+        .getRawMany();
+      for (const r of f2cInterestIds) saveLink('fixed_to_current_interest_detail', Number(r.id), companyId, 'internalDepositBalance');
+
       const fixedInterestSum = await queryRunner.manager.createQueryBuilder(DailyFixedInterestDetail, 'detail')
         .select('SUM(detail.interestAmount)', 'total')
         .where('detail.companyId = :companyId', { companyId })
@@ -433,6 +464,7 @@ async createSnapshot(name: string, cutoffDate: Date, userId: number) {
         Number(depositToFixed.total || 0) +
         Number(depositFixedTotal[0]?.remainingAmount || 0) +
         Number(currentInterestSum.total || 0) +
+        Number(f2cInterestSum.total || 0) +
         Number(fixedInterestSum.total || 0);
 
       // === 代垫费用 ===
