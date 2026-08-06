@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Dict } from '../models/dict.model';
 import { PlatformTags } from '../models/platform-tags.model';
+import { PlatformQuotationTemplateAssociation } from '../models/platform-quotation-template-association.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 import { Not, In } from 'typeorm';
@@ -113,7 +114,7 @@ export class DictController {
   // 创建字典
   async create(req: Request, res: Response): Promise<Response> {
     try {
-      const { name, value, icon, group, remark, tagIds } = req.body;
+      const { name, value, icon, group, remark, tagIds, template } = req.body;
       
       if (!name) {
         return errorResponse(res, 400, '字典名称不能为空', null);
@@ -146,6 +147,7 @@ export class DictController {
 
       const savedDict = await dictRepository.save(dict);
 
+      // 处理标签
       if (tagIds && Array.isArray(tagIds) && tagIds.length > 0) {
         for (const tagId of tagIds) {
           const tag = await AppDataSource.getRepository(PlatformTags).findOne({
@@ -162,6 +164,17 @@ export class DictController {
           }
         }
       }
+
+      // 当 group 为 1（平台）时，保存平台和报单模板的关系
+      if (Number(group) === 1 && template) {
+        const association = new PlatformQuotationTemplateAssociation();
+        association.platformId = Number(value);
+        association.templateId = Number(template);
+        association.type = 1; // 默认为普通报价单类型
+        association.isDeleted = 0;
+        await AppDataSource.getRepository(PlatformQuotationTemplateAssociation).save(association);
+        logger.info(`创建平台-模板关联: platformId=${association.platformId}, templateId=${association.templateId}`);
+      }
       
       return successResponse(res, savedDict, '创建字典成功');
     } catch (error) {
@@ -174,7 +187,7 @@ export class DictController {
   async update(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
-      const { name, value, icon, group, remark, tagIds } = req.body;
+      const { name, value, icon, group, remark, tagIds, template } = req.body;
       
       if (!name) {
         return errorResponse(res, 400, '字典名称不能为空', null);
@@ -220,7 +233,6 @@ export class DictController {
 
       // 更新平台标签
       if (Number(group) === 1) {
-        
         const tags = await AppDataSource.getRepository(PlatformTags).find({
           where: {
             platformId: Number(value)
@@ -231,9 +243,7 @@ export class DictController {
         const newTags = tagIds.filter((tag: any) => typeof tag === "number");
 
         if (oldTags.length !== newTags.length) {
-
           if (JSON.stringify([...oldTags].sort()) !== JSON.stringify([...newTags].sort())) {
-
             const tagsToDelete = oldTags.filter((tag: any) => !newTags.includes(tag));
             if (tagsToDelete.length > 0) {
               await AppDataSource.getRepository(PlatformTags).delete({
@@ -259,6 +269,26 @@ export class DictController {
               }
             }
           }
+        }
+
+        // 更新平台和报单模板的关联
+        const associationRepository = AppDataSource.getRepository(PlatformQuotationTemplateAssociation);
+        
+        // 删除旧的关联（如果存在）
+        await associationRepository.delete({
+          platformId: Number(value),
+          isDeleted: 0
+        });
+        
+        // 创建新的关联（如果提供了 template）
+        if (template) {
+          const association = new PlatformQuotationTemplateAssociation();
+          association.platformId = Number(value);
+          association.templateId = Number(template);
+          association.type = 1;
+          association.isDeleted = 0;
+          await associationRepository.save(association);
+          logger.info(`更新平台-模板关联: platformId=${association.platformId}, templateId=${association.templateId}`);
         }
       }
       

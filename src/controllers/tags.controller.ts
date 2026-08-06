@@ -5,6 +5,7 @@ import { Tag, TagType } from '../models/tag.model';
 import { Product } from '../models/product.model';
 import { ProductTag } from '../models/product-tag.model';
 import { PlatformTags } from '../models/platform-tags.model';
+import { PlatformQuotationTemplateAssociation } from '../models/platform-quotation-template-association.model';
 import { Dict } from '../models/dict.model';
 import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
@@ -173,8 +174,21 @@ export class TagsController {
         relations: ['tag']
       });
 
+      // 获取平台和报单模板的关联
+      const templateAssociation = await AppDataSource.getRepository(PlatformQuotationTemplateAssociation)
+        .createQueryBuilder('assoc')
+        .leftJoinAndSelect('assoc.template', 'template')
+        .where('assoc.platformId = :platformId', { platformId: Number(id) })
+        .andWhere('assoc.isDeleted = 0')
+        .orderBy('assoc.id', 'DESC')
+        .getOne();
+
       return successResponse(res, {
-        tags
+        tags,
+        template: templateAssociation ? {
+          id: templateAssociation.templateId,
+          templateName: templateAssociation.template?.templateName || ''
+        } : null
       }, '获取标签列表成功');
     } catch (error) {
       logger.error('获取平台标签失败:', error);

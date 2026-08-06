@@ -59,6 +59,8 @@ import { SystemLog, LogChain, LogArchive } from '../models/system-log.model';
 import { CsConversation } from '../models/cs-conversation.model';
 import { TicketConfirmation } from '../models/ticket-confirmation.model';
 import { TicketDepartment } from '../models/ticket-department.model';
+import { QuotationTemplate } from '../models/quotation-template.model';
+import { PlatformQuotationTemplateAssociation } from '../models/platform-quotation-template-association.model';
 
 // 加载环境变量
 dotenv.config();
@@ -76,7 +78,7 @@ export const AppDataSource = new DataSource({
   entities: [Bulletin, Category, Coupon, CouponUser, CsConfig, Customer, Department, Dict, Gallery, InviteCode, KnowledgeBase, KbDocument, QaPair, QaPairTag, Notification, Order, OrderCalculationLog, OrderItem, OrderStatusLog, Permission, PlatformTags, Product, ProductModel, ProductSeries, ProductSeriesTag,
     ProductTag, ProductTbSku, Promotion, PromotionPlatforms, PromotionRule, Role, RolePermission, RolePlatforms, RoleTags, ReturnOrder, ReturnOrderItem, Settings, SpecGroup, SpecItem, Staff, Tag, Ticket, TicketAttachment, TicketComment, TicketFollowUpConfig, TicketFollowUpStage, TicketFollowUpRecord, User,
     UserRole, PromotionV3, PromotionRuleV3, ShortLink, ExpressTracking, ExpressCompany,
-    SystemLog, LogChain, LogArchive, CsConversation, TicketConfirmation, TicketDepartment, GalleryLog,
+    SystemLog, LogChain, LogArchive, CsConversation, TicketConfirmation, TicketDepartment, QuotationTemplate, PlatformQuotationTemplateAssociation, GalleryLog,
   ],
   migrations: [__dirname + '/../migrations/**/*.ts'],
   subscribers: [__dirname + '/../subscribers/**/*.ts'],

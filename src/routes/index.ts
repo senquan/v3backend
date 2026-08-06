@@ -20,6 +20,7 @@ import ticketRoutes  from './ticket.routes';
 import settingsRoutes  from './settings.routes';
 import notificationRoutes  from './notification.routes';
 import galleryRoutes  from './gallery.routes';
+import quotationTemplatesRoutes from './quotation_templates.routes';
 import wsRoutes from './ws.routes';
 import shortLinkRoutes from './short-link.routes';
 import expressRoutes from './express.routes';
@@ -58,6 +59,7 @@ router.use('/v1/ticket', ticketRoutes);
 router.use('/v1/settings', settingsRoutes);
 router.use('/v1/notifications', notificationRoutes);
 router.use('/v1/gallery', galleryRoutes);
+router.use('/v1/quotation-templates', quotationTemplatesRoutes);
 router.use('/v1/ws', wsRoutes)
 router.use('/v1/s', shortLinkRoutes)
 router.use('/v1/express', expressRoutes)
