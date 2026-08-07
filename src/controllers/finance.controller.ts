@@ -483,46 +483,57 @@ export class ImportDepositController {
       fundLog.logType = 1;
       fundLog.logTime = record.releaseDate;
       fundLog.amount = Number(releaseAmount);
-      fundLog.remark = `定期资金释放，释放日期：${record.releaseDate.toLocaleDateString()}`;
+      fundLog.remark = interestDays;
       fundLog.createdBy = userId;
       fundLog.createdAt = new Date();
       await queryRunner.manager.save(fundLog);
 
       // 即刻入账：按活期利率计算上一次计息日到释放日的利息
-      // const today = new Date();
-      // const rate = await this.interestRateRepository.findOne({
-      //   where: { rateType: 1, status: 1 },
-      //   order: { createdAt: 'DESC' }
-      // });
+      const today = new Date();
+      const rate = await this.interestRateRepository.findOne({
+        where: { rateType: 1, status: 1 },
+        order: { createdAt: 'DESC' }
+      });
 
-      // if (rate && Number(releaseAmount) > 0) {
-      //   const dailyRate = Number(rate.rateValue) / 100 / 360;
-      //   const interestStartDate = record.lastInterestDate
-      //     ? new Date(record.lastInterestDate)
-      //     : new Date(record.startDate);
-      //   const interestDaysCalc = Math.floor(
-      //     (new Date(releaseDate).getTime() - interestStartDate.getTime()) / (1000 * 60 * 60 * 24)
-      //   );
+      if (rate && Number(releaseAmount) > 0) {
+        const dailyRate = Number(rate.rateValue) / 100 / 360;
+        const interestDaysCalc = interestDays;
 
-      //   if (interestDaysCalc > 0) {
-      //     const interestAmount = Number(releaseAmount) * dailyRate * interestDaysCalc;
+        if (interestDaysCalc > 0) {
+          const releaseDateObj = new Date(releaseDate);
+          // 统一归零时间部分，确保日期比较一致
+          releaseDateObj.setHours(0, 0, 0, 0);
+          // 按 interestDays 倒推计息起始日
+          const startDate = new Date(releaseDateObj);
+          startDate.setDate(startDate.getDate() - interestDaysCalc);
 
-      //     const detail = new FixedToCurrentInterestDetail();
-      //     detail.depositCode = record.depositCode;
-      //     detail.companyId = record.companyId;
-      //     detail.interestStartDate = interestStartDate;
-      //     detail.interestReleaseDate = new Date(releaseDate);
-      //     detail.releaseAmount = Number(releaseAmount);
-      //     detail.dailyRate = dailyRate;
-      //     detail.depositPeriod = record.depositPeriod;
-      //     detail.interestAmount = interestAmount;
-      //     detail.createdAt = today;
-      //     await queryRunner.manager.save(detail);
+          // 去重检查：避免与定时任务重复创建
+          const existing = await queryRunner.manager.findOne(FixedToCurrentInterestDetail, {
+            where: { depositCode: record.depositCode, interestReleaseDate: releaseDateObj }
+          });
+          if (existing) {
+            console.log(`定期转活期利息已存在: ${record.depositCode}, releaseDate=${releaseDate}`);
+          } else {
+            const dailyRate = Number(rate.rateValue) / 100 / 360;
+            const interestAmount = Number(releaseAmount) * dailyRate * interestDaysCalc;
 
-      //     record.lastInterestDate = today;
-      //     await queryRunner.manager.save(record);
-      //   }
-      // }
+            const detail = new FixedToCurrentInterestDetail();
+            detail.depositCode = record.depositCode;
+            detail.companyId = record.companyId;
+            detail.interestStartDate = startDate;
+            detail.interestReleaseDate = releaseDateObj;
+            detail.releaseAmount = Number(releaseAmount);
+            detail.dailyRate = dailyRate;
+            detail.depositPeriod = record.depositPeriod;
+            detail.interestAmount = interestAmount;
+            detail.createdAt = today;
+            await queryRunner.manager.save(detail);
+          }
+
+          record.lastInterestDate = today;
+          await queryRunner.manager.save(record);
+        }
+      }
 
       await queryRunner.commitTransaction();
 

@@ -157,11 +157,13 @@ export class InterestCalculationTask {
         continue;
       }
 
-      const interestStartDate = new Date(deposit.startDate);
+      // 以 releaseDate 作为唯一键去重，确保同一条释放记录只计息一次
       const releaseDate = new Date(deposit.releaseDate);
-      const interestDays = Math.floor(
-        (releaseDate.getTime() - interestStartDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
+      releaseDate.setHours(0, 0, 0, 0); // 统一归零时间部分
+      // 按用户输入的 interestDays 倒推计息起始日
+      const interestDays = deposit.interestDays;
+      const interestStartDate = new Date(releaseDate);
+      interestStartDate.setDate(interestStartDate.getDate() - interestDays);
 
       if (interestDays <= 0) {
         continue;
@@ -173,7 +175,7 @@ export class InterestCalculationTask {
         depositCode: deposit.depositCode,
         companyId: deposit.companyId,
         interestStartDate: interestStartDate,
-        interestReleaseDate: deposit.releaseDate || today,
+        interestReleaseDate: releaseDate,
         releaseAmount: deposit.releaseAmount,
         dailyRate: dailyRate,
         depositPeriod: deposit.depositPeriod,
