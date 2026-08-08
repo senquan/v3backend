@@ -52,21 +52,29 @@ export class QuotationTemplatesController {
         return errorResponse(res, 400, 'platformId 不能为空', null)
       }
 
-      // 先查找平台和模板的关联
-      const association = await AppDataSource.getRepository(PlatformQuotationTemplateAssociation)
+      // 一次查询该平台所有模板关联
+      const associations = await AppDataSource.getRepository(PlatformQuotationTemplateAssociation)
         .createQueryBuilder('assoc')
         .leftJoinAndSelect('assoc.template', 'template')
         .where('assoc.platformId = :platformId', { platformId: Number(platformId) })
-        .andWhere('assoc.type = :type', { type: Number(type) || 1 })
         .andWhere('assoc.isDeleted = 0')
         .andWhere('template.isDeleted = 0')
-        .getOne()
+        .getMany()
+
+      // 优先匹配当前 type
+      const requestedType = Number(type) || 1
+      let association = associations.find(a => a.type === requestedType)
+
+      // 没有则回退 type=1
+      if (!association && requestedType !== 1) {
+        association = associations.find(a => a.type === 1)
+      }
 
       if (association) {
         return successResponse(res, association.template, '获取模板成功')
       }
 
-      // 如果没有关联，返回启用的默认模板
+      // 再没有则返回全局默认模板
       const defaultTemplate = await AppDataSource.getRepository(QuotationTemplate)
         .createQueryBuilder('template')
         .where('template.isEnabled = 1')
