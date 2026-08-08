@@ -13,78 +13,73 @@ export class ImageProcessorController {
    */
   async generateThumbnails(uploadsDir?: string): Promise<void> {
     try {
-      // 获取当前目录
       const currentDir = process.cwd();
-      // uploads目录路径
       const uploadPath = uploadsDir || process.env.UPLOAD_PATH || './uploads';
       const fullUploadDir = path.join(currentDir, uploadPath);
-      
-      // 检查uploads目录是否存在
+
       if (!fs.existsSync(fullUploadDir)) {
         logger.error(`uploads目录不存在: ${fullUploadDir}`);
         return;
       }
-      
-      // thumb子目录路径
+
       const thumbDir = path.join(fullUploadDir, 'thumb');
-      
-      // 确保thumb目录存在
       if (!fs.existsSync(thumbDir)) {
         fs.mkdirSync(thumbDir, { recursive: true });
         logger.info(`创建thumb目录: ${thumbDir}`);
       }
-      
-      // 读取uploads目录中的所有文件
+
+      const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff'];
+
+      const processFile = async (relativePath: string): Promise<number> => {
+        const filePath = path.join(fullUploadDir, relativePath);
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile()) {
+          return 0;
+        }
+        const ext = path.extname(relativePath).toLowerCase();
+        if (!imageExts.includes(ext)) {
+          return 0;
+        }
+        const thumbFilePath = path.join(thumbDir, relativePath);
+        fs.mkdirSync(path.dirname(thumbFilePath), { recursive: true });
+        if (fs.existsSync(thumbFilePath)) {
+          return -1;
+        }
+        await sharp(filePath)
+          .resize({ height: 200, withoutEnlargement: true })
+          .jpeg({ quality: 80 })
+          .toFile(thumbFilePath);
+        logger.info(`已生成缩略图: ${relativePath}`);
+        return 1;
+      };
+
+      const results: number[] = [];
       const files = fs.readdirSync(fullUploadDir);
-      logger.info(`在uploads目录中找到 ${files.length} 个文件`);
-      
-      let processedCount = 0;
-      let skippedCount = 0;
-      let errorCount = 0;
-      
-      // 遍历所有文件
+      logger.info(`在uploads目录中找到 ${files.length} 个条目`);
+
+      const tasks: Promise<number>[] = [];
       for (const file of files) {
-        // 跳过thumb目录
         if (file === 'thumb') {
           continue;
         }
-        
         const filePath = path.join(fullUploadDir, file);
-        
-        // 检查是否是文件（而不是目录）
-        if (!fs.statSync(filePath).isFile()) {
-          continue;
-        }
-        
-        // 检查是否是图片文件
-        const ext = path.extname(file).toLowerCase();
-        if (!['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff'].includes(ext)) {
-          continue;
-        }
-        
-        try {
-          // 检查thumb目录中是否已存在同名文件
-          const thumbFilePath = path.join(thumbDir, file);
-          if (fs.existsSync(thumbFilePath)) {
-            logger.debug(`缩略图已存在，跳过: ${file}`);
-            skippedCount++;
-            continue;
+        const stat = fs.statSync(filePath);
+        if (stat.isDirectory()) {
+          for (const subFile of fs.readdirSync(filePath)) {
+            tasks.push(processFile(path.join(file, subFile)));
           }
-          
-          // 生成缩略图（固定高度100px，宽度按比例缩放）
-          await sharp(filePath)
-            .resize({ height: 100, withoutEnlargement: true })
-            .jpeg({ quality: 80 }) // 统一输出为JPEG格式以减小文件大小
-            .toFile(thumbFilePath);
-          
-          logger.info(`已生成缩略图: ${file}`);
-          processedCount++;
-        } catch (err) {
-          logger.error(`生成缩略图失败 ${file}: ${err}`);
-          errorCount++;
+        } else if (stat.isFile()) {
+          tasks.push(processFile(file));
         }
       }
-      
+
+      for (const result of await Promise.all(tasks)) {
+        results.push(result);
+      }
+
+      const processedCount = results.filter(r => r === 1).length;
+      const skippedCount = results.filter(r => r === -1).length;
+      const errorCount = tasks.length - processedCount - skippedCount;
       logger.info(`缩略图生成完成: 处理了 ${processedCount} 个文件, 跳过 ${skippedCount} 个文件, 失败 ${errorCount} 个`);
     } catch (error) {
       logger.error(`缩略图生成失败: ${error}`);
@@ -234,12 +229,12 @@ export class ImageProcessorController {
                 gallery.mimeType = mimeType;
                 gallery.width = width || 0;
                 gallery.height = height || 0;
-                gallery.thumbnailUrl = image.replace('uploads/', 'uploads/thumb/');;
+                gallery.thumbnailUrl = image.replace(/\/uploads\//, '/uploads/thumb/');
                 gallery.categoryId = 1;
                 gallery.altText = product.name;
                 gallery.sortOrder = 0;
                 gallery.uploadBy = 1;
-                const savedGallery = await galleryRepository.save(gallery);
+                await galleryRepository.save(gallery);
                 insertCount++;
                 imageCache.push(image);
               } else {

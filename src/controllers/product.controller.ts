@@ -476,7 +476,7 @@ export class ProductController {
             gallery.mimeType = file.type || "application/octet-stream";
             gallery.width = file.width || 0;
             gallery.height = file.height || 0;
-            gallery.thumbnailUrl = gallery.fileUrl.replace('uploads/', 'uploads/thumb/');
+            gallery.thumbnailUrl = gallery.fileUrl.replace(/\/uploads\//, '/uploads/thumb/');
             gallery.categoryId = 1;
             gallery.altText = gallery.fileName;
             gallery.sortOrder = 0;
@@ -640,7 +640,7 @@ export class ProductController {
               gallery.mimeType = file.type || "application/octet-stream";
               gallery.width = file.width || 0;
               gallery.height = file.height || 0;
-              gallery.thumbnailUrl = gallery.fileUrl.replace('uploads/', 'uploads/thumb/');
+              gallery.thumbnailUrl = gallery.fileUrl.replace(/\/uploads\//, '/uploads/thumb/');
               gallery.categoryId = 1;
               gallery.altText = gallery.fileName;
               gallery.sortOrder = 0;

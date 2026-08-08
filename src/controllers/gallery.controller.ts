@@ -143,17 +143,19 @@ export class GalleryController {
       const userId = (req as any).user?.id;
 
       const gallery = new Gallery();
-      gallery.title = title;
+      const resolvedFileUrl = fileUrl || filePath || "";
+      const fileInfo = this.getFileInfo(resolvedFileUrl);
+      gallery.title = title || fileInfo.title || "unnamed";
       gallery.description = description;
       gallery.fileName = fileName;
       gallery.filePath = filePath;
-      gallery.fileUrl = fileUrl;
+      gallery.fileUrl = resolvedFileUrl;
       gallery.fileSize = fileSize;
       gallery.fileType = fileType;
       gallery.mimeType = mimeType;
       gallery.width = width || 0;
       gallery.height = height || 0;
-      gallery.thumbnailUrl = thumbnailUrl;
+      gallery.thumbnailUrl = thumbnailUrl || resolvedFileUrl.replace(/\/uploads\//, '/uploads/thumb/');
       gallery.categoryId = categoryId;
       gallery.altText = altText;
       gallery.sortOrder = sortOrder || 0;
@@ -209,13 +211,13 @@ export class GalleryController {
       files.forEach(async (file: any) => {
         const info = this.getFileInfo(file.url);
         const gallery = new Gallery();
-        gallery.title = title || info.fileName || "unnamed";
+        gallery.title = title || info.title || "unnamed";
         gallery.fileName = info.fileName || "unnamed";
         gallery.filePath = file.url;
         gallery.fileUrl = file.url;
         gallery.fileType = info.fileType;
         gallery.mimeType = file.type || "application/octet-stream";
-        gallery.thumbnailUrl = file.url.replace('uploads/', 'uploads/thumb/');
+        gallery.thumbnailUrl = file.url.replace(/\/uploads\//, '/uploads/thumb/');
         gallery.fileSize = file.size;
         gallery.width = file.width || 0;
         gallery.height = file.height || 0;
@@ -263,9 +265,12 @@ export class GalleryController {
   }
 
   getFileInfo(fileUrl: string) {
-    const fileType = fileUrl.split(".")[1];
+    const fileName = fileUrl.split("/").pop() || "";
+    const title = fileName.replace(/\.[^.]+$/, "");
+    const fileType = fileName.split(".").pop() || "";
     return {
-      fileName: fileUrl.split("/").pop(),
+      fileName,
+      title,
       fileType
     }
   }
