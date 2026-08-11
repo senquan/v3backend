@@ -12,6 +12,9 @@ export class FixedToCurrentInterestDetail {
   @Column({ type: 'bigint', comment: '单位ID' })
   companyId!: number;
 
+  @Column({ type: 'bigint', comment: '资金释放记录ID', nullable: true })
+  fundLogId!: number | null;
+
   @Column({ type: 'date', comment: '计息起始日期' })
   interestStartDate!: Date;
 

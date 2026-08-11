@@ -342,6 +342,7 @@ export class AdvanceExpenseController {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
+    let successCount = 0;
     try {
       const { expenses, batchNo, businessYear } = req.body;
 
@@ -414,7 +415,7 @@ export class AdvanceExpenseController {
 
         const expense = new AdvanceExpense();
         expense.batchNo = currentBatchNo;
-        expense.advanceCode = item.advanceCode || this.generateAdvanceCode();
+        expense.advanceCode = item.advanceCode || `AE${currentBatchNo}${i + 1}`;
         expense.companyId = companyNameToId.get(item.companyName) || 0;
         expense.expenseType = expenseTypeId;
         expense.amount = parseFloat(item.amount);
@@ -425,8 +426,9 @@ export class AdvanceExpenseController {
         expense.updatedBy = userId;
 
         const savedExpense = await queryRunner.manager.save(expense);
+        successCount++;
 
-        // 创建代垫费用明细
+               // 创建代垫费用明细
         if (item.details && item.details.length > 0) {
 
           let sum = 0;
@@ -465,6 +467,7 @@ export class AdvanceExpenseController {
 
       return successResponse(res, {
         success: true,
+        successCount: successCount,
         total: expenses.length,
         batchNo: currentBatchNo
       }, '导入成功');

@@ -433,7 +433,7 @@ export class ImportDepositController {
       return errorResponse(res, 401, '未认证用户');
     }
 
-    const { earlyRelease, releaseDate, interestDays, releaseAmount } = req.body;
+    const { earlyRelease, releaseDate, interestDays, releaseAmount, remark } = req.body;
 
     if (earlyRelease !== 1) {
       return errorResponse(res, 400, 'earlyRelease 必须为 1');
@@ -483,12 +483,13 @@ export class ImportDepositController {
       fundLog.logType = 1;
       fundLog.logTime = record.releaseDate;
       fundLog.amount = Number(releaseAmount);
-      fundLog.remark = interestDays;
+      fundLog.interestDays = interestDays;
+      fundLog.remark = remark;
       fundLog.createdBy = userId;
       fundLog.createdAt = new Date();
       await queryRunner.manager.save(fundLog);
 
-      // 即刻入账：按活期利率计算上一次计息日到释放日的利息
+      // 即刻入账：按活期利率计算计息天数的利息
       const today = new Date();
       const rate = await this.interestRateRepository.findOne({
         where: { rateType: 1, status: 1 },
@@ -496,7 +497,6 @@ export class ImportDepositController {
       });
 
       if (rate && Number(releaseAmount) > 0) {
-        const dailyRate = Number(rate.rateValue) / 100 / 360;
         const interestDaysCalc = interestDays;
 
         if (interestDaysCalc > 0) {
@@ -507,12 +507,12 @@ export class ImportDepositController {
           const startDate = new Date(releaseDateObj);
           startDate.setDate(startDate.getDate() - interestDaysCalc);
 
-          // 去重检查：避免与定时任务重复创建
+          // 去重检查：以资金释放记录ID作为唯一键
           const existing = await queryRunner.manager.findOne(FixedToCurrentInterestDetail, {
-            where: { depositCode: record.depositCode, interestReleaseDate: releaseDateObj }
+            where: { fundLogId: fundLog.id }
           });
           if (existing) {
-            console.log(`定期转活期利息已存在: ${record.depositCode}, releaseDate=${releaseDate}`);
+            console.log(`定期转活期利息已存在: fundLogId=${fundLog.id}`);
           } else {
             const dailyRate = Number(rate.rateValue) / 100 / 360;
             const interestAmount = Number(releaseAmount) * dailyRate * interestDaysCalc;
@@ -520,10 +520,11 @@ export class ImportDepositController {
             const detail = new FixedToCurrentInterestDetail();
             detail.depositCode = record.depositCode;
             detail.companyId = record.companyId;
+            detail.fundLogId = fundLog.id;
             detail.interestStartDate = startDate;
             detail.interestReleaseDate = releaseDateObj;
             detail.releaseAmount = Number(releaseAmount);
-            detail.dailyRate = dailyRate;
+            detail.dailyRate = dailyRate * 100;
             detail.depositPeriod = record.depositPeriod;
             detail.interestAmount = interestAmount;
             detail.createdAt = today;

@@ -8,7 +8,7 @@ export class AdvanceExpense {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id!: number;
 
-  @Column({ type: 'varchar', length: 50, unique: true, comment: '垫付编号' })
+  @Column({ type: 'varchar', length: 50, comment: '垫付编号' })
   advanceCode!: string;
 
   @Column({ type: 'bigint', comment: '单位ID' })

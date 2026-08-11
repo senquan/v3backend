@@ -19,6 +19,9 @@ export class FixedDepositLog {
   @Column({ type: 'decimal', precision: 18, scale: 2, comment: '金额' })
   amount!: number;
 
+  @Column({ type: 'smallint', default: 0, comment: '计息天数' })
+  interestDays!: number;
+
   @Column({ type: 'varchar', length: 500, nullable: true, comment: '备注' })
   remark!: string | null;
 

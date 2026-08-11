@@ -13,7 +13,7 @@ const fixedToCurrentRepository = AppDataSource.getRepository(FixedToCurrentInter
 const interestDetailService = new InterestDetailService(dailyInterestRepository, dailyFixedRepository, fixedToCurrentRepository);
 
 export class InterestDetailController {
-  async getDailyInterest(req: Request, res: Response): Promise<Response> {
+  async getDailyInterestAll(req: Request, res: Response): Promise<Response> {
     try {
       const result = await interestDetailService.getDailyInterestAll(req.query);
       return successResponse(res, result, '查询成功');

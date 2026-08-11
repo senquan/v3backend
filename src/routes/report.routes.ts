@@ -25,7 +25,7 @@ router.get('/clearing-snapshots/drill-down', clearingSummaryController.getDrillD
 router.get('/deposit-loan-summary', depositLoanSummaryController.getAll);
 router.get('/deposit-loan-summary/:id', depositLoanSummaryController.getById);
 
-router.get('/daily-interest', interestDetailController.getDailyInterest);
+router.get('/daily-interest', interestDetailController.getDailyInterestAll);
 router.get('/daily-fixed-interest', interestDetailController.getDailyFixedInterest);
 router.get('/fixed-to-current-interest', interestDetailController.getFixedToCurrentInterest);
 

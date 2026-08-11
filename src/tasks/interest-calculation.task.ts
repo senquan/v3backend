@@ -6,6 +6,7 @@ import { DepositLoanSummary } from '../models/deposit-loan-summary.entity';
 import { DailyCurrentInterestDetail } from '../models/current-interest-detail.entity';
 import { DailyFixedInterestDetail } from '../models/fixed-interest-detail.entity';
 import { FixedToCurrentInterestDetail } from '../models/f2c-interest-detail.entity';
+import { FixedDepositLog } from '../models/fixed-deposit-log.entity';
 import { InterestRate } from '../models/interest-rate.entity';
 import { LessThanOrEqual } from 'typeorm';
 import { summaryEventEmitter, SummaryEvents } from '../events/summary-events';
@@ -15,6 +16,7 @@ export class InterestCalculationTask {
   private dailyCurrentInterestRepository = AppDataSource.getRepository(DailyCurrentInterestDetail);
   private dailyFixedInterestRepository = AppDataSource.getRepository(DailyFixedInterestDetail);
   private fixedToCurrentInterestRepository = AppDataSource.getRepository(FixedToCurrentInterestDetail);
+  private fixedDepositLogRepository = AppDataSource.getRepository(FixedDepositLog);
   private interestRateRepository = AppDataSource.getRepository(InterestRate);
   private depositLoanSummaryRepository = AppDataSource.getRepository(DepositLoanSummary);
 
@@ -127,14 +129,15 @@ export class InterestCalculationTask {
   private async calculateFixedToCurrentInterest(today: Date) {
     console.log('开始计算定期转活期利息...');
 
-    const fixedDeposits = await this.fixedDepositRepository.find({
+    // 查询所有资金释放记录（一条定期可能有多次释放）
+    const logs = await this.fixedDepositLogRepository.find({
       where: {
-        earlyRelease: 1,
-        releaseDate: LessThanOrEqual(today),
-        status: 2
-      }
+        logType: 1,
+        logTime: LessThanOrEqual(today)
+      },
+      relations: ['deposit']
     });
-    console.log(`共 ${fixedDeposits.length} 条提前释放记录`);
+    console.log(`共 ${logs.length} 条资金释放记录`);
 
     const rate = await this.interestRateRepository.findOne({
       where: { rateType: 1, status: 1 },
@@ -142,26 +145,23 @@ export class InterestCalculationTask {
     });
     const dailyRate = rate ? Number(rate.rateValue) / 100 / 360 : 0;
 
-    for (const deposit of fixedDeposits) {
-      if (!deposit.releaseDate) continue;
+    for (const log of logs) {
+      if (!log.deposit) continue;
 
-      // 以 releaseDate 作为唯一键去重，确保同一条释放记录只计息一次
+      // 以 fundLogId 作为唯一键去重，确保每条释放记录只计息一次
       const existing = await this.fixedToCurrentInterestRepository.findOne({
-        where: {
-          depositCode: deposit.depositCode,
-          interestReleaseDate: deposit.releaseDate
-        }
+        where: { fundLogId: log.id }
       });
 
       if (existing) {
         continue;
       }
 
-      // 以 releaseDate 作为唯一键去重，确保同一条释放记录只计息一次
-      const releaseDate = new Date(deposit.releaseDate);
-      releaseDate.setHours(0, 0, 0, 0); // 统一归零时间部分
-      // 按用户输入的 interestDays 倒推计息起始日
-      const interestDays = deposit.interestDays;
+      const deposit = log.deposit;
+      const releaseDate = new Date(log.logTime);
+      releaseDate.setHours(0, 0, 0, 0);
+      // 按日志中的计息天数倒推计息起始日
+      const interestDays = Number(log.interestDays || 0);
       const interestStartDate = new Date(releaseDate);
       interestStartDate.setDate(interestStartDate.getDate() - interestDays);
 
@@ -169,14 +169,15 @@ export class InterestCalculationTask {
         continue;
       }
 
-      const interestAmount = Number(deposit.releaseAmount) * dailyRate * interestDays;
+      const interestAmount = Number(log.amount) * dailyRate * interestDays;
 
       await this.fixedToCurrentInterestRepository.save({
         depositCode: deposit.depositCode,
         companyId: deposit.companyId,
+        fundLogId: log.id,
         interestStartDate: interestStartDate,
         interestReleaseDate: releaseDate,
-        releaseAmount: deposit.releaseAmount,
+        releaseAmount: log.amount,
         dailyRate: dailyRate,
         depositPeriod: deposit.depositPeriod,
         interestAmount: interestAmount
@@ -186,7 +187,7 @@ export class InterestCalculationTask {
         lastInterestDate: today
       });
 
-      console.log(`计算定期转活期利息: ${deposit.depositCode}, 释放金额=${deposit.releaseAmount}, 计息天数=${interestDays}, 利息=${interestAmount}`);
+      console.log(`计算定期转活期利息: ${deposit.depositCode}, 释放金额=${log.amount}, 计息天数=${interestDays}, 利息=${interestAmount}`);
     }
 
     console.log('定期转活期利息计算完成');
