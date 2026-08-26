@@ -380,6 +380,24 @@ export class TicketController {
         .take(Number(pageSize))
         .getMany();
       
+      // 附加当前用户对每个工单的确认状态（供列表显示确认图标）
+      if (tickets.length > 0) {
+        const ticketIds = tickets.map((t: Ticket) => t.id);
+        const myConfirmations = await AppDataSource.getRepository(TicketConfirmation)
+          .createQueryBuilder('tc')
+          .where('tc.ticketId IN (:...ticketIds)', { ticketIds })
+          .andWhere('tc.userId = :userId', { userId })
+          .getMany();
+        const confirmationMap = new Map<number, TicketConfirmation>(
+          myConfirmations.map((c) => [c.ticketId, c])
+        );
+        for (const ticket of tickets) {
+          const my = confirmationMap.get(ticket.id);
+          (ticket as any).myConfirmedAt = my?.confirmedAt || null;
+          (ticket as any).myConfirmationRequired = !!my;
+        }
+      }
+      
       return successResponse(res, {
         tickets,
         total,
@@ -1316,6 +1334,55 @@ export class TicketController {
       }, '获取确认进度成功');
     } catch (error) {
       logger.error('获取确认进度失败:', error);
+      return errorResponse(res, 500, '服务器内部错误', null);
+    }
+  }
+
+  // 获取确认记录（分页，按确认先后排序）
+  async getConfirmations(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
+
+      const ticket = await AppDataSource.getRepository(Ticket).findOne({
+        where: { id: Number(id), isDeleted: 0 }
+      });
+      if (!ticket) {
+        return errorResponse(res, 404, '工单不存在', null);
+      }
+
+      // 获取该工单全部确认记录（单工单数据量小，内存中排序分页，避免 orderBy 表达式 + 联表 getManyAndCount 的兼容性问题）
+      const confirmations = await AppDataSource.getRepository(TicketConfirmation).find({
+        where: { ticketId: Number(id) },
+        relations: { user: { staff: { dept: true } } }
+      });
+
+      // 按确认先后排序：已确认在前（按确认时间升序），未确认在后
+      confirmations.sort((a, b) => {
+        const aConfirmed = !!a.confirmedAt;
+        const bConfirmed = !!b.confirmedAt;
+        if (aConfirmed !== bConfirmed) return aConfirmed ? -1 : 1;
+        if (aConfirmed && bConfirmed) {
+          return a.confirmedAt!.getTime() - b.confirmedAt!.getTime();
+        }
+        return a.id - b.id;
+      });
+
+      const total = confirmations.length;
+      const list = confirmations.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize).map(c => ({
+        id: c.id,
+        userId: c.userId,
+        userName: c.user?.staff?.name || c.user?.name || c.user?.username || '',
+        department: c.user?.staff?.dept?.name || '',
+        position: c.user?.staff?.position || '',
+        confirmed: !!c.confirmedAt,
+        confirmedAt: c.confirmedAt
+      }));
+
+      return successResponse(res, { list, total, page, pageSize }, '获取确认记录成功');
+    } catch (error) {
+      logger.error('获取确认记录失败:', error);
       return errorResponse(res, 500, '服务器内部错误', null);
     }
   }

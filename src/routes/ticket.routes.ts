@@ -34,6 +34,9 @@ router.post('/:id/reply', ticketController.reply);
 router.post('/:id/acknowledge', ticketController.acknowledgeReceipt);
 router.get('/:id/confirmation-progress', ticketController.getConfirmationProgress);
 
+// 获取确认记录（分页）
+router.get('/:id/confirmations', ticketController.getConfirmations);
+
 // 工单附件
 //router.post('/:id/attachments', uploadMiddleware.single('file'), ticketController.uploadAttachment);
 
