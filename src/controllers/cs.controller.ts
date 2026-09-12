@@ -58,9 +58,13 @@ export class CsController {
         payload.backend_url = `http://localhost:${process.env.PORT || 5002}`;
       }
 
-      // 调用 ai-gateway /cs/chat
+      // 调用 ai-gateway /cs/chat（携带内部令牌）
+      const internalToken = process.env.INTERNAL_TOKEN || '';
+      const headers: Record<string, string> = {};
+      if (internalToken) headers['X-Internal-Token'] = internalToken;
       const resp = await axios.post(`${AI_GATEWAY_URL}/cs/chat`, payload, {
         timeout: 120000,
+        headers,
       });
 
       const data = resp.data;

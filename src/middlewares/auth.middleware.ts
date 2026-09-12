@@ -29,7 +29,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     // 验证 token
     const decoded = jwt.verify(
       token, 
-      process.env.JWT_SECRET || 'your-secret-key'
+      process.env.JWT_SECRET as string
     ) as JwtPayload;
     
     if (!decoded || !decoded.id) return errorResponse(res, 401, '无效的认证令牌');

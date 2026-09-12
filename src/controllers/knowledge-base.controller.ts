@@ -7,6 +7,8 @@ import { logger } from '../utils/logger';
 import { errorResponse, successResponse } from '../utils/response';
 
 const AI_GATEWAY_URL = process.env.AI_GATEWAY_URL || 'http://localhost:8000';
+const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || '';
+const internalHeaders = INTERNAL_TOKEN ? { 'X-Internal-Token': INTERNAL_TOKEN } : {};
 
 export class KnowledgeBaseController {
   // 获取知识库列表
@@ -336,7 +338,7 @@ export class KnowledgeBaseController {
         doc_id: doc.id,
         title: doc.title,
         content: doc.content,
-      }, { timeout: 120000 });
+      }, { timeout: 120000, headers: internalHeaders });
 
       if (resp.data?.status === 'ok') {
         doc.status = DocStatus.PARSED;
@@ -363,7 +365,7 @@ export class KnowledgeBaseController {
         doc_id: doc.id,
         title: doc.title,
         content: doc.content,
-      }, { timeout: 120000 });
+      }, { timeout: 120000, headers: internalHeaders });
 
       if (resp.data?.status === 'ok') {
         doc.status = DocStatus.PARSED;
@@ -384,7 +386,7 @@ export class KnowledgeBaseController {
       await axios.post(`${AI_GATEWAY_URL}/knowledge/remove-doc`, {
         kb_id: String(kbId),
         doc_id: docId,
-      }, { timeout: 30000 });
+      }, { timeout: 30000, headers: internalHeaders });
       logger.info(`文档向量已清理 kb=${kbId}, doc_id=${docId}`);
     } catch (error: any) {
       logger.warn(`清理向量失败(可忽略) kb=${kbId}, doc_id=${docId}: ${error.message}`);

@@ -3,8 +3,12 @@ import { LogService, LogQuery } from '../services/log.service';
 import { LogLevel, LogCategory } from '../models/system-log.model';
 import { AppDataSource } from '../config/database';
 import { SystemLog, LogChain } from '../models/system-log.model';
+import { authMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router();
+
+// 所有日志接口需要登录鉴权（防止未授权读取/删除系统日志）
+router.use(authMiddleware);
 
 const logRepository = AppDataSource.getRepository(SystemLog);
 const chainRepository = AppDataSource.getRepository(LogChain);

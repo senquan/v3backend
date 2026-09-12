@@ -100,7 +100,7 @@ export class AuthService {
     try {
       const decoded = jwt.verify(
         refreshToken,
-        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
+        process.env.JWT_REFRESH_SECRET!,
       ) as { id: number };
 
       const user = await this.userRepository.findOne({
@@ -180,7 +180,7 @@ export class AuthService {
       accessPlatforms: user.getRolePlatforms(),
     };
 
-    return jwt.sign(payload, process.env.JWT_SECRET || 'your-secret-key', {
+    return jwt.sign(payload, process.env.JWT_SECRET!, {
       expiresIn: '2h',
     });
   }
@@ -188,7 +188,7 @@ export class AuthService {
   private generateRefreshToken(user: User): string {
     return jwt.sign(
       { id: user.id },
-      process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
+      process.env.JWT_REFRESH_SECRET!,
       { expiresIn: '7d' },
     );
   }

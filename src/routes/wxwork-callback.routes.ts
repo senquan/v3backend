@@ -4,6 +4,7 @@ import { WxWorkBot } from '../bot/wxwork-bot';
 import { expressTrackingService } from '../services/express-tracking.service';
 import { successResponse, errorResponse } from '../utils/response';
 import { logger } from '../utils/logger';
+import { authMiddleware } from '../middlewares/auth.middleware';
 
 const router = Router();
 const callbackHandler = wxWorkCallbackHandler;
@@ -16,6 +17,9 @@ router.get('/callback', async (req: Request, res: Response) => {
 router.post('/callback', async (req: Request, res: Response) => {
   await callbackHandler.handleCallback(req, res);
 });
+
+// 以下为主动外发消息接口，必须登录鉴权（防止伪造推送）
+router.use(authMiddleware);
 
 // 发送消息给用户（通过应用消息接口）
 router.post('/send', async (req: Request, res: Response) => {

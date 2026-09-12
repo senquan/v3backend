@@ -58,7 +58,7 @@ export class WebSocketService {
       try {
         // 解析JWT token获取用户ID
         const jwt = require('jsonwebtoken');
-        const secret = process.env.JWT_SECRET || 'your-secret-key';
+        const secret = process.env.JWT_SECRET as string;
         const decoded = jwt.verify(token, secret) as { id: string; iat: number; exp: number };
         userId = decoded.id.toString();
       } catch (error) {

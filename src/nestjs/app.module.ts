@@ -20,7 +20,7 @@ import { join } from 'path';
     ScheduleModule.forRoot(),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
+      secret: process.env.JWT_SECRET!,
       signOptions: { expiresIn: '2h' },
     }),
     DatabaseModule,

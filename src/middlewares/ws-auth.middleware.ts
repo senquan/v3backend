@@ -80,7 +80,7 @@ const validateToken = async (token: string): Promise<string | null> => {
   try {
     // 导入JWT库进行验证
     const jwt = await import('jsonwebtoken');
-    const secret = process.env.JWT_SECRET || 'your-secret-key';
+    const secret = process.env.JWT_SECRET as string;
     
     // 验证JWT token
     const decoded = jwt.default.verify(token, secret) as { id: string; iat: number; exp: number };

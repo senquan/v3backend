@@ -28,7 +28,7 @@ export class AuthGuard implements CanActivate {
     const token = parts[1];
     try {
       // 验证 token
-      const secret = process.env.JWT_SECRET || 'your-secret-key';
+      const secret = process.env.JWT_SECRET as string;
       const decoded = jwt.verify(token, secret);
       
       // 将解码后的用户信息附加到请求对象上，以便后续使用

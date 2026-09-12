@@ -66,7 +66,7 @@ export class UserController {
           accessTags: tagIds,
           accessPlatforms: userPlatforms 
         },
-        process.env.JWT_SECRET || 'ei(@3kdl20KS21020alsa12',
+        process.env.JWT_SECRET as string,
         { expiresIn: '24h' }
       );
 
